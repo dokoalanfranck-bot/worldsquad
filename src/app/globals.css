@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0A0A0F;
+  --bg-card: #0D0D17;
+  --bg-elevated: #12121f;
+  --accent-gold: #F5C518;
+  --accent-neon: #00D4FF;
+  --accent-purple: #A855F7;
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --border-subtle: rgba(255, 255, 255, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.font-bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
+
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.glass-elevated {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+@keyframes holo-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.holo-effect {
+  background: linear-gradient(
+    125deg,
+    transparent 0%,
+    rgba(255,0,128,0.15) 10%,
+    rgba(255,165,0,0.15) 20%,
+    rgba(255,255,0,0.15) 30%,
+    rgba(0,255,128,0.15) 40%,
+    rgba(0,200,255,0.15) 50%,
+    rgba(128,0,255,0.15) 60%,
+    rgba(255,0,200,0.15) 70%,
+    transparent 100%
+  );
+  background-size: 300% 300%;
+  animation: holo-shift 4s ease infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, #F5C518 0%, #fff 40%, #F5C518 60%, #F5C518 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 10px rgba(245,197,24,0.3); }
+  50%       { box-shadow: 0 0 30px rgba(245,197,24,0.6); }
+}
+.pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }
+
+@keyframes pulse-neon {
+  0%, 100% { box-shadow: 0 0 10px rgba(0,212,255,0.3); }
+  50%       { box-shadow: 0 0 30px rgba(0,212,255,0.6); }
+}
+.pulse-neon { animation: pulse-neon 2s ease-in-out infinite; }
+
+@keyframes vip-border {
+  0%, 100% { border-color: #F5C518; }
+  50%       { border-color: #fff; }
+}
+.vip-border { animation: vip-border 2s linear infinite; border-width: 2px; border-style: solid; }
+
+@keyframes loading-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+  animation: loading-shimmer 1.5s infinite;
+}
+
+.dashboard-content { padding-left: 0; }
+@media (min-width: 1024px) { .dashboard-content { padding-left: 256px; } }
+
+.countdown-digit {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  color: var(--accent-gold);
+  text-shadow: 0 0 20px rgba(245,197,24,0.5);
+}
