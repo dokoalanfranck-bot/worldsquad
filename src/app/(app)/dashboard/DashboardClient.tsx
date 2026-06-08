@@ -184,6 +184,7 @@ export function DashboardClient({
             <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-4">Ta Carte</p>
             <div className="flex flex-col items-center gap-3">
               {profile.card_image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={profile.card_image_url}
                   alt="Carte supporter"

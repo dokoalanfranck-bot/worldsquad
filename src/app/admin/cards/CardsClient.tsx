@@ -245,6 +245,7 @@ export function CardsClient({
                   <tr key={card.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-3 py-2.5">
                       {card.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={card.image_url} alt={card.name}
                           className="w-9 h-9 rounded-lg object-contain bg-white/5"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}

@@ -294,6 +294,7 @@ export function CardFormClient({ card, ownersCount = 0 }: CardFormClientProps) {
             {/* Card preview header */}
             <div className="flex items-center gap-3">
               {form.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={form.image_url}
                   alt={form.name}
