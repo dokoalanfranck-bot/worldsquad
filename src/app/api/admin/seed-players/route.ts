@@ -138,10 +138,25 @@ export async function POST() {
 
   const admin = createAdminClient()
 
-  // 1. Delete existing player cards
+  // 1. Sauvegarder les images uploadées manuellement (Supabase Storage)
+  const { data: existingCards } = await admin
+    .from('cards')
+    .select('name, image_url')
+    .eq('type', 'player')
+    .not('image_url', 'is', null)
+
+  // Garder uniquement les images uploadées manuellement (stockées sur Supabase)
+  const savedImages: Record<string, string> = {}
+  for (const card of existingCards ?? []) {
+    if (card.image_url?.includes('supabase.co')) {
+      savedImages[card.name] = card.image_url
+    }
+  }
+
+  // 2. Supprimer les cartes existantes
   await admin.from('cards').delete().eq('type', 'player')
 
-  // 2. Collect all players + coaches from squads
+  // 3. Collect all players + coaches from squads
   type RawPlayer = { name: string; pos: string; team: string; isCoach?: boolean }
   const allPlayers: RawPlayer[] = []
   for (const squad of WC2026_SQUADS) {
@@ -175,7 +190,7 @@ export async function POST() {
       type: 'player' as const,
       name: p.name,
       rarity,
-      image_url: photoMap[p.name] ?? null,
+      image_url: savedImages[p.name] ?? photoMap[p.name] ?? null,
       nation: p.team,
       description: p.isCoach ? `${flag} ${p.team} · Coach` : `${flag} ${p.team} · ${p.pos}`,
       stats: {
