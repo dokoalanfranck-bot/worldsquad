@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -166,7 +166,7 @@ const KNOCKOUT_MATCHES = [
   { a: 'TBD', b: 'TBD', date: '2026-07-19T19:00:00Z', phase: 'final', venue: 'New York/New Jersey', label: 'FINALE' },
 ]
 
-export async function POST(_req: NextRequest) {
+export async function POST() {
   // Auth check
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
