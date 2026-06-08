@@ -36,7 +36,7 @@ export default async function GroupPage() {
     )
   }
 
-  const group = membership.group as { id: string; name: string; code: string; creator_id: string | null }
+  const group = membership.group as unknown as { id: string; name: string; code: string; creator_id: string | null }
 
   const [{ data: members }, { data: activities }] = await Promise.all([
     supabase
@@ -51,14 +51,17 @@ export default async function GroupPage() {
       .limit(30),
   ])
 
+  type MemberUser = { id: string; pseudo: string; photo_url: string | null; nation: string; coins: number; predictions_correct: number; battles_won: number; card_image_url: string | null }
+
   const leaderboard = (members ?? [])
-    .map((m) => m.user)
-    .sort((a: any, b: any) => (b?.coins ?? 0) - (a?.coins ?? 0))
+    .map((m) => m.user as unknown as MemberUser | null)
+    .filter((u): u is MemberUser => u !== null)
+    .sort((a, b) => (b.coins ?? 0) - (a.coins ?? 0))
 
   return (
     <GroupClient
       group={group}
-      leaderboard={leaderboard as any[]}
+      leaderboard={leaderboard}
       activities={activities ?? []}
       currentUserId={user!.id}
     />

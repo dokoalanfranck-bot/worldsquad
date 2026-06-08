@@ -3,17 +3,30 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
+import {
+  LayoutDashboard,
+  Calendar,
+  Layers,
+  Swords,
+  Users,
+  Trophy,
+  ShoppingBag,
+  Settings,
+  Crown,
+  Globe,
+  type LucideIcon,
+} from 'lucide-react'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User } from '@/types'
 
-const NAV_ITEMS = [
-  { href: '/dashboard', icon: '🏠', label: 'Dashboard' },
-  { href: '/matches', icon: '⚽', label: 'Matchs & Pronostics' },
-  { href: '/collection', icon: '🃏', label: 'Ma Collection' },
-  { href: '/battles', icon: '⚔️', label: 'Battles' },
-  { href: '/group', icon: '👥', label: 'Mon Groupe' },
-  { href: '/leaderboard', icon: '🏆', label: 'Classement' },
-  { href: '/shop', icon: '🪙', label: 'Boutique' },
+const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
+  { href: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/matches',     icon: Calendar,        label: 'Matchs & Pronostics' },
+  { href: '/collection',  icon: Layers,          label: 'Ma Collection' },
+  { href: '/battles',     icon: Swords,          label: 'Battles' },
+  { href: '/group',       icon: Users,           label: 'Mon Groupe' },
+  { href: '/leaderboard', icon: Trophy,          label: 'Classement' },
+  { href: '/shop',        icon: ShoppingBag,     label: 'Boutique' },
 ]
 
 interface SidebarProps {
@@ -29,7 +42,7 @@ export function Sidebar({ user }: SidebarProps) {
       <aside className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-[#0D0D17] border-r border-white/5 z-40 py-6 px-4">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2 mb-8 px-2">
-          <span className="text-2xl">⚽</span>
+          <Globe size={22} className="text-[#F5C518]" />
           <span
             className="text-2xl font-black text-white tracking-wider"
             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
@@ -68,7 +81,7 @@ export function Sidebar({ user }: SidebarProps) {
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <span className="text-lg">{item.icon}</span>
+                  <item.icon size={18} />
                   <span className="font-medium text-sm">{item.label}</span>
                   {isActive && (
                     <motion.div
@@ -86,7 +99,7 @@ export function Sidebar({ user }: SidebarProps) {
         {user.is_vip && (
           <div className="px-2 mt-4">
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#F5C518]/10 border border-[#F5C518]/30">
-              <span>👑</span>
+              <Crown size={14} className="text-[#F5C518]" />
               <span className="text-[#F5C518] font-bold text-sm">Membre VIP</span>
             </div>
           </div>
@@ -97,7 +110,7 @@ export function Sidebar({ user }: SidebarProps) {
           href="/settings"
           className="flex items-center gap-3 px-3 py-2 mt-4 text-gray-500 hover:text-gray-300 transition-colors text-sm"
         >
-          <span>⚙️</span>
+          <Settings size={16} />
           Paramètres
         </Link>
       </aside>
@@ -115,7 +128,7 @@ export function Sidebar({ user }: SidebarProps) {
                   isActive ? 'text-[#F5C518]' : 'text-gray-500'
                 }`}
               >
-                <span className="text-xl">{item.icon}</span>
+                <item.icon size={20} />
                 <span className="text-xs font-medium leading-tight">
                   {item.label.split(' ')[0]}
                 </span>

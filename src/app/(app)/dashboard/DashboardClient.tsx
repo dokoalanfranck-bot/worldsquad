@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { Calendar, Gift, Swords, ShoppingBag, Crown, Target, Check, X, Clock, Users, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User, Match, Prediction, GroupActivity } from '@/types'
@@ -13,7 +14,6 @@ interface Props {
   recentPredictions: (Prediction & { match: Match })[]
   group: { id: string; name: string; code: string } | null
   groupActivity: (GroupActivity & { user: { pseudo: string; photo_url: string | null } | null })[]
-  groupLeaderboard: Array<{ id: string; pseudo: string; photo_url: string | null; nation: string; coins: number; predictions_correct: number; battles_won: number } | null>
 }
 
 function Countdown({ targetDate }: { targetDate: string }) {
@@ -58,7 +58,6 @@ export function DashboardClient({
   recentPredictions,
   group,
   groupActivity,
-  groupLeaderboard,
 }: Props) {
   const [liveActivities, setLiveActivities] = useState(groupActivity)
   const supabase = createClient()
@@ -115,8 +114,8 @@ export function DashboardClient({
         <div className="flex items-center gap-3">
           <CoinDisplay amount={profile.coins} size="lg" />
           {profile.is_vip && (
-            <span className="bg-[#F5C518]/10 border border-[#F5C518]/30 text-[#F5C518] text-xs font-bold px-2 py-1 rounded-lg">
-              👑 VIP
+            <span className="inline-flex items-center gap-1 bg-[#F5C518]/10 border border-[#F5C518]/30 text-[#F5C518] text-xs font-bold px-2 py-1 rounded-lg">
+              <Crown size={11} /> VIP
             </span>
           )}
         </div>
@@ -168,9 +167,10 @@ export function DashboardClient({
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-center">
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <Target size={14} className="text-[#F5C518]" />
                   <span className="text-sm text-[#F5C518] font-bold group-hover:underline">
-                    ⚽ Faire mon pronostic →
+                    Faire mon pronostic →
                   </span>
                 </div>
               </div>
@@ -244,23 +244,23 @@ export function DashboardClient({
                     </div>
                     <div className="flex items-center gap-2">
                       {pred.status === 'correct_score' && (
-                        <span className="text-xs bg-green-500/10 text-green-400 font-bold px-2 py-0.5 rounded">
-                          +300 🪙
+                        <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-400 font-bold px-2 py-0.5 rounded">
+                          <Check size={10} /> +300
                         </span>
                       )}
                       {pred.status === 'correct_winner' && (
-                        <span className="text-xs bg-blue-500/10 text-blue-400 font-bold px-2 py-0.5 rounded">
-                          +100 🪙
+                        <span className="inline-flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 font-bold px-2 py-0.5 rounded">
+                          <Check size={10} /> +100
                         </span>
                       )}
                       {pred.status === 'wrong' && (
-                        <span className="text-xs bg-red-500/10 text-red-400 font-bold px-2 py-0.5 rounded">
-                          Raté
+                        <span className="inline-flex items-center gap-1 text-xs bg-red-500/10 text-red-400 font-bold px-2 py-0.5 rounded">
+                          <X size={10} /> Raté
                         </span>
                       )}
                       {pred.status === 'pending' && (
-                        <span className="text-xs bg-white/5 text-gray-500 font-bold px-2 py-0.5 rounded">
-                          En attente
+                        <span className="inline-flex items-center gap-1 text-xs bg-white/5 text-gray-500 font-bold px-2 py-0.5 rounded">
+                          <Clock size={10} /> En attente
                         </span>
                       )}
                     </div>
@@ -308,7 +308,9 @@ export function DashboardClient({
         {!group && (
           <motion.div variants={item}>
             <div className="glass rounded-2xl p-6 border border-[#F5C518]/10 text-center">
-              <div className="text-4xl mb-3">👥</div>
+              <div className="flex justify-center mb-3">
+                <Users size={40} className="text-gray-600" />
+              </div>
               <p className="text-white font-bold mb-1">Pas encore dans un groupe</p>
               <p className="text-gray-500 text-sm mb-4">Rejoins tes amis pour jouer ensemble</p>
               <Link
@@ -331,7 +333,9 @@ export function DashboardClient({
                   whileTap={{ scale: 0.97 }}
                   className="glass rounded-xl p-4 text-center border border-white/5 hover:border-white/15 transition-colors cursor-pointer"
                 >
-                  <div className="text-3xl mb-2">{action.icon}</div>
+                  <div className="flex justify-center mb-2">
+                    <action.icon size={28} className="text-[#F5C518]" />
+                  </div>
                   <div className="text-white font-bold text-sm">{action.label}</div>
                   <div className="text-gray-600 text-xs mt-0.5">{action.sub}</div>
                 </motion.div>
@@ -344,9 +348,9 @@ export function DashboardClient({
   )
 }
 
-const QUICK_ACTIONS = [
-  { href: '/matches', icon: '⚽', label: 'Pronostics', sub: '104 matchs' },
-  { href: '/packs', icon: '🎁', label: 'Ouvrir un pack', sub: 'Dès 100 coins' },
-  { href: '/battles', icon: '⚔️', label: 'Battle', sub: 'Défie tes potes' },
-  { href: '/shop', icon: '🪙', label: 'Boutique', sub: 'Acheter des coins' },
+const QUICK_ACTIONS: { href: string; icon: LucideIcon; label: string; sub: string }[] = [
+  { href: '/matches', icon: Calendar,    label: 'Pronostics',    sub: '104 matchs' },
+  { href: '/packs',   icon: Gift,        label: 'Ouvrir un pack', sub: 'Dès 100 coins' },
+  { href: '/battles', icon: Swords,      label: 'Battle',        sub: 'Défie tes potes' },
+  { href: '/shop',    icon: ShoppingBag, label: 'Boutique',      sub: 'Acheter des coins' },
 ]

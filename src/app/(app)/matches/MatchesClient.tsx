@@ -156,7 +156,6 @@ function MatchCard({
 
 export function MatchesClient({ matches, predictionsByMatch, userNation }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
-  const [phaseFilter, setPhaseFilter] = useState<string>('all')
 
   const todayStr = new Date().toDateString()
 
@@ -166,9 +165,6 @@ export function MatchesClient({ matches, predictionsByMatch, userNation }: Props
     if (filter === 'group') return m.phase === 'group'
     if (filter === 'knockout') return m.phase !== 'group'
     return true
-  }).filter((m) => {
-    if (phaseFilter === 'all') return true
-    return m.phase === phaseFilter
   })
 
   const grouped = filtered.reduce((acc, m) => {

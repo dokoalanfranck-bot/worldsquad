@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 
 const COIN_PACKS = [
@@ -51,7 +51,6 @@ const VIP_PACK = {
 
 export default function ShopPage() {
   const [loading, setLoading] = useState<string | null>(null)
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const success = searchParams.get('success')

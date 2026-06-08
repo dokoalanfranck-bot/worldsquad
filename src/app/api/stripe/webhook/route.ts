@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-02-24.acacia' })
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')!
 
@@ -29,19 +30,36 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminClient()
   const coins = parseInt(coinsGranted)
 
-  await Promise.all([
-    supabase.from('users').update({ coins: supabase.rpc as never }).eq('id', userId),
-    supabase.rpc('increment_coins', { user_id: userId, delta: coins }),
-    supabase.from('coin_transactions').insert({
-      user_id: userId,
-      amount: coins,
-      reason: `Achat ${packType}`,
-    }),
-    supabase
-      .from('purchases')
-      .update({ status: 'completed' })
-      .eq('stripe_session_id', session.id),
-  ])
+  // Get current coins
+  const { data: user } = await supabase
+    .from('users')
+    .select('coins')
+    .eq('id', userId)
+    .single()
+
+  if (user && coins > 0) {
+    await Promise.all([
+      supabase
+        .from('users')
+        .update({ coins: user.coins + coins })
+        .eq('id', userId),
+      supabase.from('coin_transactions').insert({
+        user_id: userId,
+        amount: coins,
+        reason: `Achat ${packType}`,
+      }),
+    ])
+  }
+
+  await supabase
+    .from('purchases')
+    .update({ status: 'completed' })
+    .eq('stripe_session_id', session.id)
+
+  // Grant VIP if applicable
+  if (packType === 'vip') {
+    await supabase.from('users').update({ is_vip: true }).eq('id', userId)
+  }
 
   return NextResponse.json({ success: true })
 }

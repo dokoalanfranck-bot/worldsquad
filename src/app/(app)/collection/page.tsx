@@ -15,7 +15,7 @@ export default async function CollectionPage() {
   return (
     <CollectionClient
       allCards={allCards ?? []}
-      ownedIds={[...ownedIds]}
+      ownedIds={Array.from(ownedIds)}
     />
   )
 }
