@@ -1,52 +1,68 @@
 'use client'
 
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useTransition, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { GameCard } from '@/components/ui/Card'
-import type { Card, CardRarity, CardType } from '@/types'
+import type { Card } from '@/types'
 import { RARITY_COLORS } from '@/types'
 
 interface Props {
-  allCards: Card[]
+  ownedCards: Card[]
+  notOwnedCards: Card[]
   ownedIds: string[]
+  totalCards: number
+  currentPage: number
+  totalPages: number
+  notOwnedCount: number
+  currentType: string
+  currentRarity: string
 }
 
-export function CollectionClient({ allCards, ownedIds }: Props) {
-  const [filterType, setFilterType] = useState<CardType | 'all'>('all')
-  const [filterRarity, setFilterRarity] = useState<CardRarity | 'all'>('all')
+export function CollectionClient({
+  ownedCards, notOwnedCards, ownedIds,
+  totalCards, currentPage, totalPages, notOwnedCount,
+  currentType, currentRarity,
+}: Props) {
+  const router = useRouter()
+  const [, startTransition] = useTransition()
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
-
   const ownedSet = new Set(ownedIds)
 
-  const filtered = allCards.filter((c) => {
-    if (filterType !== 'all' && c.type !== filterType) return false
-    if (filterRarity !== 'all' && c.rarity !== filterRarity) return false
-    return true
-  })
+  const navigate = (updates: Record<string, string | number>) => {
+    const params = new URLSearchParams()
+    const type   = String(updates.type   ?? currentType)
+    const rarity = String(updates.rarity ?? currentRarity)
+    const p      = String(updates.page   ?? 1)
 
-  const owned = filtered.filter((c) => ownedSet.has(c.id))
-  const notOwned = filtered.filter((c) => !ownedSet.has(c.id))
+    if (type   !== 'all') params.set('type', type)
+    if (rarity !== 'all') params.set('rarity', rarity)
+    if (p !== '1')        params.set('page', p)
+
+    startTransition(() => router.push(`/collection?${params.toString()}`))
+  }
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-4xl font-black text-white mb-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             MA COLLECTION
           </h1>
           <p className="text-gray-500 text-sm">
-            <span className="text-[#F5C518] font-bold">{ownedIds.length}</span> / {allCards.length} cartes collectées
+            <span className="text-[#F5C518] font-bold">{ownedIds.length}</span> / {totalCards} cartes collectées
           </p>
         </div>
-        {/* Progress bar */}
         <div className="w-40 hidden sm:block">
           <div className="text-right text-xs text-gray-500 mb-1">
-            {Math.round((ownedIds.length / allCards.length) * 100)}%
+            {totalCards > 0 ? Math.round((ownedIds.length / totalCards) * 100) : 0}%
           </div>
           <div className="h-2 bg-white/5 rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(ownedIds.length / allCards.length) * 100}%` }}
+              animate={{ width: `${totalCards > 0 ? (ownedIds.length / totalCards) * 100 : 0}%` }}
               className="h-full bg-[#F5C518] rounded-full"
             />
           </div>
@@ -57,84 +73,104 @@ export function CollectionClient({ allCards, ownedIds }: Props) {
       <div className="flex flex-wrap gap-2 mb-6">
         <div className="flex gap-1.5">
           {(['all', 'player', 'nation', 'trophy'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
+            <button key={t} onClick={() => navigate({ type: t, page: 1 })}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize ${
-                filterType === t
+                currentType === t
                   ? 'bg-[#F5C518] text-black'
                   : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/5'
-              }`}
-            >
+              }`}>
               {t === 'all' ? 'Tous' : t}
             </button>
           ))}
         </div>
         <div className="flex gap-1.5">
           {(['all', 'Common', 'Rare', 'Epic', 'Legend'] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => setFilterRarity(r)}
+            <button key={r} onClick={() => navigate({ rarity: r, page: 1 })}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                filterRarity === r
-                  ? 'text-black'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/5'
+                currentRarity === r ? 'text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/5'
               }`}
-              style={filterRarity === r && r !== 'all' ? { background: RARITY_COLORS[r] } : filterRarity === r ? { background: '#F5C518', color: '#000' } : {}}
-            >
+              style={currentRarity === r && r !== 'all'
+                ? { background: RARITY_COLORS[r] }
+                : currentRarity === r ? { background: '#F5C518', color: '#000' } : {}}>
               {r === 'all' ? 'Toutes' : r}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Owned cards */}
-      {owned.length > 0 && (
+      {/* Owned */}
+      {ownedCards.length > 0 && (
         <div className="mb-8">
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
-            Possédées ({owned.length})
+            Possédées ({ownedIds.length})
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-            {owned.map((card) => (
-              <GameCard
-                key={card.id}
-                card={card}
-                owned
-                size="sm"
-                onClick={() => setSelectedCard(card)}
-              />
+            {ownedCards.map((card) => (
+              <GameCard key={card.id} card={card} owned size="sm" onClick={() => setSelectedCard(card)} />
             ))}
           </div>
         </div>
       )}
 
       {/* Not owned */}
-      {notOwned.length > 0 && (
+      {(notOwnedCards.length > 0 || notOwnedCount > 0) && (
         <div>
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
-            Non possédées ({notOwned.length})
+            Non possédées ({notOwnedCount})
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-            {notOwned.map((card) => (
-              <GameCard
-                key={card.id}
-                card={card}
-                owned={false}
-                size="sm"
-                onClick={() => setSelectedCard(card)}
-              />
+            {notOwnedCards.map((card) => (
+              <GameCard key={card.id} card={card} owned={false} size="sm" onClick={() => setSelectedCard(card)} />
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <button
+                onClick={() => navigate({ page: currentPage - 1 })}
+                disabled={currentPage <= 1}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-white/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" /> Préc.
+              </button>
+
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4))
+                const p = start + i
+                return (
+                  <button key={p} onClick={() => navigate({ page: p })}
+                    className={`w-9 h-9 rounded-lg text-xs font-bold transition-colors ${
+                      p === currentPage
+                        ? 'bg-[#F5C518] text-black'
+                        : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'
+                    }`}>
+                    {p}
+                  </button>
+                )
+              })}
+
+              <button
+                onClick={() => navigate({ page: currentPage + 1 })}
+                disabled={currentPage >= totalPages}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-white/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                Suiv. <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <p className="text-center text-white/20 text-xs mt-3">
+            Page {currentPage} / {totalPages} · {notOwnedCount} cartes
+          </p>
         </div>
       )}
 
-      {/* Card detail modal */}
+      {/* Modal */}
       <AnimatePresence>
         {selectedCard && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
             onClick={() => setSelectedCard(null)}
           >
@@ -160,7 +196,9 @@ export function CollectionClient({ allCards, ownedIds }: Props) {
                   )}
                   {selectedCard.stats && Object.keys(selectedCard.stats).length > 0 && (
                     <div className="space-y-1.5">
-                      {Object.entries(selectedCard.stats).map(([key, val]) => (
+                      {Object.entries(selectedCard.stats)
+                        .filter(([k]) => k !== 'position')
+                        .map(([key, val]) => (
                         <div key={key} className="flex items-center justify-between">
                           <span className="text-xs text-gray-500 uppercase">{key}</span>
                           <div className="flex items-center gap-2">
@@ -185,10 +223,8 @@ export function CollectionClient({ allCards, ownedIds }: Props) {
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedCard(null)}
-                className="w-full mt-4 py-2 border border-white/10 text-gray-500 hover:text-white rounded-xl transition-colors text-sm font-semibold"
-              >
+              <button onClick={() => setSelectedCard(null)}
+                className="w-full mt-4 py-2 border border-white/10 text-gray-500 hover:text-white rounded-xl transition-colors text-sm font-semibold">
                 Fermer
               </button>
             </motion.div>
