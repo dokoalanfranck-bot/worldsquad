@@ -19,7 +19,7 @@ export async function debitCoins(
   userId: string,
   amount: number,
   reason: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; newBalance?: number; error?: string }> {
   const supabase = createAdminClient()
 
   const { data: user } = await supabase
@@ -32,15 +32,12 @@ export async function debitCoins(
     return { success: false, error: 'Coins insuffisants' }
   }
 
+  const newBalance = user.coins - amount
+
   await Promise.all([
-    supabase
-      .from('users')
-      .update({ coins: user.coins - amount })
-      .eq('id', userId),
-    supabase
-      .from('coin_transactions')
-      .insert({ user_id: userId, amount: -amount, reason }),
+    supabase.from('users').update({ coins: newBalance }).eq('id', userId),
+    supabase.from('coin_transactions').insert({ user_id: userId, amount: -amount, reason }),
   ])
 
-  return { success: true }
+  return { success: true, newBalance }
 }

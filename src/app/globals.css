@@ -14,10 +14,19 @@
   --text-primary: #FFFFFF;
   --text-secondary: #9CA3AF;
   --border-subtle: rgba(255, 255, 255, 0.05);
+  /* Safe area insets for iPhone notch / Dynamic Island */
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
 }
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* Prevent elastic bounce scroll on iOS */
+  overscroll-behavior: none;
 }
 
 body {
@@ -25,15 +34,21 @@ body {
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  min-height: 100dvh;
+  /* Smooth scroll on iOS */
+  -webkit-overflow-scrolling: touch;
 }
 
+/* Hide scrollbars but keep functionality */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
 .font-bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
 
+/* Glass morphism */
 .glass {
   background: rgba(255,255,255,0.03);
   backdrop-filter: blur(20px);
@@ -44,9 +59,11 @@ body {
 .glass-elevated {
   background: rgba(255,255,255,0.06);
   backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255,255,255,0.1);
 }
 
+/* Holo card effect */
 @keyframes holo-shift {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
@@ -71,6 +88,7 @@ body {
   mix-blend-mode: screen;
 }
 
+/* Text shimmer */
 @keyframes shimmer {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }
@@ -85,6 +103,7 @@ body {
   animation: shimmer 3s linear infinite;
 }
 
+/* Glow animations */
 @keyframes pulse-gold {
   0%, 100% { box-shadow: 0 0 10px rgba(245,197,24,0.3); }
   50%       { box-shadow: 0 0 30px rgba(245,197,24,0.6); }
@@ -97,12 +116,20 @@ body {
 }
 .pulse-neon { animation: pulse-neon 2s ease-in-out infinite; }
 
+@keyframes pulse-purple {
+  0%, 100% { box-shadow: 0 0 10px rgba(168,85,247,0.3); }
+  50%       { box-shadow: 0 0 30px rgba(168,85,247,0.6); }
+}
+.pulse-purple { animation: pulse-purple 2s ease-in-out infinite; }
+
+/* VIP border */
 @keyframes vip-border {
   0%, 100% { border-color: #F5C518; }
   50%       { border-color: #fff; }
 }
 .vip-border { animation: vip-border 2s linear infinite; border-width: 2px; border-style: solid; }
 
+/* Skeleton loading */
 @keyframes loading-shimmer {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
@@ -122,9 +149,11 @@ body {
   animation: loading-shimmer 1.5s infinite;
 }
 
+/* Layout */
 .dashboard-content { padding-left: 0; }
 @media (min-width: 1024px) { .dashboard-content { padding-left: 256px; } }
 
+/* Countdown digits */
 .countdown-digit {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 2rem;
@@ -132,6 +161,7 @@ body {
   text-shadow: 0 0 20px rgba(245,197,24,0.5);
 }
 
+/* Scrolling ticker */
 @keyframes scroll-left {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -140,3 +170,79 @@ body {
   animation: scroll-left 40s linear infinite;
 }
 .animate-scroll-left:hover { animation-play-state: paused; }
+
+/* ── Card flip 3D ─────────────────────────────────── */
+.card-3d { transform-style: preserve-3d; }
+.card-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+
+/* ── Rarity flash animations ─────────────────────── */
+@keyframes legend-flash {
+  0%   { opacity: 0; transform: scale(0.8); }
+  30%  { opacity: 1; transform: scale(1.1); }
+  70%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+.legend-flash { animation: legend-flash 1.2s ease-out forwards; }
+
+@keyframes epic-flash {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.epic-flash { animation: epic-flash 0.9s ease-out forwards; }
+
+/* ── Page transition ─────────────────────────────── */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: page-in 0.3s ease-out both; }
+
+/* ── Bottom sheet (mobile modal) ─────────────────── */
+.bottom-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bottom-sheet-panel {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 24px 24px 0 0;
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  background: #12121f;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+@media (min-width: 640px) {
+  .bottom-sheet {
+    align-items: center;
+  }
+  .bottom-sheet-panel {
+    max-width: 420px;
+    border-radius: 24px;
+    padding-bottom: 24px;
+  }
+}
+
+/* ── Touch targets ───────────────────────────────── */
+@media (max-width: 1023px) {
+  button, a {
+    min-height: 40px;
+  }
+  /* Pack cards: full-width on tiny screens */
+  .pack-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Floating label animation ────────────────────── */
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+}
+.float-up { animation: float-up 1s ease-out forwards; }

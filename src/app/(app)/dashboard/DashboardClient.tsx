@@ -3,10 +3,18 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { Calendar, Gift, Swords, ShoppingBag, Crown, Target, Check, X, Clock, Users, type LucideIcon } from 'lucide-react'
+import { Calendar, Gift, Swords, ShoppingBag, Crown, Target, Check, X, Clock, Users, Flame, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User, Match, Prediction, GroupActivity } from '@/types'
+import toast from 'react-hot-toast'
+
+interface DailyRewardState {
+  canClaim: boolean
+  nextClaim: string | null
+  streak: number
+  todayReward: number
+}
 
 interface Props {
   profile: User
@@ -14,6 +22,7 @@ interface Props {
   recentPredictions: (Prediction & { match: Match })[]
   group: { id: string; name: string; code: string } | null
   groupActivity: (GroupActivity & { user: { pseudo: string; photo_url: string | null } | null })[]
+  dailyReward: DailyRewardState
 }
 
 function Countdown({ targetDate }: { targetDate: string }) {
@@ -52,12 +61,106 @@ function Countdown({ targetDate }: { targetDate: string }) {
   )
 }
 
+function DailyRewardWidget({ initial }: { initial: DailyRewardState }) {
+  const [state, setState] = useState(initial)
+  const [claiming, setClaiming] = useState(false)
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    if (state.canClaim || !state.nextClaim) return
+    function update() {
+      const diff = new Date(state.nextClaim!).getTime() - Date.now()
+      if (diff <= 0) { setState((s) => ({ ...s, canClaim: true })); return }
+      const h = Math.floor(diff / 3_600_000)
+      const m = Math.floor((diff % 3_600_000) / 60_000)
+      const s = Math.floor((diff % 60_000) / 1_000)
+      setTimeLeft(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+    }
+    update()
+    const t = setInterval(update, 1000)
+    return () => clearInterval(t)
+  }, [state.canClaim, state.nextClaim])
+
+  async function claim() {
+    setClaiming(true)
+    try {
+      const res = await fetch('/api/daily-reward', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error === 'already_claimed' ? 'Déjà réclamée aujourd\'hui !' : data.error)
+        return
+      }
+      toast.success(`+${data.coins} coins ! Série : ${data.streak} jour${data.streak > 1 ? 's' : ''} 🔥`)
+      setState({ canClaim: false, nextClaim: null, streak: data.streak, todayReward: data.coins })
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  const STREAK_REWARDS = [100, 150, 200, 250, 350, 500, 750]
+
+  return (
+    <div className="glass rounded-2xl p-5 border border-white/5 h-full">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Récompense quotidienne</p>
+        {state.streak > 0 && (
+          <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-lg">
+            <Flame size={11} /> {state.streak} jour{state.streak > 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {/* Streak dots (7 days) */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {STREAK_REWARDS.map((coins, i) => {
+          const day = i + 1
+          const claimed = day <= state.streak
+          const today = day === Math.min(state.streak + (state.canClaim ? 1 : 0), 7) && state.canClaim
+          return (
+            <div key={i} className={`flex-1 min-w-[36px] rounded-lg py-1.5 text-center transition-all ${
+              claimed ? 'bg-[#F5C518]/20 border border-[#F5C518]/40' :
+              today ? 'bg-[#F5C518]/10 border border-[#F5C518]/60 animate-pulse' :
+              'bg-white/3 border border-white/5'
+            }`}>
+              <div className="text-[9px] text-gray-600 font-semibold">J{day}</div>
+              <div className={`text-[10px] font-black ${claimed ? 'text-[#F5C518]' : today ? 'text-[#F5C518]/70' : 'text-gray-600'}`}>
+                {claimed ? '✓' : `${coins}`}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {state.canClaim ? (
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={claim}
+          disabled={claiming}
+          className="w-full py-3 rounded-xl font-black text-black transition-all disabled:opacity-60"
+          style={{ background: '#F5C518', fontFamily: 'Bebas Neue, sans-serif' }}
+          animate={{ boxShadow: ['0 0 10px #F5C51840', '0 0 25px #F5C51870', '0 0 10px #F5C51840'] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          {claiming ? 'Réclamation…' : `RÉCLAMER +${state.todayReward} 🪙`}
+        </motion.button>
+      ) : (
+        <div className="text-center py-2">
+          <p className="text-gray-600 text-xs mb-1">Prochaine récompense dans</p>
+          <p className="text-white font-black text-xl countdown-digit">{timeLeft || '—'}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function DashboardClient({
   profile,
   nextMatch,
   recentPredictions,
   group,
   groupActivity,
+  dailyReward,
 }: Props) {
   const [liveActivities, setLiveActivities] = useState(groupActivity)
   const supabase = createClient()
@@ -212,6 +315,11 @@ export function DashboardClient({
               </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* Daily reward */}
+        <motion.div variants={item}>
+          <DailyRewardWidget initial={dailyReward} />
         </motion.div>
 
         {/* Recent predictions */}

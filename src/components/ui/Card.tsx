@@ -17,9 +17,12 @@ const SIZE_MAP = {
   lg: { w: 210, h: 295, nameSize: 15, statSize: 10, statCount: 6 },
 }
 
-const PLAYER_STATS = ['pace', 'tir', 'passe', 'defense', 'dribble', 'physique'] as const
+// English stat keys matching the DB schema
+const PLAYER_STATS = ['pace', 'shooting', 'passing', 'defending', 'dribbling', 'physical'] as const
 const STAT_LABELS: Record<string, string> = {
-  pace: 'PAC', tir: 'TIR', passe: 'PAS', defense: 'DEF', dribble: 'DRI', physique: 'PHY'
+  pace: 'PAC', shooting: 'TIR', passing: 'PAS', defending: 'DEF', dribbling: 'DRI', physical: 'PHY',
+  // Legacy French keys fallback
+  tir: 'TIR', passe: 'PAS', defense: 'DEF', dribble: 'DRI', physique: 'PHY',
 }
 
 const FLAGS: Record<string, string> = {
@@ -46,6 +49,18 @@ function getInitials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
+function getVisibleStats(stats: Record<string, number | string>, count: number): [string, number][] {
+  // Try English keys first, fall back to whatever keys exist
+  const preferred = PLAYER_STATS.filter((k) => stats[k] !== undefined).slice(0, count)
+  if (preferred.length > 0) return preferred.map((k) => [k, Number(stats[k])])
+
+  // Fallback to any numeric stats (excluding position)
+  return Object.entries(stats)
+    .filter(([k, v]) => k !== 'position' && !isNaN(Number(v)))
+    .slice(0, count)
+    .map(([k, v]) => [k, Number(v)])
+}
+
 export function GameCard({ card, owned = true, size = 'md', onClick, selected }: CardProps) {
   const { w, h, nameSize, statSize, statCount } = SIZE_MAP[size]
   const rarityColor = RARITY_COLORS[card.rarity]
@@ -53,7 +68,7 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
   const isHolo = card.rarity === 'Epic' || card.rarity === 'Legend'
   const isPlayer = card.type === 'player'
 
-  const visibleStats = PLAYER_STATS.slice(0, statCount)
+  const visibleStats = isPlayer && card.stats ? getVisibleStats(card.stats, statCount) : []
 
   return (
     <motion.div
@@ -68,7 +83,7 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
         filter: !owned ? 'grayscale(80%) brightness(0.5)' : undefined,
       }}
     >
-      {/* ── Card body gradient ── */}
+      {/* Card body gradient */}
       <div
         className="absolute inset-0"
         style={{
@@ -78,25 +93,22 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
         }}
       />
 
-      {/* ── Holo shimmer ── */}
+      {/* Holo shimmer (Epic / Legend) */}
       {isHolo && owned && (
         <div className="absolute inset-0 z-10 pointer-events-none holo-effect rounded-xl opacity-25" />
       )}
 
-      {/* ── Top rarity bar ── */}
+      {/* Top rarity bar */}
       <div className="absolute top-0 left-0 right-0 h-[3px] z-20 rounded-t-xl"
         style={{ background: `linear-gradient(90deg, transparent, ${rarityColor}, transparent)` }}
       />
 
-      {/* ── Content ── */}
+      {/* Content */}
       <div className="relative z-10 h-full flex flex-col px-1.5 pt-1.5 pb-1">
 
-        {/* Header row: rarity label + nation flag */}
+        {/* Header: rarity + flag */}
         <div className="flex items-center justify-between mb-0.5 px-0.5">
-          <span
-            className="font-black uppercase tracking-widest"
-            style={{ color: rarityColor, fontSize: statSize }}
-          >
+          <span className="font-black uppercase tracking-widest" style={{ color: rarityColor, fontSize: statSize }}>
             {card.rarity}
           </span>
           {card.nation && (
@@ -104,7 +116,7 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
           )}
         </div>
 
-        {/* ── Photo area ── */}
+        {/* Photo area */}
         <div
           className="relative flex-1 rounded-lg overflow-hidden flex items-center justify-center"
           style={{
@@ -146,14 +158,13 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
             </span>
           )}
 
-          {/* Bottom shine */}
           <div
             className="absolute bottom-0 left-0 right-0 h-8 pointer-events-none"
             style={{ background: `linear-gradient(to top, ${rarityColor}18, transparent)` }}
           />
         </div>
 
-        {/* ── Name ── */}
+        {/* Name */}
         <p
           className="font-black text-white text-center leading-tight truncate mt-1 px-0.5"
           style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: nameSize + 1, letterSpacing: '0.04em' }}
@@ -161,30 +172,21 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
           {card.name}
         </p>
 
-        {/* ── Stats grid (player only) ── */}
-        {isPlayer && card.stats && (
+        {/* Stats grid */}
+        {visibleStats.length > 0 && (
           <div
             className="grid mt-0.5 gap-x-1 gap-y-0"
-            style={{ gridTemplateColumns: `repeat(${Math.min(statCount, 3)}, 1fr)` }}
+            style={{ gridTemplateColumns: `repeat(${Math.min(visibleStats.length, 3)}, 1fr)` }}
           >
-            {visibleStats.map((key) => {
-              const val = card.stats?.[key]
-              if (val === undefined) return null
-              const num = Number(val)
+            {visibleStats.map(([key, num]) => {
               const color = num >= 85 ? '#22c55e' : num >= 70 ? '#F5C518' : num >= 55 ? '#60a5fa' : '#9ca3af'
               return (
                 <div key={key} className="flex flex-col items-center">
-                  <span
-                    className="font-black leading-none"
-                    style={{ fontSize: statSize + 1, color }}
-                  >
+                  <span className="font-black leading-none" style={{ fontSize: statSize + 1, color }}>
                     {num}
                   </span>
-                  <span
-                    className="text-white/30 leading-none"
-                    style={{ fontSize: statSize - 1 }}
-                  >
-                    {STAT_LABELS[key]}
+                  <span className="text-white/30 leading-none" style={{ fontSize: statSize - 1 }}>
+                    {STAT_LABELS[key] ?? key.slice(0, 3).toUpperCase()}
                   </span>
                 </div>
               )
@@ -192,18 +194,15 @@ export function GameCard({ card, owned = true, size = 'md', onClick, selected }:
           </div>
         )}
 
-        {/* Nation card: nation name */}
+        {/* Nation card label */}
         {card.type === 'nation' && (
-          <p
-            className="text-center font-bold truncate mt-0.5"
-            style={{ color: rarityColor, fontSize: statSize }}
-          >
+          <p className="text-center font-bold truncate mt-0.5" style={{ color: rarityColor, fontSize: statSize }}>
             {card.nation ?? card.name}
           </p>
         )}
       </div>
 
-      {/* ── Locked overlay ── */}
+      {/* Locked overlay */}
       {!owned && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 rounded-xl">
           <svg className="w-7 h-7 text-gray-500" fill="currentColor" viewBox="0 0 24 24">

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 
+const STREAK_REWARDS = [100, 150, 200, 250, 350, 500, 750]
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -32,7 +34,6 @@ export default async function DashboardPage() {
         .single(),
     ])
 
-  // Profil introuvable = compte auth sans profil (signup incomplet → recommencer)
   if (!profile) redirect('/signup')
 
   let groupActivity = null
@@ -47,6 +48,24 @@ export default async function DashboardPage() {
     groupActivity = activities
   }
 
+  // Compute daily reward state server-side
+  const lastClaim = profile.daily_reward_claimed_at ? new Date(profile.daily_reward_claimed_at) : null
+  const now = new Date()
+  let canClaim = true
+  let nextClaim: string | null = null
+
+  if (lastClaim) {
+    const hoursSince = (now.getTime() - lastClaim.getTime()) / 3_600_000
+    if (hoursSince < 24) {
+      canClaim = false
+      nextClaim = new Date(lastClaim.getTime() + 86_400_000).toISOString()
+    }
+  }
+
+  const streak = profile.daily_streak ?? 0
+  const rewardIndex = Math.min(canClaim ? streak : streak - 1, STREAK_REWARDS.length - 1)
+  const todayReward = STREAK_REWARDS[Math.max(0, rewardIndex)]
+
   return (
     <DashboardClient
       profile={profile}
@@ -54,6 +73,7 @@ export default async function DashboardPage() {
       recentPredictions={recentPredictions ?? []}
       group={groupData?.group as unknown as { id: string; name: string; code: string } | null}
       groupActivity={groupActivity ?? []}
+      dailyReward={{ canClaim, nextClaim, streak, todayReward }}
     />
   )
 }

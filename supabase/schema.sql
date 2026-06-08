@@ -288,6 +288,10 @@ create policy "Service role can manage teams" on public.teams for all using (aut
 alter table public.users add column if not exists is_admin boolean default false;
 alter table public.matches add column if not exists group_letter text;
 
+-- Daily reward system
+alter table public.users add column if not exists daily_reward_claimed_at timestamptz;
+alter table public.users add column if not exists daily_streak integer default 0;
+
 -- ─────────────────────────────────────────────
 -- HELPER FUNCTIONS
 -- ─────────────────────────────────────────────

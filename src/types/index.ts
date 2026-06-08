@@ -19,6 +19,8 @@ export interface User {
   is_vip: boolean
   predictions_correct: number
   battles_won: number
+  daily_reward_claimed_at: string | null
+  daily_streak: number
   created_at: string
 }
 
@@ -138,25 +140,36 @@ export interface GroupActivity {
 
 export const PACK_CONFIGS = {
   common: {
-    name: 'Pack Commun',
+    name: 'Pack Découverte',
     cost: 100,
     cards: 3,
-    odds: { Common: 0.7, Rare: 0.25, Epic: 0.05, Legend: 0 },
-    color: '#ffffff',
+    odds: { Common: 0.70, Rare: 0.25, Epic: 0.05, Legend: 0.00 },
+    color: '#9CA3AF',
+    icon: '📦',
   },
   rare: {
-    name: 'Pack Rare',
+    name: 'Pack Pro',
     cost: 300,
     cards: 3,
-    odds: { Common: 0, Rare: 0.5, Epic: 0.4, Legend: 0.1 },
+    odds: { Common: 0.00, Rare: 0.50, Epic: 0.40, Legend: 0.10 },
     color: '#00D4FF',
+    icon: '💎',
   },
   elite: {
-    name: 'Pack Elite',
+    name: 'Pack Élite',
     cost: 800,
-    cards: 3,
-    odds: { Common: 0, Rare: 0, Epic: 0.7, Legend: 0.3 },
+    cards: 5,
+    odds: { Common: 0.00, Rare: 0.00, Epic: 0.65, Legend: 0.35 },
+    color: '#A855F7',
+    icon: '👑',
+  },
+  legend: {
+    name: 'Pack Légendaire',
+    cost: 5000,
+    cards: 5,
+    odds: { Common: 0.00, Rare: 0.00, Epic: 0.25, Legend: 0.75 },
     color: '#F5C518',
+    icon: '⚡',
   },
 } as const
 
