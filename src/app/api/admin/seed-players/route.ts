@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { WC2026_SQUADS } from '@/data/wc2026-squads'
+import { getFC25Stats } from '@/data/wc2026-player-stats'
 import type { CardRarity } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -61,17 +62,22 @@ function assignRarity(name: string): CardRarity {
 }
 
 function generateStats(pos: string, name: string) {
+  // Cherche d'abord dans FC25
+  const fc25 = getFC25Stats(name)
+  if (fc25) return fc25
+
+  // Fallback déterministe par position
   let seed = 0
   for (const c of name) seed = (seed * 31 + c.charCodeAt(0)) & 0xffffffff
   seed = Math.abs(seed)
   const v = (base: number, range = 12) =>
     Math.min(99, Math.max(25, base + (seed % range) - Math.floor(range / 2)))
 
-  if (pos === 'GK')    return { pace: v(52), tir: v(18, 8), passe: v(62), defense: v(87, 8), dribble: v(42, 8), physique: v(80) }
-  if (pos === 'DEF')   return { pace: v(73), tir: v(44), passe: v(68), defense: v(83, 10), dribble: v(60), physique: v(80) }
-  if (pos === 'MID')   return { pace: v(76), tir: v(72), passe: v(83, 10), defense: v(64), dribble: v(78), physique: v(72) }
-  if (pos === 'COACH') return { pace: v(72, 10), tir: v(75, 10), passe: v(84, 8), defense: v(88, 8), dribble: v(80, 8), physique: v(86, 8) }
-  return { pace: v(86, 10), tir: v(85, 10), passe: v(72), defense: v(38), dribble: v(84, 10), physique: v(74) }
+  if (pos === 'GK')    return { pace: v(52), shooting: v(18, 8), passing: v(62), defending: v(87, 8), dribbling: v(42, 8), physical: v(80) }
+  if (pos === 'DEF')   return { pace: v(73), shooting: v(44), passing: v(68), defending: v(83, 10), dribbling: v(60), physical: v(80) }
+  if (pos === 'MID')   return { pace: v(76), shooting: v(72), passing: v(83, 10), defending: v(64), dribbling: v(78), physical: v(72) }
+  if (pos === 'COACH') return { pace: v(72, 10), shooting: v(75, 10), passing: v(84, 8), defending: v(88, 8), dribbling: v(80, 8), physical: v(86, 8) }
+  return { pace: v(86, 10), shooting: v(85, 10), passing: v(72), defending: v(38), dribbling: v(84, 10), physical: v(74) }
 }
 
 // ─── TheSportsDB PHOTO SEARCH ─────────────────────────────────────────────────
