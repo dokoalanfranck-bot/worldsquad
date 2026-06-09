@@ -292,6 +292,28 @@ alter table public.matches add column if not exists group_letter text;
 alter table public.users add column if not exists daily_reward_claimed_at timestamptz;
 alter table public.users add column if not exists daily_streak integer default 0;
 
+-- Live scores integration (TheSportsDB event ID for fast lookup)
+alter table public.matches add column if not exists thesportsdb_id text;
+
+-- ─────────────────────────────────────────────
+-- MATCH LIVE EVENTS (anti-doublons notifications)
+-- ─────────────────────────────────────────────
+create table if not exists public.match_live_events (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid references public.matches(id) on delete cascade,
+  event_key text not null unique,  -- "{match_id}:{type}:{detail}"
+  event_type text not null,        -- match_started, half_time, score, full_time, lineup_announced
+  created_at timestamptz default now()
+);
+
+alter table public.match_live_events enable row level security;
+drop policy if exists "Service role manages live events" on public.match_live_events;
+create policy "Service role manages live events" on public.match_live_events
+  for all using (auth.role() = 'service_role');
+
+create index if not exists match_live_events_key_idx on public.match_live_events(event_key);
+create index if not exists match_live_events_match_idx on public.match_live_events(match_id);
+
 -- ─────────────────────────────────────────────
 -- PUSH SUBSCRIPTIONS (Web Push / PWA)
 -- ─────────────────────────────────────────────
