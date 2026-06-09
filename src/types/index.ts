@@ -20,6 +20,9 @@ export interface User {
   is_admin: boolean
   predictions_correct: number
   battles_won: number
+  battles_played: number
+  battle_streak: number
+  best_streak: number
   daily_reward_claimed_at: string | null
   daily_streak: number
   created_at: string
@@ -91,6 +94,14 @@ export interface UserCard {
   card?: Card
 }
 
+export interface BattleRound {
+  stat: string
+  label: string
+  challenger_val: number
+  opponent_val: number
+  winner: 'challenger' | 'opponent' | 'tie'
+}
+
 export interface Battle {
   id: string
   challenger_id: string
@@ -102,6 +113,7 @@ export interface Battle {
   status: BattleStatus
   stat_compared: string | null
   result_summary: string | null
+  rounds: BattleRound[] | null
   created_at: string
   challenger?: User
   opponent?: User
