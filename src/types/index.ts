@@ -17,6 +17,7 @@ export interface User {
   level: string
   card_rarity: CardRarity
   is_vip: boolean
+  is_admin: boolean
   predictions_correct: number
   battles_won: number
   daily_reward_claimed_at: string | null
