@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Swords, Trophy, X, Clock, Plus, Flame, ChevronRight } from 'lucide-react'
+import { Swords, Trophy, X, Clock, Plus, Flame, ChevronRight, Wifi } from 'lucide-react'
 import { GameCard } from '@/components/ui/Card'
 import type { Battle } from '@/types'
 import toast from 'react-hot-toast'
@@ -31,6 +31,26 @@ export function BattlesClient({ battles, currentUserId }: Props) {
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-4xl mx-auto">
+      {/* Draft Duel CTA */}
+      <Link
+        href="/battles/matchmaking"
+        className="block w-full glass rounded-2xl p-5 mb-6 border border-[#F5C518]/20 hover:border-[#F5C518]/50 transition-all group"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Wifi size={16} className="text-[#F5C518]" />
+              <span className="text-[#F5C518] font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                DRAFT DUEL — NOUVEAU
+              </span>
+            </div>
+            <p className="text-white font-bold">3 cartes · Ban · 3 rounds</p>
+            <p className="text-gray-500 text-xs mt-0.5">Matchmaking automatique · Tu gagnes une carte adverse</p>
+          </div>
+          <div className="text-4xl group-hover:scale-110 transition-transform">⚔️</div>
+        </div>
+      </Link>
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-4xl font-black text-white mb-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
