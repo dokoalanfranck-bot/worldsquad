@@ -6,6 +6,7 @@ import {
   User as UserIcon, Bell, BellOff, LogOut, ChevronRight,
   Check, Shield, Smartphone, AlertTriangle, X,
   Trophy, Layers, Swords, Flame, Globe, Send,
+  UsersRound, Plus, Copy, LogOut as LeaveIcon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -13,9 +14,17 @@ import toast from 'react-hot-toast'
 import type { User } from '@/types'
 import { NATIONS_2026 } from '@/types'
 
+interface GroupInfo {
+  id: string
+  name: string
+  code: string
+  creator_id: string | null
+}
+
 interface Props {
   user: User
   cardCount: number
+  group: GroupInfo | null
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -65,13 +74,19 @@ function Row({
   )
 }
 
-export function SettingsClient({ user, cardCount }: Props) {
+export function SettingsClient({ user, cardCount, group }: Props) {
   const router = useRouter()
   const [notifStatus, setNotifStatus] = useState<NotificationPermission>('default')
   const [mounted, setMounted] = useState(false)
   const [showEditPseudo, setShowEditPseudo] = useState(false)
   const [showEditNation, setShowEditNation] = useState(false)
   const [showBlockedGuide, setShowBlockedGuide] = useState(false)
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [showJoinGroup, setShowJoinGroup] = useState(false)
+  const [groupName, setGroupName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [currentGroup, setCurrentGroup] = useState<GroupInfo | null>(group)
+  const [groupLoading, setGroupLoading] = useState(false)
   const [pseudo, setPseudo] = useState(user.pseudo)
   const [nation, setNation] = useState(user.nation)
   const [saving, setSaving] = useState(false)
@@ -162,6 +177,68 @@ export function SettingsClient({ user, cardCount }: Props) {
     }
   }
 
+  const handleCreateGroup = async () => {
+    if (groupName.trim().length < 3) return
+    setGroupLoading(true)
+    try {
+      const res = await fetch('/api/groups/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: groupName.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error); return }
+      setCurrentGroup(data.group)
+      setShowCreateGroup(false)
+      setGroupName('')
+      toast.success(`Groupe "${data.group.name}" créé ! Code : ${data.group.code}`)
+      router.refresh()
+    } catch {
+      toast.error('Erreur')
+    } finally {
+      setGroupLoading(false)
+    }
+  }
+
+  const handleJoinGroup = async () => {
+    if (joinCode.trim().length < 6) return
+    setGroupLoading(true)
+    try {
+      const res = await fetch('/api/groups/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: joinCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error); return }
+      setCurrentGroup(data.group)
+      setShowJoinGroup(false)
+      setJoinCode('')
+      toast.success(`Tu as rejoint "${data.group.name}" !`)
+      router.refresh()
+    } catch {
+      toast.error('Erreur')
+    } finally {
+      setGroupLoading(false)
+    }
+  }
+
+  const handleLeaveGroup = async () => {
+    if (!confirm('Quitter le groupe ?')) return
+    setGroupLoading(true)
+    try {
+      const res = await fetch('/api/groups/leave', { method: 'POST' })
+      if (!res.ok) { const d = await res.json(); toast.error(d.error); return }
+      setCurrentGroup(null)
+      toast.success('Tu as quitté le groupe')
+      router.refresh()
+    } catch {
+      toast.error('Erreur')
+    } finally {
+      setGroupLoading(false)
+    }
+  }
+
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -241,6 +318,42 @@ export function SettingsClient({ user, cardCount }: Props) {
           value={`${currentNation?.flag ?? ''} ${nation}`}
           onClick={() => setShowEditNation(true)}
         />
+      </Section>
+
+      {/* Groupe */}
+      <Section title="Groupe">
+        {currentGroup ? (
+          <>
+            <Row icon={UsersRound} label={currentGroup.name} value={`Code : ${currentGroup.code}`} />
+            <Row
+              icon={Copy}
+              label="Copier le code d'invitation"
+              onClick={() => {
+                navigator.clipboard.writeText(currentGroup.code)
+                toast.success(`Code ${currentGroup.code} copié !`)
+              }}
+            />
+            <Row
+              icon={LeaveIcon}
+              label="Quitter le groupe"
+              onClick={handleLeaveGroup}
+              danger
+            />
+          </>
+        ) : (
+          <>
+            <Row
+              icon={Plus}
+              label="Créer un groupe"
+              onClick={() => setShowCreateGroup(true)}
+            />
+            <Row
+              icon={UsersRound}
+              label="Rejoindre avec un code"
+              onClick={() => setShowJoinGroup(true)}
+            />
+          </>
+        )}
       </Section>
 
       {/* Notifications */}
@@ -356,6 +469,86 @@ export function SettingsClient({ user, cardCount }: Props) {
                     {n.name === nation && <Check size={14} className="text-[#F5C518]" />}
                   </button>
                 ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Créer un groupe */}
+        {showCreateGroup && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowCreateGroup(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl p-5 border border-white/10 bg-[#13131f]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-black text-lg">Créer un groupe</h3>
+                <button onClick={() => setShowCreateGroup(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-gray-400"><X size={14} /></button>
+              </div>
+              <input
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+                maxLength={30}
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-semibold focus:outline-none focus:border-[#F5C518]/50 mb-1"
+                placeholder="Nom du groupe (ex: Les Potes de Foot)"
+              />
+              <p className="text-gray-600 text-xs mb-4">Un code unique sera généré automatiquement</p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowCreateGroup(false)} className="flex-1 py-3 rounded-xl text-sm font-semibold border border-white/10 text-gray-400">Annuler</button>
+                <button
+                  onClick={handleCreateGroup}
+                  disabled={groupLoading || groupName.trim().length < 3}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black bg-[#F5C518] text-black disabled:opacity-40"
+                >
+                  {groupLoading ? '…' : <><Check size={14} /> Créer</>}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Rejoindre un groupe */}
+        {showJoinGroup && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowJoinGroup(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl p-5 border border-white/10 bg-[#13131f]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-black text-lg">Rejoindre un groupe</h3>
+                <button onClick={() => setShowJoinGroup(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-gray-400"><X size={14} /></button>
+              </div>
+              <input
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && handleJoinGroup()}
+                maxLength={6}
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-black tracking-widest focus:outline-none focus:border-[#F5C518]/50 mb-1 text-center uppercase"
+                placeholder="XXXXXX"
+              />
+              <p className="text-gray-600 text-xs mb-4 text-center">Demande le code à ton ami qui a créé le groupe</p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowJoinGroup(false)} className="flex-1 py-3 rounded-xl text-sm font-semibold border border-white/10 text-gray-400">Annuler</button>
+                <button
+                  onClick={handleJoinGroup}
+                  disabled={groupLoading || joinCode.trim().length < 6}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black bg-[#F5C518] text-black disabled:opacity-40"
+                >
+                  {groupLoading ? '…' : <><Check size={14} /> Rejoindre</>}
+                </button>
               </div>
             </motion.div>
           </motion.div>
