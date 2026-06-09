@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WorldSquad — Hors ligne</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100dvh;
+      background: #0A0A0F;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      text-align: center;
+      padding: 24px;
+    }
+    .emoji { font-size: 64px; }
+    h1 { font-size: 28px; font-weight: 900; color: #F5C518; letter-spacing: 2px; }
+    p { color: #6B7280; font-size: 15px; max-width: 300px; line-height: 1.6; }
+    button {
+      margin-top: 8px;
+      padding: 12px 28px;
+      background: #F5C518;
+      color: #000;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+    }
+    button:active { transform: scale(0.97); }
+  </style>
+</head>
+<body>
+  <div class="emoji">⚽</div>
+  <h1>HORS LIGNE</h1>
+  <p>Pas de connexion internet. Reconnecte-toi pour accéder à WorldSquad.</p>
+  <button onclick="location.reload()">Réessayer</button>
+</body>
+</html>

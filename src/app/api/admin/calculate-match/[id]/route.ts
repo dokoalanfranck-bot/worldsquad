@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendPushToUser } from '@/lib/push'
 
 // Protected admin endpoint — call manually after each match finishes
 // Usage: POST /api/admin/calculate-match/[matchId]
@@ -82,7 +83,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           reason: `Pronostic ${u.status === 'correct_score' ? 'score exact' : 'bon vainqueur'} — match ${matchId.slice(0, 8)}`,
         }),
         supabase.rpc('increment_predictions_correct', { user_id: u.user_id }),
+        sendPushToUser(u.user_id, {
+          title: u.status === 'correct_score' ? '🎯 Score exact ! +300 coins' : '✅ Bon pronostic ! +100 coins',
+          body: `${match.home_team} ${match.score_a} - ${match.score_b} ${match.away_team} · Tu gagnes ${u.coins_won} coins 🪙`,
+          tag: 'prediction-result',
+          url: '/matches',
+        }),
       ])
+    )
+  )
+
+  // Notify wrong predictions (no coins)
+  const losers = updates.filter((u) => u.coins_won === 0)
+  await Promise.allSettled(
+    losers.map((u) =>
+      sendPushToUser(u.user_id, {
+        title: '❌ Pronostic raté',
+        body: `${match.home_team} ${match.score_a} - ${match.score_b} ${match.away_team} · Meilleure chance au prochain match !`,
+        tag: 'prediction-result',
+        url: '/matches',
+      })
     )
   )
 
