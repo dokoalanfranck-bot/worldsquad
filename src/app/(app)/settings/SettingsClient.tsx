@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User as UserIcon, Bell, BellOff, LogOut, ChevronRight,
-  Check, Pencil, Shield, Smartphone, AlertTriangle, X,
-  Trophy, Layers, Swords, Flame, Globe,
+  Check, Shield, Smartphone, AlertTriangle, X,
+  Trophy, Layers, Swords, Flame, Globe, Send,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -251,6 +251,17 @@ export function SettingsClient({ user, cardCount }: Props) {
           value={notifLabel}
           onClick={mounted ? toggleNotifications : undefined}
         />
+        {notifStatus === 'granted' && (
+          <Row
+            icon={Send}
+            label="Envoyer une notification test"
+            onClick={async () => {
+              const res = await fetch('/api/push/test', { method: 'POST' })
+              if (res.ok) toast.success('Notification envoyée ! Vérifie tes alertes 🔔')
+              else toast.error('Erreur — abonne-toi d\'abord aux notifications')
+            }}
+          />
+        )}
       </Section>
 
       {/* Compte */}
