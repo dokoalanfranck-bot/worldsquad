@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, BellOff, X, Download, Smartphone } from 'lucide-react'
+import { Bell, BellOff, X, Download, Smartphone, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // Type augmentation for BeforeInstallPromptEvent
@@ -21,6 +21,7 @@ export function PWAProvider() {
   const [isInstalled, setIsInstalled] = useState(false)
   const [supportsNotifications, setSupportsNotifications] = useState(false)
   const [showBanner, setShowBanner] = useState(false)
+  const [showBlockedGuide, setShowBlockedGuide] = useState(false)
 
   // Register service worker
   useEffect(() => {
@@ -84,15 +85,21 @@ export function PWAProvider() {
 
   const subscribeToPush = async () => {
     if (!swReady || !('PushManager' in window)) {
-      toast.error('Les notifications push ne sont pas supportées')
+      toast.error('Les notifications push ne sont pas supportées sur ce navigateur')
+      return
+    }
+    // Already blocked — show the unblock guide
+    if (Notification.permission === 'denied') {
+      setShowBlockedGuide(true)
       return
     }
     const permission = await Notification.requestPermission()
     setNotifStatus(permission)
-    if (permission !== 'granted') {
-      toast.error('Permission refusée')
+    if (permission === 'denied') {
+      setShowBlockedGuide(true)
       return
     }
+    if (permission !== 'granted') return
     try {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.subscribe({
@@ -133,6 +140,67 @@ export function PWAProvider() {
 
   return (
     <>
+      {/* ── Notifications bloquées — guide de déblocage ───────────────── */}
+      <AnimatePresence>
+        {showBlockedGuide && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowBlockedGuide(false)}
+          >
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 32, stiffness: 300 }}
+              className="w-full max-w-sm rounded-2xl p-5 border border-orange-500/20"
+              style={{ background: 'linear-gradient(135deg, #1a1208 0%, #130f09 100%)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-base">Notifications bloquées</h3>
+                  <p className="text-orange-400 text-xs">Débloque-les dans les paramètres</p>
+                </div>
+                <button onClick={() => setShowBlockedGuide(false)} className="ml-auto w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-gray-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                Ton navigateur a bloqué les notifications pour WorldSquad. Pour les réactiver :
+              </p>
+
+              <div className="space-y-2 mb-5">
+                {[
+                  { step: '1', text: 'Clique sur le 🔒 cadenas dans la barre d\'adresse' },
+                  { step: '2', text: 'Va dans "Paramètres du site" ou "Autorisations"' },
+                  { step: '3', text: 'Trouve "Notifications" et passe sur "Autoriser"' },
+                  { step: '4', text: 'Recharge la page et réessaie' },
+                ].map(({ step, text }) => (
+                  <div key={step} className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {step}
+                    </span>
+                    <p className="text-gray-300 text-sm">{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => { setShowBlockedGuide(false); location.reload() }}
+                className="w-full py-3 rounded-xl text-sm font-black bg-orange-500 text-white hover:bg-orange-400 active:scale-95 transition-all"
+              >
+                J'ai modifié — Recharger la page
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Install banner (bottom sheet) ─────────────────────────────── */}
       <AnimatePresence>
         {showBanner && installPrompt && !isInstalled && (
