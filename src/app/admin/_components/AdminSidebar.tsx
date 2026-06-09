@@ -15,6 +15,7 @@ import {
   Shield,
   Menu,
   X,
+  Bell,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/groups', icon: UsersRound, label: 'Groupes privés' },
   { href: '/admin/battles', icon: Swords, label: 'Battles' },
   { href: '/admin/transactions', icon: ArrowLeftRight, label: 'Transactions' },
+  { href: '/admin/notifications', icon: Bell, label: 'Notifications Push' },
 ]
 
 interface AdminSidebarProps {

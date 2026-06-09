@@ -311,6 +311,28 @@ create policy "Users manage own push subs" on public.push_subscriptions
 create index if not exists push_subscriptions_user_id_idx on public.push_subscriptions(user_id);
 
 -- ─────────────────────────────────────────────
+-- PUSH NOTIFICATION LOGS (historique admin)
+-- ─────────────────────────────────────────────
+create table if not exists public.push_notification_logs (
+  id uuid primary key default gen_random_uuid(),
+  sent_by uuid references public.users(id) on delete set null,
+  title text not null,
+  body text not null,
+  url text default '/dashboard',
+  tag text default 'admin',
+  audience text not null check (audience in ('all', 'specific')),
+  recipients_count integer default 0,
+  created_at timestamptz default now()
+);
+
+alter table public.push_notification_logs enable row level security;
+drop policy if exists "Admins manage push logs" on public.push_notification_logs;
+create policy "Admins manage push logs" on public.push_notification_logs
+  for all using (
+    exists (select 1 from public.users where id = auth.uid() and is_admin = true)
+  );
+
+-- ─────────────────────────────────────────────
 -- HELPER FUNCTIONS
 -- ─────────────────────────────────────────────
 create or replace function increment_coins(user_id uuid, delta integer)
