@@ -15,12 +15,12 @@ export async function POST(_req: Request) {
 
   const admin = createAdminClient()
 
-  // Check already in active draft_duel
+  // Check already in active team_match
   const { data: active } = await admin
     .from('battles')
     .select('id, phase')
     .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
-    .eq('type', 'draft_duel')
+    .eq('type', 'team_match')
     .not('phase', 'in', '("finished","declined")')
     .single()
 
@@ -56,7 +56,7 @@ export async function POST(_req: Request) {
     // Remove both from queue
     await admin.from('battle_queue').delete().in('user_id', [user.id, opponent.user_id])
 
-    // Create draft_duel battle
+    // Create team_match battle
     const { data: battle, error } = await admin
       .from('battles')
       .insert({
@@ -64,10 +64,8 @@ export async function POST(_req: Request) {
         opponent_id: opponent.user_id,
         coins_stake: 0,
         status: 'accepted',
-        type: 'draft_duel',
-        phase: 'draft',
-        round_picks: {},
-        current_round: 1,
+        type: 'team_match',
+        phase: 'team_selection',
       })
       .select('id')
       .single()

@@ -9,6 +9,8 @@ import { Trophy, X, Swords, ArrowLeft, Flame, Check, Clock } from 'lucide-react'
 import type { Card } from '@/types'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { TeamSelectionClient } from './TeamSelectionClient'
+import { MatchAnimationClient } from './MatchAnimationClient'
 
 const ALL_STATS = ['pace', 'shooting', 'passing', 'defending', 'dribbling', 'physical']
 const STAT_LABELS: Record<string, string> = {
@@ -118,6 +120,45 @@ export function PlayClient({ initialBattle, currentUserId, myCards }: Props) {
       toast.error('Erreur réseau')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ── Nouvelles phases team_match ─────────────────────────────────────────
+  if (battle.type === 'team_match') {
+    if (phase === 'team_selection') {
+      return <TeamSelectionClient battle={battle} currentUserId={currentUserId} myCards={myCards} />
+    }
+    if (phase === 'match_ready') {
+      return <MatchAnimationClient battle={battle} currentUserId={currentUserId} />
+    }
+    if (phase === 'finished') {
+      const iWon = winnerId === currentUserId
+      const isDraw = !winnerId
+      const finalScore = battle.final_score as { home: number; away: number } | null
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-6">
+          <div className="text-6xl">{isDraw ? '🤝' : iWon ? '🏆' : '💔'}</div>
+          <h2 className={`text-5xl font-black ${isDraw ? 'text-gray-300' : iWon ? 'text-[#F5C518]' : 'text-red-400'}`}
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+            {isDraw ? 'MATCH NUL' : iWon ? 'VICTOIRE !' : 'DÉFAITE'}
+          </h2>
+          {finalScore && (
+            <p className="text-gray-400 text-lg font-bold">
+              {finalScore.home} — {finalScore.away}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <Link href="/battles/matchmaking"
+              className="bg-[#F5C518] text-black font-black px-6 py-3 rounded-xl text-sm"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              REJOUER
+            </Link>
+            <Link href="/battles" className="border border-white/10 text-gray-400 px-6 py-3 rounded-xl text-sm hover:text-white transition-colors">
+              Mes battles
+            </Link>
+          </div>
+        </div>
+      )
     }
   }
 
