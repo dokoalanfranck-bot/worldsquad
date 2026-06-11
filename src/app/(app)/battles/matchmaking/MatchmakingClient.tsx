@@ -5,22 +5,20 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Swords, X, Wifi } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import toast from 'react-hot-toast'
 
 interface Props {
   userId: string
-  pseudo: string
 }
 
 const TIPS = [
-  'Choisis 3 cartes équilibrées — PAC pour la vitesse, DEF pour la résistance',
-  'Banne la stat où ton adversaire est le plus fort',
-  'Garde ta meilleure carte pour le round 3 — effet de surprise',
-  'Les cartes Legend dominent la plupart des stats, mais elles valent cher à perdre',
-  'Observe les cartes adverses avant de décider quel card jouer',
+  'La cohésion est clé — 3 joueurs de la même nation donne +35 points',
+  'Un coach de la même nationalité que tes joueurs booste la cohésion',
+  'Les cartes Legend et Epic augmentent fortement la puissance de ton équipe',
+  'Les stats de tes joueurs comptent : plus elles sont élevées, plus tu marques',
+  'Équipe homogène > Équipe puissante mais incohérente',
 ]
 
-export function MatchmakingClient({ userId, pseudo }: Props) {
+export function MatchmakingClient({ userId }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [status, setStatus] = useState<'idle' | 'searching' | 'found'>('idle')
@@ -54,7 +52,7 @@ export function MatchmakingClient({ userId, pseudo }: Props) {
         },
         (payload) => {
           const b = payload.new as { type: string; id: string }
-          if (b.type === 'draft_duel') {
+          if (b.type === 'team_match') {
             setStatus('found')
             cleanup()
             setTimeout(() => router.push(`/battles/${b.id}/play`), 1200)
@@ -124,19 +122,19 @@ export function MatchmakingClient({ userId, pseudo }: Props) {
             exit={{ opacity: 0, y: -20 }}
             className="text-center max-w-sm"
           >
-            <div className="text-7xl mb-6">⚔️</div>
+            <div className="text-7xl mb-6">⚽</div>
             <h1 className="text-5xl font-black text-white mb-3" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              DRAFT DUEL
+              TEAM MATCH
             </h1>
-            <p className="text-gray-400 text-sm mb-2">3 cartes · Ban · 3 rounds · Tu gagnes une carte</p>
+            <p className="text-gray-400 text-sm mb-2">3 joueurs + 1 coach · Cohésion · Match 20s</p>
             <p className="text-gray-600 text-xs mb-8">Matchmaking automatique selon ton niveau</p>
 
             <div className="glass rounded-2xl p-5 mb-6 text-left space-y-3">
               {[
-                { icon: '🎴', label: 'Draft', desc: 'Choisis 3 cartes de ta collection' },
-                { icon: '🚫', label: 'Ban', desc: 'Banne 1 stat pour handicaper l\'adversaire' },
-                { icon: '⚡', label: '3 Rounds', desc: 'Assigne une carte secrète par round' },
-                { icon: '🏆', label: 'Récompense', desc: 'Le gagnant vole 1 carte adverse' },
+                { icon: '👥', label: 'Équipe', desc: 'Sélectionne 3 joueurs + 1 coach de ta collection' },
+                { icon: '🔥', label: 'Cohésion', desc: 'Nation, rareté et stats déterminent ta force' },
+                { icon: '⚽', label: 'Match 20s', desc: 'Simulation animée en temps réel sur le terrain' },
+                { icon: '🏆', label: 'Résultat', desc: 'Le score final désigne le vainqueur' },
               ].map((step) => (
                 <div key={step.label} className="flex items-center gap-3">
                   <span className="text-2xl">{step.icon}</span>

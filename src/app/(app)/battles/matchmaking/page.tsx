@@ -13,5 +13,5 @@ export default async function MatchmakingPage() {
     .eq('id', user.id)
     .single()
 
-  return <MatchmakingClient userId={user.id} pseudo={profile?.pseudo ?? '?'} />
+  return <MatchmakingClient userId={user.id} />
 }
