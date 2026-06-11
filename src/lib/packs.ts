@@ -16,7 +16,8 @@ function rollRarity(odds: Record<string, number>): CardRarity {
 
 export async function openPack(
   userId: string,
-  packType: PackType
+  packType: PackType,
+  globalProgression: number  // 0-100 — les Legends sont verrouillées sous 70%
 ): Promise<{ cards: Card[]; error?: string }> {
   const supabase = createAdminClient()
   const config = PACK_CONFIGS[packType]
@@ -24,7 +25,12 @@ export async function openPack(
   const cards: Card[] = []
 
   for (let i = 0; i < config.cards; i++) {
-    const rarity = rollRarity(config.odds as Record<string, number>)
+    let rarity = rollRarity(config.odds as Record<string, number>)
+
+    // Les cartes Legend ne peuvent sortir qu'à partir de 70% de progression globale
+    if (rarity === 'Legend' && globalProgression < 70) {
+      rarity = 'Epic'
+    }
 
     // Fetch a random card of the required rarity
     const { data: pool } = await supabase

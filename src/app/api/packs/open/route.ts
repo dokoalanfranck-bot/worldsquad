@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { openPack } from '@/lib/packs'
 import { debitCoins, creditCoins } from '@/lib/coins'
 import { PACK_CONFIGS } from '@/types'
@@ -14,6 +15,14 @@ export async function POST(req: NextRequest) {
 
   const config = PACK_CONFIGS[packType]
 
+  // Calcul de la progression globale du joueur (cartes possédées / total cartes joueurs)
+  const admin = createAdminClient()
+  const [{ count: totalCards }, { count: ownedCards }] = await Promise.all([
+    admin.from('cards').select('*', { count: 'exact', head: true }).eq('type', 'player'),
+    admin.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+  ])
+  const globalProgression = totalCards ? Math.round(((ownedCards ?? 0) / totalCards) * 100) : 0
+
   // Debit coins server-side (atomic)
   const { success, newBalance, error: debitError } = await debitCoins(
     user.id,
@@ -22,8 +31,8 @@ export async function POST(req: NextRequest) {
   )
   if (!success) return NextResponse.json({ error: debitError ?? 'Coins insuffisants' }, { status: 400 })
 
-  // Select & insert cards
-  const { cards, error } = await openPack(user.id, packType)
+  // Select & insert cards (Legends verrouillées avant 70% de progression)
+  const { cards, error } = await openPack(user.id, packType, globalProgression)
   if (error) {
     // Refund on failure
     await creditCoins(user.id, config.cost, `Remboursement ${config.name}`)
