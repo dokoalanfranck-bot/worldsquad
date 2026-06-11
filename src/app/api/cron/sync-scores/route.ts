@@ -42,11 +42,10 @@ export async function GET(req: NextRequest) {
   let fixtures: ApiFixture[] = []
   try {
     const res = await fetch(
-      `https://api-football-v1.p.rapidapi.com/v3/fixtures?league=${leagueId}&season=${season}&live=all`,
+      `https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${season}&live=all`,
       {
         headers: {
-          'x-rapidapi-key': rapidApiKey,
-          'x-rapidapi-host': 'api-football-v1.p.rapidapi.com',
+          'x-apisports-key': rapidApiKey,
         },
         next: { revalidate: 0 },
       }
