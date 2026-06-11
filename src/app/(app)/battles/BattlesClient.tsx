@@ -69,7 +69,7 @@ export function BattlesClient({ battles, currentUserId }: Props) {
           )}
         </div>
         <Link
-          href="/battles/new"
+          href="/battles/matchmaking"
           className="inline-flex items-center gap-2 bg-[#F5C518] hover:bg-[#ffd700] text-black font-black px-5 py-2.5 rounded-xl transition-all hover:scale-105 text-sm"
           style={{ fontFamily: 'Bebas Neue, sans-serif' }}
         >
@@ -117,7 +117,7 @@ export function BattlesClient({ battles, currentUserId }: Props) {
             <p className="text-white font-bold text-lg mb-2">Aucun battle pour l&apos;instant</p>
             <p className="text-gray-500 text-sm mb-6">Lance ton premier défi contre un membre de ton groupe</p>
             <Link
-              href="/battles/new"
+              href="/battles/matchmaking"
               className="inline-flex items-center gap-2 bg-[#F5C518] text-black font-black px-6 py-3 rounded-xl hover:bg-[#ffd700] transition-colors"
               style={{ fontFamily: 'Bebas Neue, sans-serif' }}
             >
