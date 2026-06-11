@@ -31,7 +31,7 @@ export function BattlesClient({ battles, currentUserId }: Props) {
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-4xl mx-auto">
-      {/* Draft Duel CTA */}
+      {/* Team Match CTA */}
       <Link
         href="/battles/matchmaking"
         className="block w-full glass rounded-2xl p-5 mb-6 border border-[#F5C518]/20 hover:border-[#F5C518]/50 transition-all group"
@@ -41,13 +41,13 @@ export function BattlesClient({ battles, currentUserId }: Props) {
             <div className="flex items-center gap-2 mb-1">
               <Wifi size={16} className="text-[#F5C518]" />
               <span className="text-[#F5C518] font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                DRAFT DUEL — NOUVEAU
+                TEAM MATCH — MATCHMAKING
               </span>
             </div>
-            <p className="text-white font-bold">3 cartes · Ban · 3 rounds</p>
-            <p className="text-gray-500 text-xs mt-0.5">Matchmaking automatique · Tu gagnes une carte adverse</p>
+            <p className="text-white font-bold">3 joueurs + coach · Cohésion · Match 20s</p>
+            <p className="text-gray-500 text-xs mt-0.5">Simulation en temps réel · Terrain animé</p>
           </div>
-          <div className="text-4xl group-hover:scale-110 transition-transform">⚔️</div>
+          <div className="text-4xl group-hover:scale-110 transition-transform">⚽</div>
         </div>
       </Link>
 
@@ -171,6 +171,10 @@ function BattleCard({ battle, currentUserId }: { battle: Battle; currentUserId: 
   }
 
   function handleClick() {
+    if (battle.type === 'team_match') {
+      router.push(`/battles/${battle.id}/play`)
+      return
+    }
     if (isFinished) router.push(`/battles/${battle.id}`)
     if (isMyPendingChallenge) router.push(`/battles/${battle.id}/accept`)
   }

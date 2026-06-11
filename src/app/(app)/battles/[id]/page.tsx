@@ -28,7 +28,12 @@ export default async function BattlePage({ params }: { params: Promise<{ id: str
   // Only participants can view
   if (battle.challenger_id !== user.id && battle.opponent_id !== user.id) redirect('/battles')
 
-  // Pending: redirect opponent to accept page
+  // team_match actif → toujours vers /play
+  if (battle.type === 'team_match' && battle.phase !== 'finished') {
+    redirect(`/battles/${battleId}/play`)
+  }
+
+  // Pending: redirect opponent to accept page (classic battles)
   if (battle.status === 'pending' && battle.opponent_id === user.id) {
     redirect(`/battles/${battleId}/accept`)
   }

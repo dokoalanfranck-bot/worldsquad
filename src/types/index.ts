@@ -111,6 +111,8 @@ export interface Battle {
   coins_stake: number
   winner_id: string | null
   status: BattleStatus
+  type?: string
+  phase?: string
   stat_compared: string | null
   result_summary: string | null
   rounds: BattleRound[] | null
