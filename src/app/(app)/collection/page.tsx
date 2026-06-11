@@ -29,11 +29,12 @@ interface SearchParams {
   view?: string
 }
 
-export default async function CollectionPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function CollectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const view = searchParams.view ?? 'grid'
+  const view = params.view ?? 'grid'
 
   // Fetch owned IDs (always needed)
   const { data: userCards } = await supabase
@@ -80,9 +81,9 @@ export default async function CollectionPage({ searchParams }: { searchParams: S
   }
 
   // ── GRID VIEW ────────────────────────────────────────────
-  const page = Math.max(1, parseInt(searchParams.page ?? '1') || 1)
-  const type = searchParams.type ?? 'all'
-  const rarity = searchParams.rarity ?? 'all'
+  const page = Math.max(1, parseInt(params.page ?? '1') || 1)
+  const type = params.type ?? 'all'
+  const rarity = params.rarity ?? 'all'
   const offset = (page - 1) * PAGE_SIZE
 
   let ownedQuery = supabase
