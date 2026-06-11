@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
-import { Trophy, X, Swords, ArrowLeft, Flame, Check, Clock } from 'lucide-react'
+import { Trophy, X, Swords, ArrowLeft, Flame, Check, Clock, Search } from 'lucide-react'
 import type { Card } from '@/types'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
@@ -131,29 +131,57 @@ export function PlayClient({ initialBattle, currentUserId, myCards }: Props) {
     if (phase === 'match_ready') {
       return <MatchAnimationClient battle={battle} currentUserId={currentUserId} />
     }
+    if (phase === 'pick_reward') {
+      return (
+        <TeamMatchPickReward
+          battleId={battle.id}
+          iWon={winnerId === currentUserId}
+          them={them}
+          finalScore={battle.final_score as { home: number; away: number } | null}
+        />
+      )
+    }
     if (phase === 'finished') {
       const iWon = winnerId === currentUserId
       const isDraw = !winnerId
       const finalScore = battle.final_score as { home: number; away: number } | null
+      const rewardCard = battle.reward_card as Card | null
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-6">
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-5 max-w-sm mx-auto">
           <div className="text-6xl">{isDraw ? '🤝' : iWon ? '🏆' : '💔'}</div>
-          <h2 className={`text-5xl font-black ${isDraw ? 'text-gray-300' : iWon ? 'text-[#F5C518]' : 'text-red-400'}`}
-            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          <h2
+            className={`text-5xl font-black ${isDraw ? 'text-gray-300' : iWon ? 'text-[#F5C518]' : 'text-red-400'}`}
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+          >
             {isDraw ? 'MATCH NUL' : iWon ? 'VICTOIRE !' : 'DÉFAITE'}
           </h2>
           {finalScore && (
-            <p className="text-gray-400 text-lg font-bold">
+            <p className="text-gray-400 text-xl font-black" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
               {finalScore.home} — {finalScore.away}
             </p>
           )}
-          <div className="flex gap-3">
-            <Link href="/battles/matchmaking"
-              className="bg-[#F5C518] text-black font-black px-6 py-3 rounded-xl text-sm"
-              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              REJOUER
+          {rewardCard && (
+            <div className={`w-full glass rounded-2xl p-4 flex flex-col items-center gap-3 border ${iWon ? 'border-[#F5C518]/30' : 'border-red-500/20'}`}>
+              <p className={`text-xs font-bold ${iWon ? 'text-[#F5C518]' : 'text-red-400'}`}>
+                {iWon ? '🎴 Carte volée à l\'adversaire' : '💸 Carte perdue'}
+              </p>
+              <GameCard card={rewardCard} owned size="md" />
+              <p className="text-white font-bold text-sm">{rewardCard.name}</p>
+              <p className="text-white/40 text-xs capitalize">{rewardCard.rarity}</p>
+            </div>
+          )}
+          <div className="flex gap-3 w-full">
+            <Link
+              href="/battles/matchmaking"
+              className="flex-1 bg-[#F5C518] text-black font-black py-3 rounded-xl text-sm flex items-center justify-center gap-1"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
+              <Swords size={14} /> REJOUER
             </Link>
-            <Link href="/battles" className="border border-white/10 text-gray-400 px-6 py-3 rounded-xl text-sm hover:text-white transition-colors">
+            <Link
+              href="/battles"
+              className="flex-1 border border-white/10 text-gray-400 py-3 rounded-xl text-sm font-semibold text-center hover:text-white transition-colors"
+            >
               Mes battles
             </Link>
           </div>
@@ -560,6 +588,189 @@ export function PlayClient({ initialBattle, currentUserId, myCards }: Props) {
         <p className="text-gray-500 mb-4">Phase inconnue : {phase}</p>
         <Link href="/battles" className="text-[#F5C518] text-sm">← Retour</Link>
       </div>
+    </div>
+  )
+}
+
+// ── TeamMatchPickReward ──────────────────────────────────────────────────────
+
+function TeamMatchPickReward({
+  battleId,
+  iWon,
+  them,
+  finalScore,
+}: {
+  battleId: string
+  iWon: boolean
+  them: UserProfile
+  finalScore: { home: number; away: number } | null
+}) {
+  const [cards, setCards] = useState<Card[] | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    if (!iWon) return
+    fetch(`/api/battles/${battleId}/opponent-cards`)
+      .then((r) => r.json())
+      .then((d) => setCards(d.cards ?? []))
+      .catch(() => setCards([]))
+  }, [battleId, iWon])
+
+  async function claimCard() {
+    if (!selected) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/battles/${battleId}/steal-card`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: selected }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        toast.error(d.error ?? 'Erreur')
+      }
+    } catch {
+      toast.error('Erreur réseau')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filtered = cards
+    ? cards.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
+    : null
+
+  return (
+    <div className="min-h-screen px-4 py-6 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="text-center mb-6">
+        {iWon ? (
+          <>
+            <div className="text-5xl mb-2">🏆</div>
+            <h2
+              className="text-4xl font-black text-[#F5C518] mb-1"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
+              VICTOIRE !
+            </h2>
+            {finalScore && (
+              <p className="text-white/50 font-bold text-lg mb-1">
+                {finalScore.home} — {finalScore.away}
+              </p>
+            )}
+            <p className="text-white text-sm">
+              Choisissez <span className="text-[#F5C518] font-black">1 carte</span> à voler à {them?.pseudo}
+            </p>
+            <p className="text-white/30 text-xs mt-1">Elle rejoindra votre collection définitivement</p>
+          </>
+        ) : (
+          <>
+            <div className="text-5xl mb-2">💔</div>
+            <h2
+              className="text-4xl font-black text-red-400 mb-1"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
+              DÉFAITE
+            </h2>
+            {finalScore && (
+              <p className="text-white/50 font-bold text-lg mb-1">
+                {finalScore.home} — {finalScore.away}
+              </p>
+            )}
+            <p className="text-white/50 text-sm">{them?.pseudo} est en train de choisir une de vos cartes…</p>
+          </>
+        )}
+      </div>
+
+      {iWon ? (
+        <>
+          {cards === null ? (
+            <div className="flex items-center justify-center py-16">
+              <Clock size={28} className="text-white/30 animate-pulse" />
+            </div>
+          ) : cards.length === 0 ? (
+            <div className="glass rounded-2xl p-8 text-center border border-white/5">
+              <p className="text-white/40 text-sm">L'adversaire ne possède aucune carte que vous n'avez pas déjà</p>
+              <p className="text-white/20 text-xs mt-1">La victoire est déjà enregistrée ✓</p>
+            </div>
+          ) : (
+            <>
+              {/* Search */}
+              {cards.length > 6 && (
+                <div className="relative mb-4">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Rechercher une carte…"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none focus:border-[#F5C518]/40"
+                  />
+                </div>
+              )}
+
+              {/* Cards grid */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[55vh] overflow-y-auto pr-1 mb-5">
+                {(filtered ?? []).map((card) => (
+                  <motion.div
+                    key={card.id}
+                    whileTap={{ scale: 0.95 }}
+                    className={`rounded-xl cursor-pointer transition-all ${selected === card.id ? 'ring-2 ring-[#F5C518]' : ''}`}
+                    onClick={() => setSelected(card.id)}
+                  >
+                    <GameCard card={card} owned size="sm" selected={selected === card.id} onClick={() => {}} />
+                  </motion.div>
+                ))}
+                {filtered?.length === 0 && (
+                  <p className="col-span-3 text-center text-white/30 text-sm py-6">Aucune carte trouvée</p>
+                )}
+              </div>
+
+              {/* Selected preview + confirm */}
+              {selected && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass rounded-xl p-3 mb-3 flex items-center gap-3 border border-[#F5C518]/20"
+                >
+                  <div className="w-12 shrink-0">
+                    <GameCard
+                      card={cards.find((c) => c.id === selected)!}
+                      owned
+                      size="sm"
+                      onClick={() => {}}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm truncate">
+                      {cards.find((c) => c.id === selected)?.name}
+                    </p>
+                    <p className="text-white/40 text-xs capitalize">
+                      {cards.find((c) => c.id === selected)?.rarity}
+                    </p>
+                  </div>
+                  <button onClick={() => setSelected(null)} className="text-white/30 hover:text-white/60 p-1">
+                    <X size={14} />
+                  </button>
+                </motion.div>
+              )}
+
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                disabled={!selected || loading}
+                onClick={claimCard}
+                className="w-full bg-[#F5C518] disabled:opacity-40 text-black font-black py-4 rounded-xl text-lg flex items-center justify-center gap-2"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+              >
+                {loading ? '…' : <><Check size={18} /> VOLER CETTE CARTE</>}
+              </motion.button>
+            </>
+          )}
+        </>
+      ) : (
+        <WaitingCard message={`${them?.pseudo} est en train de choisir une de vos cartes…`} />
+      )}
     </div>
   )
 }

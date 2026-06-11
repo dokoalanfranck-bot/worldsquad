@@ -30,10 +30,24 @@ export async function POST(
     ? (winnerId === battle.challenger_id ? battle.opponent_id : battle.challenger_id)
     : null
 
+  // Déterminer la prochaine phase — pick_reward si le perdant a des cartes que le gagnant n'a pas
+  let nextPhase: 'pick_reward' | 'finished' = 'finished'
+  if (winnerId && loserId) {
+    const [{ data: loserCards }, { data: winnerCards }] = await Promise.all([
+      admin.from('user_cards').select('card_id').eq('user_id', loserId),
+      admin.from('user_cards').select('card_id').eq('user_id', winnerId),
+    ])
+    const winnerOwned = new Set((winnerCards ?? []).map((c) => c.card_id))
+    const stealable = (loserCards ?? []).filter((c) => !winnerOwned.has(c.card_id))
+    if (stealable.length > 0) nextPhase = 'pick_reward'
+  }
+
   // Transition atomique — si une autre requête est passée en premier, data sera vide
   const { data: updated } = await admin
     .from('battles')
-    .update({ phase: 'finished', status: 'finished' })
+    .update(nextPhase === 'finished'
+      ? { phase: 'finished', status: 'finished' }
+      : { phase: 'pick_reward' })
     .eq('id', battleId)
     .eq('phase', 'match_ready')
     .select('id')

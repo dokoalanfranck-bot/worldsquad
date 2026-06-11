@@ -16,7 +16,8 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
     .select(`
       *,
       challenger:users!battles_challenger_id_fkey(id, pseudo, nation, photo_url, coins),
-      opponent:users!battles_opponent_id_fkey(id, pseudo, nation, photo_url, coins)
+      opponent:users!battles_opponent_id_fkey(id, pseudo, nation, photo_url, coins),
+      reward_card:cards!reward_card_id(id, name, rarity, image_url, stats, type, nation, position, flag)
     `)
     .eq('id', battleId)
     .single()
