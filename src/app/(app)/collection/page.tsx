@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CollectionClient } from './CollectionClient'
 import { PaniniClient } from './PaniniClient'
 import type { Card } from '@/types'
@@ -47,7 +48,8 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
 
   // ── PANINI VIEW ──────────────────────────────────────────
   if (view === 'panini') {
-    const { data: allPlayerCards, count: totalCount } = await supabase
+    const admin = createAdminClient()
+    const { data: allPlayerCards, count: totalCount } = await admin
       .from('cards')
       .select('*', { count: 'exact' })
       .eq('type', 'player')
