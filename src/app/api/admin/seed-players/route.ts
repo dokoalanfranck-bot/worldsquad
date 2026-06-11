@@ -208,15 +208,64 @@ export async function POST(request: Request) {
     }
   })
 
-  // 5. Nettoyer les doublons non possédés
+  // 5. Nettoyer les doublons — y compris ceux possédés (migrer user_cards vers la carte canonique)
   const keepIds = new Set(cards.filter((c) => 'id' in c).map((c) => (c as { id: string }).id))
   const orphanIds = Array.from(allExistingIds).filter((id) => !keepIds.has(id))
+
   if (orphanIds.length > 0) {
+    // Récupérer toutes les user_cards pointant sur des doublons
     const { data: ownedOrphans } = await admin
-      .from('user_cards').select('card_id').in('card_id', orphanIds)
-    const ownedSet = new Set((ownedOrphans ?? []).map((uc) => uc.card_id))
-    const deletable = orphanIds.filter((id) => !ownedSet.has(id))
-    if (deletable.length > 0) await admin.from('cards').delete().in('id', deletable)
+      .from('user_cards')
+      .select('id, user_id, card_id')
+      .in('card_id', orphanIds)
+
+    if (ownedOrphans && ownedOrphans.length > 0) {
+      // Construire la map orphan_id → canonical_id
+      const orphanToCanonical = new Map<string, string>()
+      for (const orphanId of orphanIds) {
+        const orphanCard = existing.find((c) => c.id === orphanId)
+        if (!orphanCard) continue
+        const canonical = existingMap.get(`${orphanCard.name}||${orphanCard.nation ?? ''}`)
+        if (canonical) orphanToCanonical.set(orphanId, canonical.id)
+      }
+
+      // Vérifier quels users possèdent déjà la carte canonique
+      const affectedUserIds = Array.from(new Set(ownedOrphans.map((uc) => uc.user_id)))
+      const canonicalIds = Array.from(new Set(orphanToCanonical.values()))
+      const { data: alreadyOwned } = await admin
+        .from('user_cards')
+        .select('user_id, card_id')
+        .in('user_id', affectedUserIds)
+        .in('card_id', canonicalIds)
+
+      const ownsCanonical = new Set(
+        (alreadyOwned ?? []).map((uc) => `${uc.user_id}__${uc.card_id}`)
+      )
+
+      const ucToDelete: string[] = []
+      const ucToUpdate: { id: string; card_id: string }[] = []
+
+      for (const uc of ownedOrphans) {
+        const canonicalId = orphanToCanonical.get(uc.card_id)
+        if (!canonicalId) { ucToDelete.push(uc.id); continue }
+        if (ownsCanonical.has(`${uc.user_id}__${canonicalId}`)) {
+          // User possède déjà la canonique → supprimer le doublon
+          ucToDelete.push(uc.id)
+        } else {
+          // User ne possède que le doublon → rediriger vers la canonique
+          ucToUpdate.push({ id: uc.id, card_id: canonicalId })
+        }
+      }
+
+      if (ucToDelete.length > 0)
+        await admin.from('user_cards').delete().in('id', ucToDelete)
+
+      for (const u of ucToUpdate)
+        await admin.from('user_cards').update({ card_id: u.card_id }).eq('id', u.id)
+    }
+
+    // Supprimer tous les doublons (plus aucune FK ne les référence)
+    await admin.from('cards').delete().in('id', orphanIds)
   }
 
   // 6. Upsert : update les cartes existantes (by id), insert les nouvelles
