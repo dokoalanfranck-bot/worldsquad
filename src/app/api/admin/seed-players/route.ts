@@ -25,38 +25,155 @@ const FLAGS: Record<string, string> = {
   'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Croatia': '🇭🇷', 'Ghana': '🇬🇭', 'Panama': '🇵🇦',
 }
 
-// ─── KNOWN LEGENDS ────────────────────────────────────────────────────────────
-const LEGEND_NAMES = new Set([
-  'kylian mbappe', 'kylian mbappé', 'lionel messi', 'cristiano ronaldo', 'erling haaland',
-  'jude bellingham', 'vinicius jr', 'vinícius júnior', 'vinicius junior', 'mohamed salah',
-  'kevin de bruyne', 'luka modric', 'luka modrić', 'harry kane', 'son heungmin', 'son heung-min',
-  'martin odegaard', 'martin ødegaard', 'ruben dias', 'rúben dias', 'virgil van dijk',
-  'thibaut courtois', 'alisson', 'ederson', 'sadio mane', 'sadio mané',
-  'neymar jr', 'neymar', 'romelu lukaku', 'darwin nunez', 'darwin núñez',
+// ─── SYSTÈME DE RARETÉ (cote de popularité + potentiel FC25) ─────────────────
+//
+// Tier Legend garanti : superstars mondiales dont la renommée dépasse les stats
+// Tier Epic garanti   : stars internationales de premier plan
+// Pour tous les autres : score FC25 pondéré par poste → seuils automatiques
+//   ≥86 → Legend | ≥76 → Epic | ≥65 → Rare | <65 → Common
+
+const LEGEND_FLOOR = new Set([
+  // Attaquants / milieux offensifs — icônes planétaires
+  'kylian mbappe', 'kylian mbappé', 'lionel messi', 'cristiano ronaldo',
+  'erling haaland', 'vinicius jr', 'vinícius júnior', 'vinicius junior',
+  'jude bellingham', 'lamine yamal', 'jamal musiala', 'florian wirtz',
+  'pedri', 'rodri', 'bukayo saka', 'phil foden',
+  'mohamed salah', 'sadio mane', 'sadio mané',
+  'harry kane', 'son heung-min', 'son heungmin',
+  'neymar', 'neymar jr', 'darwin nunez', 'darwin núñez',
+  'lautaro martinez', 'julian alvarez', 'julián álvarez',
+  // Milieux / défenseurs — légendes du jeu
+  'kevin de bruyne', 'luka modric', 'luka modrić',
+  'martin odegaard', 'martin ødegaard', 'federico valverde',
+  // Défenseurs / GK
+  'virgil van dijk', 'ruben dias', 'rúben dias',
+  'thibaut courtois', 'alisson', 'ederson', 'emiliano martinez',
+  // Romelu Lukaku — record de buts en sélection belge
+  'romelu lukaku',
 ])
 
-const EPIC_NAMES = new Set([
-  'ousmane dembele', 'ousmane dembélé', 'marcus thuram', 'bukayo saka', 'declan rice',
-  'pedri', 'gavi', 'rodri', 'lamine yamal', 'nico williams', 'florian wirtz', 'jamal musiala',
-  'leroy sane', 'leroy sané', 'bruno fernandes', 'bernardo silva', 'rafael leao', 'rafael leão',
-  'julian alvarez', 'julián álvarez', 'alexis mac allister', 'enzo fernandez', 'enzo fernández',
-  'federico valverde', 'rodrigo de paul', 'achraf hakimi', 'cody gakpo',
-  'frenkie de jong', 'ryan gravenberch', 'kalidou koulibaly', 'alphonso davies',
-  'jonathan david', 'moises caicedo', 'moisés caicedo', 'hakan calhanoglu', 'hakan çalhanoğlu',
-  'granit xhaka', 'santiago gimenez', 'lee kangin', 'rayan cherki', 'viktor gyokeres',
-  'alexander isak', 'joao felix', 'joao félix', 'arda guler', 'kenan yildiz',
-  'lautaro martinez', 'kim minjae',
+const EPIC_FLOOR = new Set([
+  // France
+  'ousmane dembele', 'ousmane dembélé', 'marcus thuram', 'antoine griezmann',
+  'aurelien tchouameni', 'aurélien tchouaméni', 'theo hernandez', 'théo hernandez',
+  'william saliba', 'mike maignan', 'randal kolo muani', 'bradley barcola',
+  // Angleterre
+  'declan rice', 'marcus rashford', 'trent alexander-arnold',
+  'john stones', 'kyle walker', 'kobbie mainoo',
+  // Espagne
+  'gavi', 'nico williams', 'dani carvajal', 'alejandro grimaldo',
+  'ferran torres', 'alvaro morata', 'pau torres',
+  // Allemagne
+  'leroy sane', 'leroy sané', 'kai havertz', 'thomas muller', 'thomas müller',
+  'antonio rudiger', 'antonio rüdiger', 'joshua kimmich', 'ilkay gundogan',
+  'serge gnabry', 'josko gvardiol',
+  // Portugal
+  'bruno fernandes', 'bernardo silva', 'rafael leao', 'rafael leão',
+  'joao felix', 'joao félix', 'diogo jota', 'vitinha', 'joao neves',
+  'nuno mendes', 'joao cancelo',
+  // Pays-Bas
+  'cody gakpo', 'frenkie de jong', 'ryan gravenberch', 'xavi simons',
+  'nathan ake', 'denzel dumfries', 'teun koopmeiners', 'tijjani reijnders',
+  'jeremy doku', 'donyell malen', 'lois openda',
+  // Belgique
+  'amadou onana', 'youri tielemans', 'alexis saelemaekers', 'charles de ketelaere',
+  'leandro trossard',
+  // Argentine
+  'alexis mac allister', 'enzo fernandez', 'enzo fernández', 'rodrigo de paul',
+  'cristian romero', 'lisandro martinez', 'nahuel molina', 'leandro paredes',
+  // Brésil
+  'raphinha', 'rodrygo', 'gabriel martinelli', 'lucas paqueta', 'lucas paquetá',
+  'marquinhos', 'eder militao', 'casemiro', 'endrick', 'bruno guimaraes',
+  // Croatie
+  'ivan perisic', 'ivan perišić', 'mateo kovacic', 'mateo kovačić',
+  'andrej kramaric', 'andrej kramarić', 'marcelo brozovic',
+  // Sénégal
+  'kalidou koulibaly', 'idrissa gana gueye', 'ismaila sarr', 'nicolas jackson',
+  'pape matar sarr', 'lamine camara',
+  // Maroc
+  'achraf hakimi', 'hakim ziyech', 'youssef en-nesyri', 'noussair mazraoui',
+  'sofyan amrabat', 'nayef aguerd',
+  // Japon
+  'kaoru mitoma', 'takefusa kubo', 'daichi kamada', 'wataru endo', 'ritsu doan',
+  'junya ito', 'takehiro tomiyasu',
+  // Corée du Sud
+  'kim minjae', 'hwang hee-chan', 'lee kangin',
+  // Mexique
+  'santiago gimenez', 'hirving lozano', 'edson alvarez', 'raul jimenez',
+  // USA
+  'christian pulisic', 'weston mckennie', 'tyler adams', 'giovanni reyna',
+  'antonee robinson', 'folarin balogun',
+  // Canada
+  'alphonso davies', 'jonathan david', 'tajon buchanan', 'stephan eustaquio',
+  // Uruguay
+  'rodrigo bentancur', 'jose maria gimenez', 'facundo torres',
+  // Colombie
+  'luis diaz', 'luis díaz', 'moises caicedo', 'moisés caicedo',
+  'james rodriguez', 'james rodríguez', 'davinson sanchez',
+  // Turquie
+  'hakan calhanoglu', 'hakan çalhanoğlu', 'arda guler', 'kenan yildiz', 'merih demiral',
+  // Algérie
+  'riyad mahrez', 'houssem aouar', 'amine gouiri', 'ramy bensebaini',
+  // Suède
+  'alexander isak', 'dejan kulusevski', 'viktor gyokeres', 'emil forsberg',
+  // Suisse
+  'granit xhaka', 'yann sommer', 'breel embolo', 'xherdan shaqiri', 'manuel akanji',
+  // Norvège
+  'alexander sorloth',
+  // Écosse
+  'scott mctominay', 'andy robertson', 'john mcginn',
+  // Ghana
+  'thomas partey', 'jordan ayew',
+  // Côte d'Ivoire
+  'franck kessie', 'franck kessié', 'sebastien haller', 'sébastien haller',
+  // Égypte
+  'omar marmoush',
+  // Iran
+  'mehdi taremi', 'sardar azmoun',
+  // Équateur
+  'enner valencia',
+  // Australie
+  'mathew leckie',
+  // Divers
+  'rayan cherki',
 ])
 
-function assignRarity(name: string): CardRarity {
+// Score global pondéré par poste (basé sur FC25)
+function positionOverall(
+  s: { pace: number; shooting: number; passing: number; defending: number; dribbling: number; physical: number },
+  pos: string
+): number {
+  const { pace: p, shooting: sh, passing: pa, defending: d, dribbling: dr, physical: ph } = s
+  if (pos === 'GK')  return p*0.05 + sh*0.05 + pa*0.10 + d*0.40 + dr*0.05 + ph*0.35
+  if (pos === 'DEF') return p*0.10 + sh*0.05 + pa*0.10 + d*0.40 + dr*0.10 + ph*0.25
+  if (pos === 'MID') return p*0.10 + sh*0.15 + pa*0.30 + d*0.15 + dr*0.25 + ph*0.05
+  // FWD
+  return p*0.20 + sh*0.35 + pa*0.10 + d*0.05 + dr*0.30 + ph*0.00
+}
+
+function assignRarity(name: string, pos: string): CardRarity {
   const n = name.toLowerCase()
-  if (LEGEND_NAMES.has(n)) return 'Legend'
-  if (EPIC_NAMES.has(n)) return 'Epic'
-  // Hash-based for determinism: ~20% Rare, rest Common
+
+  // Plancher garanti par la renommée mondiale
+  if (LEGEND_FLOOR.has(n)) return 'Legend'
+  if (EPIC_FLOOR.has(n)) return 'Epic'
+
+  // Score FC25 pour les joueurs avec des stats réelles
+  const fc25 = getFC25Stats(name)
+  if (fc25) {
+    const score = positionOverall(fc25, pos)
+    if (score >= 86) return 'Legend'
+    if (score >= 76) return 'Epic'
+    if (score >= 65) return 'Rare'
+    return 'Common'
+  }
+
+  // Fallback déterministe pour les joueurs sans stats FC25
+  // Distribution : ~3% Epic, ~22% Rare, ~75% Common
   let hash = 0
   for (const c of n) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff
   const h = Math.abs(hash) % 100
-  if (h < 5) return 'Epic'
+  if (h < 3) return 'Epic'
   if (h < 25) return 'Rare'
   return 'Common'
 }
@@ -194,7 +311,7 @@ export async function POST(request: Request) {
   // 4. Build card rows — inclure l'id existant si le joueur est déjà en DB
   const cards = allPlayers.map((p) => {
     const flag = FLAGS[p.team] ?? '🏳'
-    const rarity: CardRarity = p.isCoach ? 'Rare' : assignRarity(p.name)
+    const rarity: CardRarity = p.isCoach ? 'Rare' : assignRarity(p.name, p.pos)
     const found = existingMap.get(`${p.name}||${p.team}`)
     return {
       ...(found ? { id: found.id } : {}),
