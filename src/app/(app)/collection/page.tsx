@@ -53,6 +53,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
       .eq('type', 'player')
       .order('nation')
       .order('name')
+      .limit(2000)
 
     // Group by nation
     const groups: Record<string, Card[]> = {}

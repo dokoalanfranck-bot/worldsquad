@@ -128,13 +128,16 @@ async function fetchPhotoBatch(names: string[]): Promise<Record<string, string |
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // ─── ROUTE ────────────────────────────────────────────────────────────────────
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: profile } = await supabase.from('users').select('is_admin').eq('id', authUser.id).single()
   if (!profile?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const body = await request.json().catch(() => ({}))
+  const skipPhotos: boolean = body.skipPhotos ?? false
 
   const admin = createAdminClient()
 
@@ -145,7 +148,6 @@ export async function POST() {
     .eq('type', 'player')
     .not('image_url', 'is', null)
 
-  // Garder uniquement les images uploadées manuellement (stockées sur Supabase)
   const savedImages: Record<string, string> = {}
   for (const card of existingCards ?? []) {
     if (card.image_url?.includes('supabase.co')) {
@@ -153,10 +155,7 @@ export async function POST() {
     }
   }
 
-  // 2. Supprimer les cartes existantes
-  await admin.from('cards').delete().eq('type', 'player')
-
-  // 3. Collect all players + coaches from squads
+  // 2. Collect all players + coaches from squads
   type RawPlayer = { name: string; pos: string; team: string; isCoach?: boolean }
   const allPlayers: RawPlayer[] = []
   for (const squad of WC2026_SQUADS) {
@@ -168,18 +167,20 @@ export async function POST() {
     }
   }
 
-  // 3. Fetch photos in parallel batches of 5 (respects TheSportsDB free tier)
-  const BATCH_SIZE = 5
+  // 3. Fetch photos BEFORE deleting (so existing cards are preserved if this times out)
   const photoMap: Record<string, string | null> = {}
   let withPhotos = 0
 
-  for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
-    const batch = allPlayers.slice(i, i + BATCH_SIZE)
-    const names = batch.map((p) => p.name)
-    const batchResults = await fetchPhotoBatch(names)
-    Object.assign(photoMap, batchResults)
-    withPhotos += Object.values(batchResults).filter(Boolean).length
-    await delay(150) // Stay well within TheSportsDB rate limits
+  if (!skipPhotos) {
+    const BATCH_SIZE = 5
+    for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
+      const batch = allPlayers.slice(i, i + BATCH_SIZE)
+      const names = batch.map((p) => p.name)
+      const batchResults = await fetchPhotoBatch(names)
+      Object.assign(photoMap, batchResults)
+      withPhotos += Object.values(batchResults).filter(Boolean).length
+      await delay(150)
+    }
   }
 
   // 4. Build card rows
@@ -200,7 +201,9 @@ export async function POST() {
     }
   })
 
-  // 5. Insert in batches of 100
+  // 5. Supprimer les cartes existantes puis réinsérer
+  await admin.from('cards').delete().eq('type', 'player')
+
   let inserted = 0
   const insertErrors: string[] = []
 
@@ -223,6 +226,7 @@ export async function POST() {
     inserted,
     withPhotos,
     teamsProcessed: WC2026_SQUADS.length,
+    skippedPhotos: skipPhotos,
     errors: insertErrors.length ? insertErrors : undefined,
   })
 }
