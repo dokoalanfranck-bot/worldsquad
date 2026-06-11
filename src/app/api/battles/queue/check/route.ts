@@ -13,7 +13,7 @@ export async function GET(_req: Request) {
     .select('id')
     .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
     .eq('type', 'team_match')
-    .in('phase', ['team_selection', 'match_ready'])
+    .in('phase', ['team_selection', 'match_ready', 'pick_reward'])
     .limit(1)
 
   if (battles && battles.length > 0) {
