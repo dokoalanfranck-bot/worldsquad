@@ -10,7 +10,7 @@ export default async function DashboardPage() {
 
   if (!authUser) redirect('/login')
 
-  const [{ data: profile }, { data: nextMatch }, { data: recentPredictions }, { data: groupData }] =
+  const [{ data: profile }, { data: nextMatch }, { data: recentPredictions }, { data: groupData }, { data: liveMatches }, { data: recentFinished }] =
     await Promise.all([
       supabase.from('users').select('*').eq('id', authUser.id).single(),
       supabase
@@ -32,6 +32,17 @@ export default async function DashboardPage() {
         .eq('user_id', authUser.id)
         .limit(1)
         .single(),
+      supabase
+        .from('matches')
+        .select('*')
+        .eq('status', 'live')
+        .order('match_date', { ascending: true }),
+      supabase
+        .from('matches')
+        .select('*')
+        .eq('status', 'finished')
+        .order('match_date', { ascending: false })
+        .limit(4),
     ])
 
   if (!profile) redirect('/signup')
@@ -74,6 +85,8 @@ export default async function DashboardPage() {
       group={groupData?.group as unknown as { id: string; name: string; code: string } | null}
       groupActivity={groupActivity ?? []}
       dailyReward={{ canClaim, nextClaim, streak, todayReward }}
+      liveMatches={liveMatches ?? []}
+      recentFinished={recentFinished ?? []}
     />
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { Calendar, Gift, Swords, ShoppingBag, Crown, Target, Check, X, Clock, Users, Flame, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -23,6 +23,8 @@ interface Props {
   group: { id: string; name: string; code: string } | null
   groupActivity: (GroupActivity & { user: { pseudo: string; photo_url: string | null } | null })[]
   dailyReward: DailyRewardState
+  liveMatches: Match[]
+  recentFinished: Match[]
 }
 
 function Countdown({ targetDate }: { targetDate: string }) {
@@ -58,6 +60,129 @@ function Countdown({ targetDate }: { targetDate: string }) {
         </div>
       ))}
     </div>
+  )
+}
+
+function LiveScoresWidget({ initialLive, initialFinished }: { initialLive: Match[]; initialFinished: Match[] }) {
+  const supabase = createClient()
+  const [liveMatches, setLiveMatches] = useState<Match[]>(initialLive)
+  const [finishedMatches, setFinishedMatches] = useState<Match[]>(initialFinished)
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('live-scores')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload) => {
+        const m = payload.new as Match
+        if (m.status === 'live') {
+          setLiveMatches((prev) => {
+            const exists = prev.find((x) => x.id === m.id)
+            return exists ? prev.map((x) => (x.id === m.id ? m : x)) : [m, ...prev]
+          })
+          setFinishedMatches((prev) => prev.filter((x) => x.id !== m.id))
+        } else if (m.status === 'finished') {
+          setLiveMatches((prev) => prev.filter((x) => x.id !== m.id))
+          setFinishedMatches((prev) => {
+            const exists = prev.find((x) => x.id === m.id)
+            return exists ? prev.map((x) => (x.id === m.id ? m : x)) : [m, ...prev].slice(0, 4)
+          })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase])
+
+  if (liveMatches.length === 0 && finishedMatches.length === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="col-span-1 md:col-span-2 xl:col-span-3 mb-2"
+    >
+      <div className="glass rounded-2xl p-5 border border-white/5">
+        <div className="flex items-center gap-2 mb-4">
+          {liveMatches.length > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-red-400 font-black text-sm uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                En Direct
+              </span>
+            </span>
+          )}
+          {liveMatches.length > 0 && finishedMatches.length > 0 && (
+            <span className="text-gray-700">·</span>
+          )}
+          {finishedMatches.length > 0 && (
+            <span className="text-gray-500 font-semibold text-sm">Terminés</span>
+          )}
+          <Link href="/matches" className="ml-auto text-xs text-[#F5C518] hover:underline font-semibold">
+            Tous les matchs →
+          </Link>
+        </div>
+
+        <div className="space-y-1">
+          <AnimatePresence initial={false}>
+            {liveMatches.map((m) => (
+              <motion.div
+                key={m.id}
+                layout
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+              >
+                <Link href={`/matches/${m.id}`}>
+                  <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-red-500/10 bg-red-500/5">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-xl">{m.flag_a ?? '🏳'}</span>
+                      <span className="text-white font-bold text-sm truncate">{m.team_a}</span>
+                    </div>
+                    <div className="flex-shrink-0 text-center px-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-white font-black text-xl tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                          {m.score_a ?? 0}
+                        </span>
+                        <span className="text-red-400 text-xs font-black animate-pulse">LIVE</span>
+                        <span className="text-white font-black text-xl tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                          {m.score_b ?? 0}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                      <span className="text-white font-bold text-sm truncate text-right">{m.team_b}</span>
+                      <span className="text-xl">{m.flag_b ?? '🏳'}</span>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {finishedMatches.length > 0 && liveMatches.length > 0 && (
+            <div className="border-t border-white/5 my-2" />
+          )}
+
+          {finishedMatches.map((m) => (
+            <Link key={m.id} href={`/matches/${m.id}`}>
+              <div className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer opacity-60">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-lg">{m.flag_a ?? '🏳'}</span>
+                  <span className="text-gray-300 font-semibold text-sm truncate">{m.team_a}</span>
+                </div>
+                <div className="flex-shrink-0 text-center px-2">
+                  <span className="text-white font-black text-lg tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                    {m.score_a ?? '-'} - {m.score_b ?? '-'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                  <span className="text-gray-300 font-semibold text-sm truncate text-right">{m.team_b}</span>
+                  <span className="text-lg">{m.flag_b ?? '🏳'}</span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -161,6 +286,8 @@ export function DashboardClient({
   group,
   groupActivity,
   dailyReward,
+  liveMatches,
+  recentFinished,
 }: Props) {
   const [liveActivities, setLiveActivities] = useState(groupActivity)
   const supabase = createClient()
@@ -230,6 +357,7 @@ export function DashboardClient({
         animate="visible"
         className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
       >
+        <LiveScoresWidget initialLive={liveMatches} initialFinished={recentFinished} />
         {/* Next match widget */}
         {nextMatch && (
           <motion.div variants={item} className="col-span-1 md:col-span-2 xl:col-span-2">
