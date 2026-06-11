@@ -49,17 +49,29 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
   // ── PANINI VIEW ──────────────────────────────────────────
   if (view === 'panini') {
     const admin = createAdminClient()
-    const { data: allPlayerCards, count: totalCount } = await admin
-      .from('cards')
-      .select('*', { count: 'exact' })
-      .eq('type', 'player')
-      .order('nation')
-      .order('name')
-      .limit(10000)
+    // Paginer par tranches de 1000 pour contourner le plafond serveur PostgREST
+    const PAGE = 1000
+    let allPlayerCards: Card[] = []
+    let totalCount = 0
+    let offset = 0
+    while (true) {
+      const { data, count } = await admin
+        .from('cards')
+        .select('*', { count: offset === 0 ? 'exact' : undefined })
+        .eq('type', 'player')
+        .order('nation')
+        .order('name')
+        .range(offset, offset + PAGE - 1)
+      if (!data?.length) break
+      allPlayerCards = allPlayerCards.concat(data as Card[])
+      if (offset === 0) totalCount = count ?? 0
+      if (data.length < PAGE) break
+      offset += PAGE
+    }
 
     // Group by nation
     const groups: Record<string, Card[]> = {}
-    for (const card of allPlayerCards ?? []) {
+    for (const card of allPlayerCards) {
       const nation = (card as Card).nation ?? 'Inconnue'
       if (!groups[nation]) groups[nation] = []
       groups[nation].push(card as Card)
