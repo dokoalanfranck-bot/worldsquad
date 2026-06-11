@@ -35,11 +35,17 @@ export function MatchmakingClient({ userId }: Props) {
     if (realtimeRef.current) supabase.removeChannel(realtimeRef.current)
   }
 
+  function navigateToBattle(battleId: string) {
+    setStatus('found')
+    cleanup()
+    setTimeout(() => router.push(`/battles/${battleId}/play`), 1200)
+  }
+
   async function startSearch() {
     setStatus('searching')
     setElapsed(0)
 
-    // Subscribe to new battles where I'm opponent (matchmaker puts opponent second)
+    // Subscribe: battle INSERT où je suis opponent
     const channel = supabase
       .channel(`matchmaking-${userId}`)
       .on(
@@ -52,45 +58,50 @@ export function MatchmakingClient({ userId }: Props) {
         },
         (payload) => {
           const b = payload.new as { type: string; id: string }
-          if (b.type === 'team_match') {
-            setStatus('found')
-            cleanup()
-            setTimeout(() => router.push(`/battles/${b.id}/play`), 1200)
-          }
+          if (b.type === 'team_match') navigateToBattle(b.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'battles',
+          filter: `opponent_id=eq.${userId}`,
+        },
+        (payload) => {
+          const b = payload.new as { type: string; id: string; phase: string }
+          if (b.type === 'team_match' && b.phase !== 'finished') navigateToBattle(b.id)
         }
       )
       .subscribe()
 
     realtimeRef.current = channel
 
-    // Attempt to join queue immediately
+    // Tentative immédiate de rejoindre la file
     const res = await fetch('/api/battles/queue/join', { method: 'POST' })
     const data = await res.json()
 
     if (data.battleId) {
-      setStatus('found')
-      cleanup()
-      setTimeout(() => router.push(`/battles/${data.battleId}/play`), 1200)
+      navigateToBattle(data.battleId)
       return
     }
 
-    // Animate dots + tip rotation
+    // Animation dots + rotation des tips
     intervalRef.current = setInterval(() => {
       setDots((d) => (d + 1) % 4)
       setElapsed((e) => e + 1)
       setTipIdx((t) => (t + 1) % TIPS.length)
     }, 1500)
 
-    // Poll every 3s as fallback
+    // Polling toutes les 2s en fallback
     pollRef.current = setInterval(async () => {
-      const r = await fetch('/api/battles/queue/join', { method: 'POST' })
-      const d = await r.json()
-      if (d.battleId) {
-        setStatus('found')
-        cleanup()
-        setTimeout(() => router.push(`/battles/${d.battleId}/play`), 1200)
-      }
-    }, 3000)
+      try {
+        const r = await fetch('/api/battles/queue/join', { method: 'POST' })
+        const d = await r.json()
+        if (d.battleId) navigateToBattle(d.battleId)
+      } catch { /* réseau temporairement indisponible */ }
+    }, 2000)
   }
 
   async function cancelSearch() {
