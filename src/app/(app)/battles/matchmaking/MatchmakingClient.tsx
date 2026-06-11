@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Swords, X, Wifi } from 'lucide-react'
@@ -27,15 +27,22 @@ export function MatchmakingClient({ userId }: Props) {
   const [elapsed, setElapsed] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const hasMatchedRef = useRef(false)
 
   function cleanup() {
     if (intervalRef.current) clearInterval(intervalRef.current)
     if (pollRef.current) clearInterval(pollRef.current)
-    if (realtimeRef.current) supabase.removeChannel(realtimeRef.current)
+    if (channelRef.current) {
+      channelRef.current.untrack()
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
   }
 
   function navigateToBattle(battleId: string) {
+    if (hasMatchedRef.current) return
+    hasMatchedRef.current = true
     setStatus('found')
     cleanup()
     setTimeout(() => router.push(`/battles/${battleId}/play`), 1200)
@@ -44,79 +51,99 @@ export function MatchmakingClient({ userId }: Props) {
   async function startSearch() {
     setStatus('searching')
     setElapsed(0)
+    hasMatchedRef.current = false
 
-    // Subscribe: battle INSERT où je suis opponent
-    const channel = supabase
-      .channel(`matchmaking-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'battles',
-          filter: `opponent_id=eq.${userId}`,
-        },
-        (payload) => {
-          const b = payload.new as { type: string; id: string }
-          if (b.type === 'team_match') navigateToBattle(b.id)
+    // Canal Presence partagé par tous les joueurs qui cherchent
+    const ch = supabase.channel('matchmaking-global', {
+      config: { presence: { key: userId } },
+    })
+
+    // 1. Broadcast: le créateur notifie tout le monde quand la battle est faite
+    ch.on('broadcast', { event: 'match_found' }, ({ payload }) => {
+      const p = payload as { battleId: string; players: string[] }
+      if (p.players.includes(userId)) {
+        navigateToBattle(p.battleId)
+      }
+    })
+
+    // 2. Presence sync: dès que 2 joueurs sont présents, le "plus petit" userId crée
+    ch.on('presence', { event: 'sync' }, async () => {
+      if (hasMatchedRef.current) return
+
+      const state = ch.presenceState<{ userId: string }>()
+      const allUsers: string[] = Object.values(state)
+        .flat()
+        .map((p) => (p as { userId: string }).userId)
+        .filter(Boolean)
+        .sort()
+
+      if (allUsers.length < 2) return
+      // Seul le joueur avec le plus petit userId crée le battle
+      if (allUsers[0] !== userId) return
+
+      hasMatchedRef.current = true
+      const opponentId = allUsers[1]
+
+      try {
+        const res = await fetch('/api/battles/create-team-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opponentId }),
+        })
+        const data = await res.json()
+
+        if (data.battleId) {
+          // Notifie l'adversaire via broadcast
+          await ch.send({
+            type: 'broadcast',
+            event: 'match_found',
+            payload: { battleId: data.battleId, players: [userId, opponentId] },
+          })
+          navigateToBattle(data.battleId)
+        } else {
+          hasMatchedRef.current = false
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'battles',
-          filter: `opponent_id=eq.${userId}`,
-        },
-        (payload) => {
-          const b = payload.new as { type: string; id: string; phase: string }
-          if (b.type === 'team_match' && b.phase !== 'finished') navigateToBattle(b.id)
-        }
-      )
-      .subscribe()
+      } catch {
+        hasMatchedRef.current = false
+      }
+    })
 
-    realtimeRef.current = channel
+    // Subscribe puis tracker sa présence
+    ch.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await ch.track({ userId })
+      }
+    })
 
-    // Tentative immédiate de rejoindre la file
-    const res = await fetch('/api/battles/queue/join', { method: 'POST' })
-    const data = await res.json()
+    channelRef.current = ch
 
-    if (data.battleId) {
-      navigateToBattle(data.battleId)
-      return
-    }
-
-    // Animation dots + rotation des tips
+    // Animation
     intervalRef.current = setInterval(() => {
       setDots((d) => (d + 1) % 4)
       setElapsed((e) => e + 1)
       setTipIdx((t) => (t + 1) % TIPS.length)
     }, 1500)
 
-    // Polling toutes les 2s en fallback
+    // Polling fallback toutes les 3s (si broadcast manqué)
     pollRef.current = setInterval(async () => {
+      if (hasMatchedRef.current) return
       try {
-        const r = await fetch('/api/battles/queue/join', { method: 'POST' })
+        const r = await fetch('/api/battles/queue/check')
         const d = await r.json()
         if (d.battleId) navigateToBattle(d.battleId)
-      } catch { /* réseau temporairement indisponible */ }
-    }, 2000)
+      } catch { /* réseau */ }
+    }, 3000)
   }
 
   async function cancelSearch() {
     cleanup()
-    await fetch('/api/battles/queue/leave', { method: 'DELETE' })
+    hasMatchedRef.current = false
     setStatus('idle')
     setElapsed(0)
   }
 
   useEffect(() => {
-    return () => {
-      cleanup()
-      // Leave queue on unmount
-      fetch('/api/battles/queue/leave', { method: 'DELETE' }).catch(() => {})
-    }
+    return () => { cleanup() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dotsStr = '.'.repeat(dots)
@@ -176,7 +203,6 @@ export function MatchmakingClient({ userId }: Props) {
             exit={{ opacity: 0, scale: 0.9 }}
             className="text-center max-w-sm"
           >
-            {/* Radar animation */}
             <div className="relative w-40 h-40 mx-auto mb-8">
               {[1, 2, 3].map((i) => (
                 <motion.div
@@ -197,13 +223,12 @@ export function MatchmakingClient({ userId }: Props) {
               RECHERCHE{dotsStr}
             </h2>
             <p className="text-gray-500 text-sm mb-1">
-              {elapsed < 10 ? 'Recherche dans ton niveau...' :
-               elapsed < 25 ? 'Élargissement de la recherche...' :
-               'Recherche tous niveaux...'}
+              {elapsed < 10 ? 'En attente d\'un adversaire...' :
+               elapsed < 25 ? 'Toujours en recherche...' :
+               'Recherche active...'}
             </p>
             <p className="text-gray-700 text-xs mb-8">{elapsed}s</p>
 
-            {/* Tip */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={tipIdx}
