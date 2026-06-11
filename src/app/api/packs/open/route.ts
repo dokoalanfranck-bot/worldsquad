@@ -15,13 +15,17 @@ export async function POST(req: NextRequest) {
 
   const config = PACK_CONFIGS[packType]
 
-  // Calcul de la progression globale du joueur (cartes possédées / total cartes joueurs)
+  // Le pack Légendaire déverrouille toujours les cartes Legend
+  // Pour les autres packs, les Legends sont bloquées avant 70% de progression globale
   const admin = createAdminClient()
-  const [{ count: totalCards }, { count: ownedCards }] = await Promise.all([
-    admin.from('cards').select('*', { count: 'exact', head: true }).eq('type', 'player'),
-    admin.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-  ])
-  const globalProgression = totalCards ? Math.round(((ownedCards ?? 0) / totalCards) * 100) : 0
+  let globalProgression = 100  // défaut : accès total
+  if (packType !== 'legend') {
+    const [{ count: totalCards }, { count: ownedCards }] = await Promise.all([
+      admin.from('cards').select('*', { count: 'exact', head: true }).eq('type', 'player'),
+      admin.from('user_cards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+    ])
+    globalProgression = totalCards ? Math.round(((ownedCards ?? 0) / totalCards) * 100) : 0
+  }
 
   // Debit coins server-side (atomic)
   const { success, newBalance, error: debitError } = await debitCoins(

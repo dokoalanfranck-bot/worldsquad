@@ -30,15 +30,15 @@ export async function POST(
     ? (winnerId === battle.challenger_id ? battle.opponent_id : battle.challenger_id)
     : null
 
-  // Transition atomique — si une autre requête est passée en premier, le count sera 0
-  const { count } = await admin
+  // Transition atomique — si une autre requête est passée en premier, data sera vide
+  const { data: updated } = await admin
     .from('battles')
     .update({ phase: 'finished', status: 'finished' })
     .eq('id', battleId)
     .eq('phase', 'match_ready')
-    .select('id', { count: 'exact', head: true })
+    .select('id')
 
-  if (!count) return NextResponse.json({ success: true, alreadyDone: true })
+  if (!updated || updated.length === 0) return NextResponse.json({ success: true, alreadyDone: true })
 
   // Mise à jour des stats vainqueur
   if (winnerId) {
