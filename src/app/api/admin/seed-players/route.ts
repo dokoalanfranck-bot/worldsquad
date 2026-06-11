@@ -141,18 +141,28 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // 1. Sauvegarder les images uploadées manuellement (Supabase Storage)
-  const { data: existingCards } = await admin
+  // 1. Charger toutes les cartes joueurs existantes (id, name, nation, image_url)
+  const { data: existingRaw } = await admin
     .from('cards')
-    .select('name, image_url')
+    .select('id, name, nation, image_url')
     .eq('type', 'player')
-    .not('image_url', 'is', null)
+    .limit(5000)
 
+  const existing = existingRaw ?? []
+
+  // Map "name||nation" → premier id trouvé (garde une seule carte par joueur)
+  const existingMap = new Map<string, { id: string; image_url: string | null }>()
+  const allExistingIds = new Set<string>()
+  for (const c of existing) {
+    allExistingIds.add(c.id)
+    const key = `${c.name}||${c.nation ?? ''}`
+    if (!existingMap.has(key)) existingMap.set(key, { id: c.id, image_url: c.image_url })
+  }
+
+  // Images uploadées manuellement à préserver
   const savedImages: Record<string, string> = {}
-  for (const card of existingCards ?? []) {
-    if (card.image_url?.includes('supabase.co')) {
-      savedImages[card.name] = card.image_url
-    }
+  for (const c of existing) {
+    if (c.image_url?.includes('supabase.co')) savedImages[c.name] = c.image_url
   }
 
   // 2. Collect all players + coaches from squads
@@ -167,54 +177,55 @@ export async function POST(request: Request) {
     }
   }
 
-  // 3. Fetch photos BEFORE deleting (so existing cards are preserved if this times out)
+  // 3. Fetch photos AVANT toute modification DB
   const photoMap: Record<string, string | null> = {}
   let withPhotos = 0
-
   if (!skipPhotos) {
     const BATCH_SIZE = 5
     for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
       const batch = allPlayers.slice(i, i + BATCH_SIZE)
-      const names = batch.map((p) => p.name)
-      const batchResults = await fetchPhotoBatch(names)
+      const batchResults = await fetchPhotoBatch(batch.map((p) => p.name))
       Object.assign(photoMap, batchResults)
       withPhotos += Object.values(batchResults).filter(Boolean).length
       await delay(150)
     }
   }
 
-  // 4. Build card rows
+  // 4. Build card rows — inclure l'id existant si le joueur est déjà en DB
   const cards = allPlayers.map((p) => {
     const flag = FLAGS[p.team] ?? '🏳'
     const rarity: CardRarity = p.isCoach ? 'Rare' : assignRarity(p.name)
+    const found = existingMap.get(`${p.name}||${p.team}`)
     return {
+      ...(found ? { id: found.id } : {}),
       type: 'player' as const,
       name: p.name,
       rarity,
-      image_url: savedImages[p.name] ?? photoMap[p.name] ?? null,
+      image_url: savedImages[p.name] ?? photoMap[p.name] ?? found?.image_url ?? null,
       nation: p.team,
       description: p.isCoach ? `${flag} ${p.team} · Coach` : `${flag} ${p.team} · ${p.pos}`,
-      stats: {
-        ...generateStats(p.pos, p.name),
-        position: p.pos,
-      },
+      stats: { ...generateStats(p.pos, p.name), position: p.pos },
     }
   })
 
-  // 5. Supprimer les cartes existantes puis réinsérer
-  await admin.from('cards').delete().eq('type', 'player')
+  // 5. Nettoyer les doublons non possédés
+  const keepIds = new Set(cards.filter((c) => 'id' in c).map((c) => (c as { id: string }).id))
+  const orphanIds = Array.from(allExistingIds).filter((id) => !keepIds.has(id))
+  if (orphanIds.length > 0) {
+    const { data: ownedOrphans } = await admin
+      .from('user_cards').select('card_id').in('card_id', orphanIds)
+    const ownedSet = new Set((ownedOrphans ?? []).map((uc) => uc.card_id))
+    const deletable = orphanIds.filter((id) => !ownedSet.has(id))
+    if (deletable.length > 0) await admin.from('cards').delete().in('id', deletable)
+  }
 
-  let inserted = 0
-  const insertErrors: string[] = []
-
+  // 6. Upsert : update les cartes existantes (by id), insert les nouvelles
+  let upserted = 0
+  const errors: string[] = []
   for (let i = 0; i < cards.length; i += 100) {
-    const batch = cards.slice(i, i + 100)
-    const { error } = await admin.from('cards').insert(batch)
-    if (error) {
-      insertErrors.push(error.message)
-    } else {
-      inserted += batch.length
-    }
+    const { error } = await admin.from('cards').upsert(cards.slice(i, i + 100))
+    if (error) errors.push(error.message)
+    else upserted += Math.min(100, cards.length - i)
   }
 
   revalidatePath('/admin')
@@ -223,10 +234,11 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     totalPlayers: allPlayers.length,
-    inserted,
+    upserted,
     withPhotos,
     teamsProcessed: WC2026_SQUADS.length,
     skippedPhotos: skipPhotos,
-    errors: insertErrors.length ? insertErrors : undefined,
+    cleaned: orphanIds.length,
+    errors: errors.length ? errors : undefined,
   })
 }
