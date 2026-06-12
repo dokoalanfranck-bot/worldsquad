@@ -1,258 +1,231 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import { Music, Volume2, VolumeX, ChevronDown } from 'lucide-react'
+import { Music, VolumeX } from 'lucide-react'
 
 interface Track { id: string; name: string; url: string }
 
 interface MusicContextValue {
+  musicEnabled: boolean
+  setMusicEnabled: (v: boolean) => void
+  muted: boolean
+  setMuted: (v: boolean) => void
+  volume: number
+  setVolume: (v: number) => void
   playPackOpening: () => void
   stopPackOpening: () => void
+  isPlaying: boolean
+  currentTrackName: string
 }
 
 const MusicContext = createContext<MusicContextValue>({
+  musicEnabled: true,
+  setMusicEnabled: () => {},
+  muted: false,
+  setMuted: () => {},
+  volume: 0.5,
+  setVolume: () => {},
   playPackOpening: () => {},
   stopPackOpening: () => {},
+  isPlaying: false,
+  currentTrackName: '',
 })
 
 export function useMusicContext() {
   return useContext(MusicContext)
 }
 
+const LS_ENABLED = 'ws_music_enabled'
 const LS_MUTED = 'ws_music_muted'
 const LS_VOLUME = 'ws_music_volume'
+
+function proxyUrl(id: string) {
+  return `/api/music/stream/${id}`
+}
 
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [ambiance, setAmbiance] = useState<Track | null>(null)
   const [packTrack, setPackTrack] = useState<Track | null>(null)
-
-  const [started, setStarted] = useState(false)       // user clicked play at least once
-  const [muted, setMuted] = useState(false)
-  const [volume, setVolume] = useState(0.5)
-  const [expanded, setExpanded] = useState(false)
+  const [musicEnabled, setMusicEnabledState] = useState(true)
+  const [muted, setMutedState] = useState(false)
+  const [volume, setVolumeState] = useState(0.5)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [packPlaying, setPackPlaying] = useState(false)
   const [currentTrackName, setCurrentTrackName] = useState('')
+  const [hasInteracted, setHasInteracted] = useState(false)
+  const [hasTracks, setHasTracks] = useState(false)
 
   const ambianceRef = useRef<HTMLAudioElement | null>(null)
   const packRef = useRef<HTMLAudioElement | null>(null)
+  const playInitiated = useRef(false)
 
   // Charger les pistes actives
   useEffect(() => {
     fetch('/api/music/active')
       .then((r) => r.json())
       .then((d) => {
-        setAmbiance(d.ambiance ?? null)
-        setPackTrack(d.pack_opening ?? null)
-        if (d.ambiance) setCurrentTrackName(d.ambiance.name)
+        const a = d.ambiance ?? null
+        const p = d.pack_opening ?? null
+        setAmbiance(a)
+        setPackTrack(p)
+        if (a || p) setHasTracks(true)
+        if (a) setCurrentTrackName(a.name)
       })
       .catch(() => {})
   }, [])
 
-  // Charger les préférences utilisateur
+  // Charger les préférences depuis localStorage
   useEffect(() => {
-    const savedMuted = localStorage.getItem(LS_MUTED)
-    const savedVolume = localStorage.getItem(LS_VOLUME)
-    if (savedMuted !== null) setMuted(savedMuted === 'true')
-    if (savedVolume !== null) setVolume(parseFloat(savedVolume) || 0.5)
+    const enabled = localStorage.getItem(LS_ENABLED)
+    const mut = localStorage.getItem(LS_MUTED)
+    const vol = localStorage.getItem(LS_VOLUME)
+    if (enabled !== null) setMusicEnabledState(enabled !== 'false')
+    if (mut !== null) setMutedState(mut === 'true')
+    if (vol !== null) setVolumeState(parseFloat(vol) || 0.5)
   }, [])
 
-  // Synchroniser le volume sur l'élément audio ambiance
-  useEffect(() => {
-    const audio = ambianceRef.current
-    if (!audio) return
-    audio.volume = muted ? 0 : volume
-  }, [volume, muted])
-
-  function applyVolume(audio: HTMLAudioElement, isMuted: boolean, vol: number) {
-    audio.volume = isMuted ? 0 : vol
-  }
-
-  // Démarrer / arrêter l'ambiance
   const startAmbiance = useCallback(() => {
-    if (!ambiance) return
     const audio = ambianceRef.current
-    if (!audio) return
-    if (audio.src !== ambiance.url) {
-      audio.src = ambiance.url
+    if (!audio || !ambiance) return
+    const src = proxyUrl(ambiance.id)
+    if (audio.src !== src && !audio.src.endsWith(ambiance.id)) {
+      audio.src = src
       audio.loop = true
     }
-    applyVolume(audio, muted, volume)
-    audio.play().catch(() => {})
-    setCurrentTrackName(ambiance.name)
+    audio.volume = muted ? 0 : volume
+    audio.play()
+      .then(() => {
+        setIsPlaying(true)
+        setCurrentTrackName(ambiance.name)
+      })
+      .catch(() => {})
   }, [ambiance, muted, volume])
 
-  // Jouer la musique pack_opening
-  const playPackOpening = useCallback(() => {
-    if (!packTrack || !started) return
-    const pack = packRef.current
+  // Auto-play sur première interaction (click ou touch)
+  useEffect(() => {
+    if (!ambiance || !musicEnabled || playInitiated.current) return
+
+    const onInteraction = () => {
+      if (playInitiated.current) return
+      playInitiated.current = true
+      setHasInteracted(true)
+      startAmbiance()
+    }
+
+    window.addEventListener('click', onInteraction, { once: true })
+    window.addEventListener('touchstart', onInteraction, { once: true, passive: true })
+
+    return () => {
+      window.removeEventListener('click', onInteraction)
+      window.removeEventListener('touchstart', onInteraction)
+    }
+  }, [ambiance, musicEnabled, startAmbiance])
+
+  // Sync volume/mute sur les éléments audio
+  useEffect(() => {
     const amb = ambianceRef.current
+    if (amb) amb.volume = muted ? 0 : volume
+  }, [volume, muted])
 
-    if (amb) { amb.pause() }
-
-    if (pack) {
-      if (pack.src !== packTrack.url) {
-        pack.src = packTrack.url
-        pack.loop = false
-      }
-      applyVolume(pack, muted, Math.min(volume * 1.2, 1))
-      pack.currentTime = 0
-      pack.play().catch(() => {})
-      setPackPlaying(true)
-      setCurrentTrackName(packTrack.name)
-    } else if (amb) {
-      // Pas de pack track, reprendre ambiance
-      startAmbiance()
-    }
-  }, [packTrack, started, muted, volume, startAmbiance])
-
-  const stopPackOpening = useCallback(() => {
-    const pack = packRef.current
-    if (pack) {
-      pack.pause()
-      pack.currentTime = 0
-    }
-    setPackPlaying(false)
-    if (ambiance) {
-      startAmbiance()
-    } else {
-      setCurrentTrackName(ambiance ? (ambiance as Track).name : '')
-    }
-  }, [ambiance, startAmbiance])
-
-  // Quand la musique pack se termine → reprendre l'ambiance
+  // Pack track terminé → reprendre ambiance
   useEffect(() => {
     const pack = packRef.current
     if (!pack) return
     const onEnded = () => {
       setPackPlaying(false)
-      startAmbiance()
+      if (hasInteracted && musicEnabled) startAmbiance()
     }
     pack.addEventListener('ended', onEnded)
     return () => pack.removeEventListener('ended', onEnded)
-  }, [startAmbiance])
+  }, [hasInteracted, musicEnabled, startAmbiance])
 
-  function handleTogglePlay() {
-    if (!started) {
-      setStarted(true)
+  // ── API exposée ────────────────────────────────────────────────────────────
+
+  function setMusicEnabled(v: boolean) {
+    setMusicEnabledState(v)
+    localStorage.setItem(LS_ENABLED, String(v))
+    if (!v) {
+      ambianceRef.current?.pause()
+      packRef.current?.pause()
+      setIsPlaying(false)
+      setPackPlaying(false)
+      playInitiated.current = false
+    } else if (hasInteracted) {
       startAmbiance()
-      return
-    }
-    const amb = ambianceRef.current
-    if (!amb) return
-    if (amb.paused && !packPlaying) {
-      startAmbiance()
-    } else if (!packPlaying) {
-      amb.pause()
+    } else {
+      // Remettre le listener de première interaction
+      playInitiated.current = false
     }
   }
 
-  function handleToggleMute() {
-    const next = !muted
-    setMuted(next)
-    localStorage.setItem(LS_MUTED, String(next))
+  function setMuted(v: boolean) {
+    setMutedState(v)
+    localStorage.setItem(LS_MUTED, String(v))
     const amb = ambianceRef.current
     const pack = packRef.current
-    if (amb) amb.volume = next ? 0 : volume
-    if (pack) pack.volume = next ? 0 : Math.min(volume * 1.2, 1)
+    if (amb) amb.volume = v ? 0 : volume
+    if (pack) pack.volume = v ? 0 : Math.min(volume * 1.2, 1)
   }
 
-  function handleVolumeChange(v: number) {
-    setVolume(v)
+  function setVolume(v: number) {
+    setVolumeState(v)
     localStorage.setItem(LS_VOLUME, String(v))
     const amb = ambianceRef.current
-    const pack = packRef.current
     if (amb) amb.volume = muted ? 0 : v
-    if (pack && packPlaying) pack.volume = muted ? 0 : Math.min(v * 1.2, 1)
   }
 
-  // Ne rien afficher si aucune piste configurée
-  const hasAny = !!(ambiance || packTrack)
+  const playPackOpening = useCallback(() => {
+    if (!packTrack || !hasInteracted || !musicEnabled) return
+    const pack = packRef.current
+    const amb = ambianceRef.current
+    if (amb) amb.pause()
+    if (pack) {
+      pack.src = proxyUrl(packTrack.id)
+      pack.loop = false
+      pack.volume = muted ? 0 : Math.min(volume * 1.2, 1)
+      pack.currentTime = 0
+      pack.play().catch(() => {})
+      setPackPlaying(true)
+      setCurrentTrackName(packTrack.name)
+    }
+  }, [packTrack, hasInteracted, musicEnabled, muted, volume])
+
+  const stopPackOpening = useCallback(() => {
+    const pack = packRef.current
+    if (pack) { pack.pause(); pack.currentTime = 0 }
+    setPackPlaying(false)
+    if (hasInteracted && musicEnabled) startAmbiance()
+  }, [hasInteracted, musicEnabled, startAmbiance])
 
   return (
-    <MusicContext.Provider value={{ playPackOpening, stopPackOpening }}>
+    <MusicContext.Provider value={{
+      musicEnabled, setMusicEnabled,
+      muted, setMuted,
+      volume, setVolume,
+      playPackOpening, stopPackOpening,
+      isPlaying, currentTrackName,
+    }}>
       {children}
 
-      {/* Éléments audio cachés */}
-      <audio ref={ambianceRef} loop preload="none" className="hidden" />
-      <audio ref={packRef} preload="none" className="hidden" />
+      <audio ref={ambianceRef} loop preload="none" style={{ display: 'none' }} />
+      <audio ref={packRef} preload="none" style={{ display: 'none' }} />
 
-      {/* Lecteur flottant (seulement si des pistes existent) */}
-      {hasAny && (
-        <div
-          className="fixed bottom-24 right-4 lg:bottom-6 lg:right-6 z-40"
-          style={{ touchAction: 'none' }}
+      {/* Bouton flottant mute/unmute — visible uniquement si pistes configurées et musique activée */}
+      {hasTracks && musicEnabled && (
+        <button
+          onClick={() => setMuted(!muted)}
+          title={muted ? 'Activer le son' : 'Couper le son'}
+          className={`fixed bottom-24 right-4 lg:bottom-6 lg:right-6 z-40 w-10 h-10 rounded-full flex items-center justify-center shadow-lg border transition-all ${
+            isPlaying && !muted
+              ? 'bg-[#F5C518]/20 border-[#F5C518]/40 text-[#F5C518]'
+              : 'bg-[#12121f]/80 border-white/10 text-white/30 hover:text-white/60'
+          }`}
         >
-          {/* Panel étendu */}
-          {expanded && (
-            <div className="mb-2 glass rounded-2xl border border-white/10 p-4 w-56 shadow-2xl shadow-black/50">
-              {/* Track name */}
-              <div className="flex items-center gap-2 mb-3">
-                <Music size={12} className={`${started && !muted ? 'text-[#F5C518]' : 'text-white/30'}`} />
-                <p className="text-white/70 text-xs truncate flex-1">{currentTrackName || 'Aucune piste'}</p>
-                {packPlaying && (
-                  <span className="text-[10px] text-[#F5C518] font-bold px-1.5 py-0.5 rounded bg-[#F5C518]/10">PACK</span>
-                )}
-              </div>
-
-              {/* Volume slider */}
-              <div className="flex items-center gap-2 mb-3">
-                <button onClick={handleToggleMute} className="text-white/50 hover:text-white transition-colors flex-shrink-0">
-                  {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={muted ? 0 : volume}
-                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                  className="flex-1 accent-[#F5C518] h-1"
-                />
-              </div>
-
-              {/* Play/Stop button */}
-              <button
-                onClick={handleTogglePlay}
-                className="w-full py-2 rounded-xl bg-[#F5C518]/15 hover:bg-[#F5C518]/25 border border-[#F5C518]/30 text-[#F5C518] text-xs font-bold transition-colors"
-              >
-                {!started ? '▶ LANCER LA MUSIQUE' : ambianceRef.current?.paused && !packPlaying ? '▶ REPRENDRE' : '⏸ PAUSE'}
-              </button>
-            </div>
+          {isPlaying && !muted && (
+            <span className="absolute w-10 h-10 rounded-full border border-[#F5C518]/20 animate-ping pointer-events-none" />
           )}
-
-          {/* Bouton principal */}
-          <div className="flex items-center justify-end gap-2">
-            {expanded && (
-              <button
-                onClick={() => setExpanded(false)}
-                className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
-              >
-                <ChevronDown size={14} />
-              </button>
-            )}
-            <button
-              onClick={() => {
-                if (!expanded) setExpanded(true)
-                else if (!started) {
-                  setStarted(true)
-                  startAmbiance()
-                }
-              }}
-              title="Musique"
-              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-all border ${
-                started && !muted && (!ambianceRef.current?.paused || packPlaying)
-                  ? 'bg-[#F5C518]/20 border-[#F5C518]/40 text-[#F5C518]'
-                  : 'bg-[#12121f] border-white/10 text-white/40 hover:text-white hover:border-white/25'
-              }`}
-            >
-              {/* Pulsing ring when playing */}
-              {started && !muted && (!ambianceRef.current?.paused || packPlaying) && (
-                <span className="absolute w-11 h-11 rounded-full border border-[#F5C518]/30 animate-ping" />
-              )}
-              <Music size={16} />
-            </button>
-          </div>
-        </div>
+          {muted ? <VolumeX size={14} /> : <Music size={14} />}
+        </button>
       )}
     </MusicContext.Provider>
   )

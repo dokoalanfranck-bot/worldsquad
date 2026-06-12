@@ -80,7 +80,7 @@ function TrackRow({
       </button>
       <audio
         ref={audioRef}
-        src={track.url}
+        src={`/api/music/stream/${track.id}`}
         onEnded={() => setPlaying(false)}
         preload="none"
       />

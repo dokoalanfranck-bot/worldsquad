@@ -7,12 +7,14 @@ import {
   Check, Shield, Smartphone, AlertTriangle, X,
   Trophy, Layers, Swords, Flame, Globe, Send,
   UsersRound, Plus, Copy, LogOut as LeaveIcon,
+  Music, VolumeX,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import type { User } from '@/types'
 import { NATIONS_2026 } from '@/types'
+import { useMusicContext } from '@/components/MusicProvider'
 
 interface GroupInfo {
   id: string
@@ -76,6 +78,7 @@ function Row({
 
 export function SettingsClient({ user, cardCount, group }: Props) {
   const router = useRouter()
+  const { musicEnabled, setMusicEnabled, muted, setMuted, volume, setVolume } = useMusicContext()
   const [notifStatus, setNotifStatus] = useState<NotificationPermission>('default')
   const [mounted, setMounted] = useState(false)
   const [showEditPseudo, setShowEditPseudo] = useState(false)
@@ -374,6 +377,64 @@ export function SettingsClient({ user, cardCount, group }: Props) {
               else toast.error('Erreur — abonne-toi d\'abord aux notifications')
             }}
           />
+        )}
+      </Section>
+
+      {/* Son */}
+      <Section title="Son & Musique">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
+          <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+            {musicEnabled ? <Music size={16} className="text-[#F5C518]" /> : <VolumeX size={16} className="text-gray-400" />}
+          </div>
+          <span className="flex-1 text-left text-sm font-semibold text-white">Musique d&apos;ambiance</span>
+          <button
+            onClick={() => setMusicEnabled(!musicEnabled)}
+            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+              musicEnabled ? 'bg-[#F5C518]' : 'bg-white/10'
+            }`}
+          >
+            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+              musicEnabled ? 'left-7' : 'left-1'
+            }`} />
+          </button>
+        </div>
+        {musicEnabled && (
+          <>
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
+              <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+                <VolumeX size={16} className="text-gray-400" />
+              </div>
+              <span className="flex-1 text-left text-sm font-semibold text-white">Muet</span>
+              <button
+                onClick={() => setMuted(!muted)}
+                className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                  muted ? 'bg-[#F5C518]' : 'bg-white/10'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                  muted ? 'left-7' : 'left-1'
+                }`} />
+              </button>
+            </div>
+            {!muted && (
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <Music size={16} className="text-gray-400" />
+                </div>
+                <span className="text-sm font-semibold text-white flex-shrink-0">Volume</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="flex-1 accent-[#F5C518]"
+                />
+                <span className="text-xs text-gray-500 w-8 text-right flex-shrink-0">{Math.round(volume * 100)}%</span>
+              </div>
+            )}
+          </>
         )}
       </Section>
 
