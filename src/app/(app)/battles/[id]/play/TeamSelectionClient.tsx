@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { GameCard } from '@/components/ui/Card'
 import { Clock, Star, Users, ChevronRight } from 'lucide-react'
@@ -94,6 +94,15 @@ export function TeamSelectionClient({ battle, currentUserId, myCards }: Props) {
       setLoading(false)
     }
   }
+
+  // Auto-recovery: if human team is already saved but bot hasn't responded, re-trigger after 2s
+  useEffect(() => {
+    if (!alreadySubmitted && !submitted) return
+    const t = setTimeout(() => {
+      fetch(`/api/battles/${battle.id}/trigger-bot`, { method: 'POST' }).catch(() => {})
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [alreadySubmitted, submitted, battle.id])
 
   if (alreadySubmitted || submitted) {
     return (
