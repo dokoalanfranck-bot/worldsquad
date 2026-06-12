@@ -444,7 +444,7 @@ function PickingView({
 // ── AnimationView ─────────────────────────────────────────────────────────────
 
 function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallenger: boolean; me: Profile; them: Profile }) {
-  const DURATION_MS = 30000
+  const DURATION_MS = 60000
   const [elapsed, setElapsed] = useState(0)
   const [visibleEvents, setVisibleEvents] = useState<DuelEvent[]>([])
   const [challengerGoals, setChallengerGoals] = useState(0)

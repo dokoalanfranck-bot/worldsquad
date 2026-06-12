@@ -91,7 +91,7 @@ export function simulateDuel(
 
   allMinutes.sort((a, b) => a - b)
 
-  const MATCH_DURATION_MS = 30000
+  const MATCH_DURATION_MS = 60000
   const events: DuelEvent[] = []
 
   for (const minute of allMinutes) {

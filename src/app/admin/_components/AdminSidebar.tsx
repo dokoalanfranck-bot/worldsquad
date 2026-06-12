@@ -18,6 +18,7 @@ import {
   Bell,
   Radio,
   Music,
+  Activity,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -30,6 +31,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/admin', icon: LayoutDashboard, label: "Vue d'ensemble" },
+  { href: '/admin/tracking', icon: Activity, label: '📊 Tracking' },
   { href: '/admin/live', icon: Radio, label: '🔴 Live Control' },
   { href: '/admin/teams', icon: Globe, label: 'Équipes & Groupes' },
   { href: '/admin/matches', icon: Calendar, label: 'Matchs' },
