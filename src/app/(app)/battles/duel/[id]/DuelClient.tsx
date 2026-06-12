@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield } from 'lucide-react'
+import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, CreditCard, ArrowDownRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
 import { computePower } from '@/lib/duel-engine'
@@ -483,7 +483,9 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
     >
       {/* Scoreboard */}
       <div className="glass rounded-2xl p-5 mb-5 text-center">
-        <p className="text-gray-600 text-xs uppercase tracking-widest mb-3">⚽ Match en direct</p>
+        <p className="flex items-center justify-center gap-1.5 text-gray-600 text-xs uppercase tracking-widest mb-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Match en direct
+        </p>
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 text-center">
             <p className="text-2xl mb-1">{flag(me?.nation)}</p>
@@ -524,9 +526,9 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
                 }`}
                 style={{ opacity: 1 - i * 0.12 }}
               >
-                <span className="text-base">
-                  {ev.type === 'goal' ? '⚽' : ev.type === 'chance' ? '💨' : '🧤'}
-                </span>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-black flex-shrink-0 ${ev.type === 'goal' ? (isMyTeam ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400') : 'bg-white/5 text-white/30'}`}>
+                  {ev.type === 'goal' ? 'BUT' : ev.type === 'chance' ? 'OCC' : 'ARR'}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-bold truncate ${ev.type === 'goal' ? (isMyTeam ? 'text-green-400' : 'text-red-400') : 'text-gray-400'}`}>
                     {ev.type === 'goal' ? 'BUT !' : ev.type === 'chance' ? 'Occasion' : 'Arrêt !'}
@@ -579,14 +581,20 @@ function ResultView({ duel, currentUserId, me, them, onReplay }: {
       transition={{ type: 'spring', stiffness: 200, damping: 22 }}
       className="min-h-screen flex flex-col items-center justify-center px-4 gap-5 max-w-sm mx-auto"
     >
-      {/* Result emoji */}
+      {/* Result icon */}
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.1 }}
-        className="text-7xl"
+        className={`w-24 h-24 rounded-3xl flex items-center justify-center ${isDraw ? 'bg-white/5' : iWon ? 'bg-[#F5C518]/10' : 'bg-red-500/10'}`}
+        style={{ boxShadow: isDraw ? 'none' : iWon ? '0 0 40px rgba(245,197,24,0.25)' : '0 0 40px rgba(239,68,68,0.2)' }}
       >
-        {isDraw ? '🤝' : iWon ? '🏆' : '💔'}
+        {isDraw
+          ? <Minus size={48} className="text-white/40" />
+          : iWon
+            ? <Trophy size={48} className="text-[#F5C518]" />
+            : <TrendingDown size={48} className="text-red-400" />
+        }
       </motion.div>
 
       {/* Title */}
@@ -630,8 +638,8 @@ function ResultView({ duel, currentUserId, me, them, onReplay }: {
             iWon ? 'border-[#F5C518]/30' : 'border-red-500/20'
           }`}
         >
-          <p className={`text-xs font-bold uppercase tracking-wider ${iWon ? 'text-[#F5C518]' : 'text-red-400'}`}>
-            {iWon ? '🎴 Carte volée !' : '💸 Carte perdue'}
+          <p className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${iWon ? 'text-[#F5C518]' : 'text-red-400'}`}>
+            {iWon ? <><CreditCard size={12} /> Carte volée</> : <><ArrowDownRight size={12} /> Carte perdue</>}
           </p>
           <GameCard card={rewardCard} owned size="md" />
           <div className="text-center">
@@ -660,7 +668,7 @@ function ResultView({ duel, currentUserId, me, them, onReplay }: {
             if (navigator.share) {
               navigator.share({
                 title: iWon ? `Victoire ${myScore}-${theirScore} sur WorldSquad !` : `Défaite ${myScore}-${theirScore} sur WorldSquad`,
-                text: `Je viens de jouer un duel sur WorldSquad ⚽`,
+                text: `Je viens de jouer un duel sur WorldSquad !`,
               }).catch(() => {})
             }
           }}

@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { Calendar, Gift, Swords, ShoppingBag, Crown, Target, Check, X, Clock, Users, Flame, type LucideIcon } from 'lucide-react'
+import {
+  Calendar, Gift, Swords, ShoppingBag, Crown, Target,
+  CheckCircle2, XCircle, Clock, Users, Flame, ChevronRight,
+  TrendingUp, Zap, type LucideIcon, CircleDollarSign, Trophy,
+  Star, Radio,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User, Match, Prediction, GroupActivity } from '@/types'
@@ -27,182 +32,134 @@ interface Props {
   recentFinished: Match[]
 }
 
-function Countdown({ targetDate }: { targetDate: string }) {
-  const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0, s: 0 })
+const NATION_FLAGS: Record<string, string> = {
+  France: '🇫🇷', Brazil: '🇧🇷', Argentina: '🇦🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  Spain: '🇪🇸', Germany: '🇩🇪', Portugal: '🇵🇹', Netherlands: '🇳🇱',
+  Morocco: '🇲🇦', USA: '🇺🇸', Mexico: '🇲🇽', Belgium: '🇧🇪',
+  Japan: '🇯🇵', Senegal: '🇸🇳', Croatia: '🇭🇷', Uruguay: '🇺🇾',
+}
+const flag = (n: string) => NATION_FLAGS[n] ?? '🌍'
 
+// ── Countdown ────────────────────────────────���────────────────────────────────
+function Countdown({ targetDate }: { targetDate: string }) {
+  const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
   useEffect(() => {
-    function update() {
+    function tick() {
       const diff = new Date(targetDate).getTime() - Date.now()
-      if (diff <= 0) { setTimeLeft({ d: 0, h: 0, m: 0, s: 0 }); return }
-      setTimeLeft({
-        d: Math.floor(diff / 86400000),
-        h: Math.floor((diff % 86400000) / 3600000),
-        m: Math.floor((diff % 3600000) / 60000),
-        s: Math.floor((diff % 60000) / 1000),
-      })
+      if (diff <= 0) { setT({ d: 0, h: 0, m: 0, s: 0 }); return }
+      setT({ d: Math.floor(diff / 86400000), h: Math.floor((diff % 86400000) / 3600000), m: Math.floor((diff % 3600000) / 60000), s: Math.floor((diff % 60000) / 1000) })
     }
-    update()
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
+    tick()
+    const i = setInterval(tick, 1000)
+    return () => clearInterval(i)
   }, [targetDate])
 
   return (
-    <div className="flex items-center gap-3">
-      {[
-        { val: timeLeft.d, label: 'J' },
-        { val: timeLeft.h, label: 'H' },
-        { val: timeLeft.m, label: 'M' },
-        { val: timeLeft.s, label: 'S' },
-      ].map(({ val, label }) => (
-        <div key={label} className="text-center">
-          <div className="countdown-digit leading-none">{String(val).padStart(2, '0')}</div>
-          <div className="text-xs text-gray-600 font-semibold mt-0.5">{label}</div>
+    <div className="flex items-center gap-2">
+      {[{ v: t.d, l: 'J' }, { v: t.h, l: 'H' }, { v: t.m, l: 'M' }, { v: t.s, l: 'S' }].map(({ v, l }) => (
+        <div key={l} className="flex flex-col items-center">
+          <span className="text-white font-black text-lg tabular-nums leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+            {String(v).padStart(2, '0')}
+          </span>
+          <span className="text-white/30 text-[9px] font-bold">{l}</span>
         </div>
       ))}
     </div>
   )
 }
 
-function LiveScoresWidget({ initialLive, initialFinished }: { initialLive: Match[]; initialFinished: Match[] }) {
+// ── Live scores ───────────────────────────────────────────────────────────────
+function LiveScores({ initialLive, initialFinished }: { initialLive: Match[]; initialFinished: Match[] }) {
   const supabase = createClient()
-  const [liveMatches, setLiveMatches] = useState<Match[]>(initialLive)
-  const [finishedMatches, setFinishedMatches] = useState<Match[]>(initialFinished)
+  const [live, setLive] = useState(initialLive)
+  const [finished, setFinished] = useState(initialFinished)
 
   useEffect(() => {
-    const channel = supabase
-      .channel('live-scores')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (payload) => {
-        const m = payload.new as Match
+    const ch = supabase.channel('live-scores-dash')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' }, (p) => {
+        const m = p.new as Match
         if (m.status === 'live') {
-          setLiveMatches((prev) => {
-            const exists = prev.find((x) => x.id === m.id)
-            return exists ? prev.map((x) => (x.id === m.id ? m : x)) : [m, ...prev]
-          })
-          setFinishedMatches((prev) => prev.filter((x) => x.id !== m.id))
+          setLive((prev) => { const e = prev.find((x) => x.id === m.id); return e ? prev.map((x) => x.id === m.id ? m : x) : [m, ...prev] })
+          setFinished((prev) => prev.filter((x) => x.id !== m.id))
         } else if (m.status === 'finished') {
-          setLiveMatches((prev) => prev.filter((x) => x.id !== m.id))
-          setFinishedMatches((prev) => {
-            const exists = prev.find((x) => x.id === m.id)
-            return exists ? prev.map((x) => (x.id === m.id ? m : x)) : [m, ...prev].slice(0, 4)
-          })
+          setLive((prev) => prev.filter((x) => x.id !== m.id))
+          setFinished((prev) => { const e = prev.find((x) => x.id === m.id); return (e ? prev.map((x) => x.id === m.id ? m : x) : [m, ...prev]).slice(0, 3) })
         }
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+      }).subscribe()
+    return () => { supabase.removeChannel(ch) }
   }, [supabase])
 
-  if (liveMatches.length === 0 && finishedMatches.length === 0) return null
+  if (live.length === 0 && finished.length === 0) return null
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="col-span-1 md:col-span-2 xl:col-span-3 mb-2"
-    >
-      <div className="glass rounded-2xl p-5 border border-white/5">
-        <div className="flex items-center gap-2 mb-4">
-          {liveMatches.length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-red-400 font-black text-sm uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                En Direct
-              </span>
-            </span>
-          )}
-          {liveMatches.length > 0 && finishedMatches.length > 0 && (
-            <span className="text-gray-700">·</span>
-          )}
-          {finishedMatches.length > 0 && (
-            <span className="text-gray-500 font-semibold text-sm">Terminés</span>
-          )}
-          <Link href="/matches" className="ml-auto text-xs text-[#F5C518] hover:underline font-semibold">
-            Tous les matchs →
-          </Link>
+    <div className="glass rounded-2xl overflow-hidden border border-white/5 mb-4">
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {live.length > 0 && <><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /><span className="text-red-400 font-black text-xs uppercase tracking-widest">En Direct</span></>}
+          {live.length > 0 && finished.length > 0 && <span className="text-white/10">·</span>}
+          {finished.length > 0 && <span className="text-white/40 text-xs font-semibold">Terminés</span>}
         </div>
-
-        <div className="space-y-1">
-          <AnimatePresence initial={false}>
-            {liveMatches.map((m) => (
-              <motion.div
-                key={m.id}
-                layout
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 8 }}
-              >
-                <Link href={`/matches/${m.id}`}>
-                  <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-red-500/10 bg-red-500/5">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-xl">{m.flag_a ?? '🏳'}</span>
-                      <span className="text-white font-bold text-sm truncate">{m.team_a}</span>
-                    </div>
-                    <div className="flex-shrink-0 text-center px-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-white font-black text-xl tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                          {m.score_a ?? 0}
-                        </span>
-                        <span className="text-red-400 text-xs font-black animate-pulse">LIVE</span>
-                        <span className="text-white font-black text-xl tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                          {m.score_b ?? 0}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                      <span className="text-white font-bold text-sm truncate text-right">{m.team_b}</span>
-                      <span className="text-xl">{m.flag_b ?? '🏳'}</span>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {finishedMatches.length > 0 && liveMatches.length > 0 && (
-            <div className="border-t border-white/5 my-2" />
-          )}
-
-          {finishedMatches.map((m) => (
-            <Link key={m.id} href={`/matches/${m.id}`}>
-              <div className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer opacity-60">
+        <Link href="/matches" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
+          Tous les matchs <ChevronRight size={12} />
+        </Link>
+      </div>
+      <div className="divide-y divide-white/5">
+        <AnimatePresence initial={false}>
+          {live.map((m) => (
+            <motion.div key={m.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Link href={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-lg">{m.flag_a ?? '🏳'}</span>
-                  <span className="text-gray-300 font-semibold text-sm truncate">{m.team_a}</span>
+                  <span className="text-white font-bold text-sm truncate">{m.team_a}</span>
                 </div>
-                <div className="flex-shrink-0 text-center px-2">
-                  <span className="text-white font-black text-lg tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                    {m.score_a ?? '-'} - {m.score_b ?? '-'}
-                  </span>
+                <div className="text-center px-2">
+                  <span className="text-white font-black text-lg tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{m.score_a ?? 0}</span>
+                  <span className="text-red-400 text-[10px] font-black mx-1.5 animate-pulse">LIVE</span>
+                  <span className="text-white font-black text-lg tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{m.score_b ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                  <span className="text-gray-300 font-semibold text-sm truncate text-right">{m.team_b}</span>
+                  <span className="text-white font-bold text-sm truncate text-right">{m.team_b}</span>
                   <span className="text-lg">{m.flag_b ?? '🏳'}</span>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            </motion.div>
           ))}
-        </div>
+        </AnimatePresence>
+        {finished.map((m) => (
+          <Link key={m.id} href={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors opacity-50">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-base">{m.flag_a ?? '🏳'}</span>
+              <span className="text-white/70 text-sm truncate">{m.team_a}</span>
+            </div>
+            <span className="text-white font-black text-base tabular-nums px-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{m.score_a ?? '-'} — {m.score_b ?? '-'}</span>
+            <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+              <span className="text-white/70 text-sm truncate text-right">{m.team_b}</span>
+              <span className="text-base">{m.flag_b ?? '🏳'}</span>
+            </div>
+          </Link>
+        ))}
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-function DailyRewardWidget({ initial }: { initial: DailyRewardState }) {
+// ── Daily reward ──────────────────────────────────────────────────────────────
+function DailyReward({ initial }: { initial: DailyRewardState }) {
   const [state, setState] = useState(initial)
   const [claiming, setClaiming] = useState(false)
   const [timeLeft, setTimeLeft] = useState('')
+  const REWARDS = [100, 150, 200, 250, 350, 500, 750]
 
   useEffect(() => {
     if (state.canClaim || !state.nextClaim) return
-    function update() {
+    function tick() {
       const diff = new Date(state.nextClaim!).getTime() - Date.now()
       if (diff <= 0) { setState((s) => ({ ...s, canClaim: true })); return }
-      const h = Math.floor(diff / 3_600_000)
-      const m = Math.floor((diff % 3_600_000) / 60_000)
-      const s = Math.floor((diff % 60_000) / 1_000)
+      const h = Math.floor(diff / 3_600_000), m = Math.floor((diff % 3_600_000) / 60_000), s = Math.floor((diff % 60_000) / 1_000)
       setTimeLeft(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
     }
-    update()
-    const t = setInterval(update, 1000)
+    tick()
+    const t = setInterval(tick, 1000)
     return () => clearInterval(t)
   }, [state.canClaim, state.nextClaim])
 
@@ -211,46 +168,45 @@ function DailyRewardWidget({ initial }: { initial: DailyRewardState }) {
     try {
       const res = await fetch('/api/daily-reward', { method: 'POST' })
       const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error === 'already_claimed' ? 'Déjà réclamée aujourd\'hui !' : data.error)
-        return
-      }
-      toast.success(`+${data.coins} coins ! Série : ${data.streak} jour${data.streak > 1 ? 's' : ''} 🔥`)
+      if (!res.ok) { toast.error(data.error === 'already_claimed' ? 'Déjà réclamée aujourd\'hui !' : data.error); return }
+      toast.success(`+${data.coins} coins — Série : ${data.streak} jour${data.streak > 1 ? 's' : ''}`)
       setState({ canClaim: false, nextClaim: null, streak: data.streak, todayReward: data.coins })
-    } finally {
-      setClaiming(false)
-    }
+    } finally { setClaiming(false) }
   }
 
-  const STREAK_REWARDS = [100, 150, 200, 250, 350, 500, 750]
-
   return (
-    <div className="glass rounded-2xl p-5 border border-white/5 h-full">
+    <div className={`rounded-2xl p-5 border ${state.canClaim ? 'border-[#F5C518]/40 bg-[#F5C518]/5' : 'border-white/5 glass'}`}>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Récompense quotidienne</p>
-        {state.streak > 0 && (
-          <span className="flex items-center gap-1 text-xs font-bold text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-lg">
-            <Flame size={11} /> {state.streak} jour{state.streak > 1 ? 's' : ''}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${state.canClaim ? 'bg-[#F5C518]/20' : 'bg-white/5'}`}>
+            <Gift size={16} className={state.canClaim ? 'text-[#F5C518]' : 'text-white/40'} />
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm">Récompense du jour</p>
+            {state.streak > 0 && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <Flame size={10} className="text-orange-400" />
+                <span className="text-orange-400 text-xs font-bold">{state.streak} jour{state.streak > 1 ? 's' : ''} de série</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {state.canClaim && (
+          <span className="text-[#F5C518] font-black text-sm bg-[#F5C518]/10 px-2.5 py-1 rounded-lg">+{state.todayReward}</span>
         )}
       </div>
 
-      {/* Streak dots (7 days) */}
-      <div className="flex gap-1.5 mb-4 flex-wrap">
-        {STREAK_REWARDS.map((coins, i) => {
+      <div className="flex gap-1 mb-4">
+        {REWARDS.map((coins, i) => {
           const day = i + 1
-          const claimed = day <= state.streak
-          const today = day === Math.min(state.streak + (state.canClaim ? 1 : 0), 7) && state.canClaim
+          const done = day <= state.streak
+          const today = state.canClaim && day === Math.min(state.streak + 1, 7)
           return (
-            <div key={i} className={`flex-1 min-w-[36px] rounded-lg py-1.5 text-center transition-all ${
-              claimed ? 'bg-[#F5C518]/20 border border-[#F5C518]/40' :
-              today ? 'bg-[#F5C518]/10 border border-[#F5C518]/60 animate-pulse' :
-              'bg-white/3 border border-white/5'
-            }`}>
-              <div className="text-[9px] text-gray-600 font-semibold">J{day}</div>
-              <div className={`text-[10px] font-black ${claimed ? 'text-[#F5C518]' : today ? 'text-[#F5C518]/70' : 'text-gray-600'}`}>
-                {claimed ? '✓' : `${coins}`}
-              </div>
+            <div key={i} className={`flex-1 rounded-lg py-1.5 text-center border transition-all ${done ? 'bg-[#F5C518]/15 border-[#F5C518]/30' : today ? 'border-[#F5C518]/50 bg-[#F5C518]/8' : 'bg-white/3 border-white/5'}`}>
+              <p className="text-[9px] text-white/30 font-semibold">J{day}</p>
+              <p className={`text-[10px] font-black mt-0.5 ${done ? 'text-[#F5C518]' : today ? 'text-[#F5C518]/60' : 'text-white/20'}`}>
+                {done ? <CheckCircle2 size={10} className="mx-auto" /> : `${coins}`}
+              </p>
             </div>
           )
         })}
@@ -258,336 +214,235 @@ function DailyRewardWidget({ initial }: { initial: DailyRewardState }) {
 
       {state.canClaim ? (
         <motion.button
-          whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={claim}
           disabled={claiming}
-          className="w-full py-3 rounded-xl font-black text-black transition-all disabled:opacity-60"
-          style={{ background: '#F5C518', fontFamily: 'Bebas Neue, sans-serif' }}
-          animate={{ boxShadow: ['0 0 10px #F5C51840', '0 0 25px #F5C51870', '0 0 10px #F5C51840'] }}
+          className="w-full py-3.5 rounded-xl font-black text-black text-sm disabled:opacity-60 bg-[#F5C518]"
+          style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem' }}
+          animate={{ boxShadow: ['0 0 0px #F5C51800', '0 0 20px #F5C51860', '0 0 0px #F5C51800'] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          {claiming ? 'Réclamation…' : `RÉCLAMER +${state.todayReward} 🪙`}
+          {claiming ? 'Réclamation…' : `RÉCLAMER +${state.todayReward} COINS`}
         </motion.button>
       ) : (
-        <div className="text-center py-2">
-          <p className="text-gray-600 text-xs mb-1">Prochaine récompense dans</p>
-          <p className="text-white font-black text-xl countdown-digit">{timeLeft || '—'}</p>
+        <div className="flex items-center justify-between py-2 px-1">
+          <span className="text-white/30 text-xs">Prochaine récompense</span>
+          <span className="text-white font-black text-base tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{timeLeft || '—'}</span>
         </div>
       )}
     </div>
   )
 }
 
-export function DashboardClient({
-  profile,
-  nextMatch,
-  recentPredictions,
-  group,
-  groupActivity,
-  dailyReward,
-  liveMatches,
-  recentFinished,
-}: Props) {
-  const [liveActivities, setLiveActivities] = useState(groupActivity)
-  const supabase = createClient()
-
-  const nationData: Record<string, string> = {
-    France: '🇫🇷', Brazil: '🇧🇷', Argentina: '🇦🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-    Spain: '🇪🇸', Germany: '🇩🇪', Portugal: '🇵🇹', Netherlands: '🇳🇱',
-  }
-  const flag = nationData[profile.nation] ?? '🌍'
-
-  // Realtime group activity feed
-  useEffect(() => {
-    if (!group) return
-    const channel = supabase
-      .channel(`group:${group.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'group_activities',
-          filter: `group_id=eq.${group.id}`,
-        },
-        (payload) => {
-          setLiveActivities((prev) => [payload.new as GroupActivity & { user: { pseudo: string; photo_url: string | null } | null }, ...prev].slice(0, 10))
-        }
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [group, supabase])
-
-  const container = { hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }
-  const item = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }
-
+// ── Quick action card ─────────────────────────────────────────────────────────
+function QuickAction({ href, icon: Icon, label, sub, accent }: { href: string; icon: LucideIcon; label: string; sub: string; accent: string }) {
   return (
-    <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
-      {/* Header */}
+    <Link href={href}>
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between mb-8"
+        whileTap={{ scale: 0.96 }}
+        className="glass rounded-2xl p-4 border border-white/5 hover:border-white/10 active:bg-white/5 transition-all cursor-pointer"
       >
-        <div>
-          <h1
-            className="text-3xl md:text-4xl font-black text-white"
-            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-          >
-            BONJOUR {profile.pseudo.toUpperCase()} {flag}
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </p>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${accent}`}>
+          <Icon size={20} />
         </div>
-        <div className="flex items-center gap-3">
-          <CoinDisplay amount={profile.coins} size="lg" />
-          {profile.is_vip && (
-            <span className="inline-flex items-center gap-1 bg-[#F5C518]/10 border border-[#F5C518]/30 text-[#F5C518] text-xs font-bold px-2 py-1 rounded-lg">
-              <Crown size={11} /> VIP
-            </span>
-          )}
-        </div>
+        <p className="text-white font-black text-sm leading-tight" style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem' }}>{label}</p>
+        <p className="text-white/30 text-xs mt-0.5">{sub}</p>
       </motion.div>
-
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-      >
-        <LiveScoresWidget initialLive={liveMatches} initialFinished={recentFinished} />
-        {/* Next match widget */}
-        {nextMatch && (
-          <motion.div variants={item} className="col-span-1 md:col-span-2 xl:col-span-2">
-            <Link href={`/matches/${nextMatch.id}`}>
-              <div className="glass rounded-2xl p-6 hover:bg-white/5 transition-colors group border border-white/5 hover:border-[#F5C518]/20">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
-                      Prochain match
-                    </p>
-                    <p className="text-white font-bold mt-0.5">
-                      {new Date(nextMatch.match_date).toLocaleDateString('fr-FR', {
-                        weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
-                      })}
-                    </p>
-                  </div>
-                  <span className="text-xs bg-[#F5C518]/10 text-[#F5C518] font-bold px-2 py-1 rounded-lg uppercase">
-                    {nextMatch.phase}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="text-center flex-1">
-                    <div className="text-4xl mb-1">{nextMatch.flag_a ?? '🏳'}</div>
-                    <div className="font-black text-white text-lg" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                      {nextMatch.team_a}
-                    </div>
-                  </div>
-                  <div className="px-6 text-center">
-                    <div className="text-gray-500 font-black text-2xl" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>VS</div>
-                    <Countdown targetDate={nextMatch.match_date} />
-                  </div>
-                  <div className="text-center flex-1">
-                    <div className="text-4xl mb-1">{nextMatch.flag_b ?? '🏳'}</div>
-                    <div className="font-black text-white text-lg" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                      {nextMatch.team_b}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <Target size={14} className="text-[#F5C518]" />
-                  <span className="text-sm text-[#F5C518] font-bold group-hover:underline">
-                    Faire mon pronostic →
-                  </span>
-                </div>
-              </div>
-            </Link>
-          </motion.div>
-        )}
-
-        {/* User card widget */}
-        <motion.div variants={item}>
-          <div className="glass rounded-2xl p-6 border border-white/5 h-full">
-            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-4">Ta Carte</p>
-            <div className="flex flex-col items-center gap-3">
-              {profile.card_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.card_image_url}
-                  alt="Carte supporter"
-                  className="w-32 rounded-xl"
-                  style={{ boxShadow: '0 0 20px rgba(245,197,24,0.2)' }}
-                />
-              ) : (
-                <div className="w-32 h-44 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-3xl mb-1">{flag}</div>
-                    <div className="text-white font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                      {profile.pseudo}
-                    </div>
-                    <div className="text-[#F5C518] text-xs font-bold mt-1">{profile.level}</div>
-                  </div>
-                </div>
-              )}
-              <div className="text-center">
-                <p className="text-white font-bold">{profile.pseudo}</p>
-                <p className="text-gray-500 text-sm">{profile.nation} {flag}</p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
-                  <span>✅ {profile.predictions_correct} pronos</span>
-                  <span>⚔️ {profile.battles_won} battles</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Daily reward */}
-        <motion.div variants={item}>
-          <DailyRewardWidget initial={dailyReward} />
-        </motion.div>
-
-        {/* Recent predictions */}
-        <motion.div variants={item} className="col-span-1 md:col-span-2">
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
-                Tes derniers pronostics
-              </p>
-              <Link href="/matches" className="text-xs text-[#F5C518] hover:underline font-semibold">
-                Voir tout →
-              </Link>
-            </div>
-            {recentPredictions.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600 text-sm">Aucun pronostic pour l&apos;instant</p>
-                <Link href="/matches" className="text-[#F5C518] text-sm font-bold hover:underline mt-2 inline-block">
-                  Voir les matchs →
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {recentPredictions.map((pred) => (
-                  <div key={pred.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{pred.match?.flag_a ?? '🏳'}</span>
-                      <span className="text-white font-bold text-sm">
-                        {pred.pred_score_a} - {pred.pred_score_b}
-                      </span>
-                      <span className="text-lg">{pred.match?.flag_b ?? '🏳'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {pred.status === 'correct_score' && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-400 font-bold px-2 py-0.5 rounded">
-                          <Check size={10} /> +300
-                        </span>
-                      )}
-                      {pred.status === 'correct_winner' && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 font-bold px-2 py-0.5 rounded">
-                          <Check size={10} /> +100
-                        </span>
-                      )}
-                      {pred.status === 'wrong' && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-red-500/10 text-red-400 font-bold px-2 py-0.5 rounded">
-                          <X size={10} /> Raté
-                        </span>
-                      )}
-                      {pred.status === 'pending' && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-white/5 text-gray-500 font-bold px-2 py-0.5 rounded">
-                          <Clock size={10} /> En attente
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Group activity feed */}
-        {group && (
-          <motion.div variants={item}>
-            <div className="glass rounded-2xl p-6 border border-white/5 h-full max-h-80 overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
-                    Activité du groupe
-                  </p>
-                  <p className="text-white font-bold text-sm mt-0.5">{group.name}</p>
-                </div>
-                <Link href="/group" className="text-xs text-[#F5C518] hover:underline font-semibold">
-                  Groupe →
-                </Link>
-              </div>
-              {liveActivities.length === 0 ? (
-                <p className="text-gray-600 text-sm">Aucune activité pour l&apos;instant</p>
-              ) : (
-                <div className="space-y-2 overflow-y-auto max-h-48">
-                  {liveActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-2 text-xs">
-                      <div className="w-6 h-6 rounded-full bg-[#F5C518]/20 flex items-center justify-center flex-shrink-0 text-xs">
-                        {activity.user?.pseudo?.slice(0, 1) ?? '?'}
-                      </div>
-                      <p className="text-gray-400 leading-relaxed">{activity.message}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* No group CTA */}
-        {!group && (
-          <motion.div variants={item}>
-            <div className="glass rounded-2xl p-6 border border-[#F5C518]/10 text-center">
-              <div className="flex justify-center mb-3">
-                <Users size={40} className="text-gray-600" />
-              </div>
-              <p className="text-white font-bold mb-1">Pas encore dans un groupe</p>
-              <p className="text-gray-500 text-sm mb-4">Rejoins tes amis pour jouer ensemble</p>
-              <Link
-                href="/group"
-                className="inline-flex items-center gap-2 bg-[#F5C518]/10 border border-[#F5C518]/30 text-[#F5C518] font-bold text-sm px-4 py-2 rounded-xl hover:bg-[#F5C518]/20 transition-colors"
-              >
-                Créer / Rejoindre un groupe
-              </Link>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Quick actions */}
-        <motion.div variants={item} className="col-span-1 md:col-span-2 xl:col-span-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {QUICK_ACTIONS.map((action) => (
-              <Link key={action.href} href={action.href}>
-                <motion.div
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="glass rounded-xl p-4 text-center border border-white/5 hover:border-white/15 transition-colors cursor-pointer"
-                >
-                  <div className="flex justify-center mb-2">
-                    <action.icon size={28} className="text-[#F5C518]" />
-                  </div>
-                  <div className="text-white font-bold text-sm">{action.label}</div>
-                  <div className="text-gray-600 text-xs mt-0.5">{action.sub}</div>
-                </motion.div>
-              </Link>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
-    </div>
+    </Link>
   )
 }
 
-const QUICK_ACTIONS: { href: string; icon: LucideIcon; label: string; sub: string }[] = [
-  { href: '/matches', icon: Calendar,    label: 'Pronostics',    sub: '104 matchs' },
-  { href: '/packs',   icon: Gift,        label: 'Ouvrir un pack', sub: 'Dès 100 coins' },
-  { href: '/battles', icon: Swords,      label: 'Battle',        sub: 'Défie tes potes' },
-  { href: '/shop',    icon: ShoppingBag, label: 'Boutique',      sub: 'Acheter des coins' },
-]
+// ── Main ──────────────────────────────────────────────────────────────────────
+export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, liveMatches, recentFinished }: Props) {
+  const [activities, setActivities] = useState(groupActivity)
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (!group) return
+    const ch = supabase.channel(`group:${group.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_activities', filter: `group_id=eq.${group.id}` }, (p) => {
+        setActivities((prev) => [p.new as GroupActivity & { user: null }, ...prev].slice(0, 10))
+      }).subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [group, supabase])
+
+  const winRate = profile.battles_played > 0 ? Math.round((profile.battles_won / profile.battles_played) * 100) : 0
+
+  return (
+    <div className="px-4 py-5 max-w-xl mx-auto pb-28">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-white/40 text-xs uppercase tracking-widest mb-0.5">WorldSquad</p>
+          <h1 className="text-3xl font-black text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+            {profile.pseudo.toUpperCase()}
+          </h1>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm">{flag(profile.nation)}</span>
+            <span className="text-white/40 text-xs">{profile.nation}</span>
+            {profile.is_vip && (
+              <span className="flex items-center gap-0.5 text-[10px] font-black text-[#F5C518] bg-[#F5C518]/10 px-1.5 py-0.5 rounded border border-[#F5C518]/20">
+                <Crown size={9} /> VIP
+              </span>
+            )}
+          </div>
+        </div>
+        <CoinDisplay amount={profile.coins} size="lg" />
+      </div>
+
+      {/* ── Stats strip ────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {[
+          { icon: Target, label: 'Pronos', value: profile.predictions_correct, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+          { icon: Trophy, label: 'Victoires', value: profile.battles_won, color: 'text-[#F5C518]', bg: 'bg-[#F5C518]/10' },
+          { icon: TrendingUp, label: 'Win rate', value: profile.battles_played > 0 ? `${winRate}%` : '—', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+        ].map(({ icon: Icon, label, value, color, bg }) => (
+          <div key={label} className="glass rounded-xl p-3 border border-white/5 text-center">
+            <div className={`w-7 h-7 rounded-lg ${bg} flex items-center justify-center mx-auto mb-2`}>
+              <Icon size={14} className={color} />
+            </div>
+            <p className={`font-black text-lg leading-none ${color}`} style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{value}</p>
+            <p className="text-white/30 text-[10px] mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Daily reward ───────────────────────────────────────────────── */}
+      <div className="mb-5">
+        <DailyReward initial={dailyReward} />
+      </div>
+
+      {/* ── Live scores ────────────────────────────────────────────────── */}
+      <LiveScores initialLive={liveMatches} initialFinished={recentFinished} />
+
+      {/* ── Next match ─────────────────────────────────────────────────── */}
+      {nextMatch && (
+        <Link href={`/matches/${nextMatch.id}`}>
+          <motion.div
+            whileTap={{ scale: 0.99 }}
+            className="glass rounded-2xl p-5 border border-white/5 hover:border-[#F5C518]/20 transition-colors mb-5 cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-white/40 text-[10px] uppercase tracking-widest">Prochain match</p>
+                <p className="text-white/60 text-xs mt-0.5">
+                  {new Date(nextMatch.match_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+              </div>
+              <span className="text-[10px] font-black uppercase bg-white/5 text-white/40 px-2 py-1 rounded-lg border border-white/5">
+                {nextMatch.phase}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <div className="flex-1 text-center">
+                <span className="text-4xl">{nextMatch.flag_a ?? '🏳'}</span>
+                <p className="text-white font-black text-sm mt-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{nextMatch.team_a}</p>
+              </div>
+              <div className="px-4 text-center">
+                <p className="text-white/20 font-black text-sm mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>VS</p>
+                <Countdown targetDate={nextMatch.match_date} />
+              </div>
+              <div className="flex-1 text-center">
+                <span className="text-4xl">{nextMatch.flag_b ?? '🏳'}</span>
+                <p className="text-white font-black text-sm mt-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{nextMatch.team_b}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-1.5 text-[#F5C518] text-sm font-bold">
+              <Target size={13} />
+              <span>Faire mon pronostic</span>
+              <ChevronRight size={13} />
+            </div>
+          </motion.div>
+        </Link>
+      )}
+
+      {/* ── Quick actions ──────────────────────────────────────────────── */}
+      <div className="mb-5">
+        <p className="text-white/40 text-[10px] uppercase tracking-widest mb-3">Jouer</p>
+        <div className="grid grid-cols-2 gap-3">
+          <QuickAction href="/battles" icon={Swords} label="DUELS" sub="Défie d'autres joueurs" accent="bg-orange-500/15 text-orange-400" />
+          <QuickAction href="/packs" icon={Gift} label="PACKS" sub="Ouvre des cartes" accent="bg-amber-500/15 text-amber-400" />
+          <QuickAction href="/matches" icon={Calendar} label="PRONOSTICS" sub="Prédit les matchs" accent="bg-violet-500/15 text-violet-400" />
+          <QuickAction href="/shop" icon={ShoppingBag} label="BOUTIQUE" sub="Acheter des coins" accent="bg-blue-500/15 text-blue-400" />
+        </div>
+      </div>
+
+      {/* ── Recent predictions ─────────────────────────────────────────── */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-white/40 text-[10px] uppercase tracking-widest">Mes pronostics</p>
+          <Link href="/matches" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
+            Voir tout <ChevronRight size={12} />
+          </Link>
+        </div>
+        {recentPredictions.length === 0 ? (
+          <div className="glass rounded-2xl p-6 border border-white/5 text-center">
+            <Calendar size={28} className="text-white/20 mx-auto mb-2" />
+            <p className="text-white/40 text-sm">Aucun pronostic pour l&apos;instant</p>
+            <Link href="/matches" className="inline-block mt-3 text-[#F5C518] text-sm font-bold">
+              Voir les matchs →
+            </Link>
+          </div>
+        ) : (
+          <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+            {recentPredictions.slice(0, 5).map((pred) => (
+              <Link key={pred.id} href={`/matches/${pred.match?.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span>{pred.match?.flag_a ?? '🏳'}</span>
+                  <span className="text-white/60 text-xs truncate">{pred.match?.team_a}</span>
+                  <span className="text-white font-black text-sm tabular-nums">{pred.pred_score_a}–{pred.pred_score_b}</span>
+                  <span className="text-white/60 text-xs truncate">{pred.match?.team_b}</span>
+                  <span>{pred.match?.flag_b ?? '🏳'}</span>
+                </div>
+                <div className="flex-shrink-0">
+                  {pred.status === 'correct_score' && <span className="flex items-center gap-1 text-[10px] font-black text-green-400 bg-green-500/10 px-2 py-0.5 rounded-lg"><CheckCircle2 size={9} /> +300</span>}
+                  {pred.status === 'correct_winner' && <span className="flex items-center gap-1 text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-lg"><CheckCircle2 size={9} /> +100</span>}
+                  {pred.status === 'wrong' && <span className="flex items-center gap-1 text-[10px] font-black text-red-400 bg-red-500/10 px-2 py-0.5 rounded-lg"><XCircle size={9} /> Raté</span>}
+                  {pred.status === 'pending' && <span className="flex items-center gap-1 text-[10px] font-black text-white/30 bg-white/5 px-2 py-0.5 rounded-lg"><Clock size={9} /> Attente</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Group ──────────────────────────────────────────────────────── */}
+      {group ? (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-white/40 text-[10px] uppercase tracking-widest">{group.name}</p>
+            <Link href="/group" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
+              Groupe <ChevronRight size={12} />
+            </Link>
+          </div>
+          <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+            {activities.length === 0 ? (
+              <p className="px-4 py-5 text-white/30 text-sm text-center">Aucune activité récente</p>
+            ) : (
+              activities.slice(0, 5).map((a) => (
+                <div key={a.id} className="flex items-start gap-3 px-4 py-3">
+                  <div className="w-7 h-7 rounded-full bg-[#F5C518]/15 flex items-center justify-center text-[11px] font-black text-[#F5C518] flex-shrink-0">
+                    {a.user?.pseudo?.slice(0, 1) ?? '?'}
+                  </div>
+                  <p className="text-white/50 text-xs leading-relaxed">{a.message}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="glass rounded-2xl p-6 border border-white/5 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+            <Users size={22} className="text-white/30" />
+          </div>
+          <p className="text-white font-bold text-sm mb-1">Pas encore dans un groupe</p>
+          <p className="text-white/30 text-xs mb-4">Rejoins tes amis pour jouer ensemble</p>
+          <Link href="/group" className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-white/10 transition-colors">
+            <Users size={14} /> Créer ou rejoindre un groupe
+          </Link>
+        </div>
+      )}
+    </div>
+  )
+}

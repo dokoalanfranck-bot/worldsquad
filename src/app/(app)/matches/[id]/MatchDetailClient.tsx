@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
+import { CheckCircle2, XCircle, Lock, Circle, Clock, Target } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { Match, Prediction } from '@/types'
@@ -104,11 +105,11 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
           .update(payload)
           .eq('id', currentPrediction!.id)
         if (error) throw error
-        toast.success('✅ Pronostic mis à jour !')
+        toast.success('Pronostic mis à jour !')
       } else {
         const { error } = await supabase.from('predictions').insert(payload)
         if (error) throw error
-        toast.success('⚽ Pronostic enregistré !')
+        toast.success('Pronostic enregistré !')
       }
 
       router.refresh()
@@ -141,7 +142,12 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
                 : 'text-[#F5C518] bg-[#F5C518]/10'
             }`}
           >
-            {match.status === 'live' ? '🔴 EN DIRECT' : match.status === 'finished' ? 'Terminé' : '🕐 À venir'}
+            {match.status === 'live'
+              ? <span className="flex items-center gap-1.5"><Circle size={7} fill="currentColor" /> EN DIRECT</span>
+              : match.status === 'finished'
+              ? 'Terminé'
+              : <span className="flex items-center gap-1.5"><Clock size={11} /> À venir</span>
+            }
           </span>
         </div>
 
@@ -176,8 +182,8 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
           {isLocked ? 'TON PRONOSTIC' : hasPrediction ? 'MODIFIER TON PRONOSTIC' : 'FAIRE TON PRONOSTIC'}
         </h2>
         {isLocked && (
-          <p className="text-red-400 text-sm mb-4 font-semibold">
-            🔒 Pronostics verrouillés — match commencé
+          <p className="flex items-center gap-1.5 text-red-400 text-sm mb-4 font-semibold">
+            <Lock size={13} /> Pronostics verrouillés — match commencé
           </p>
         )}
 
@@ -224,7 +230,7 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
           {GAINS.map((g) => (
             <div key={g.label} className="text-center p-3 rounded-xl bg-white/5 border border-white/5">
               <div className="text-[#F5C518] font-black text-lg" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                +{g.coins} 🪙
+                +{g.coins}
               </div>
               <div className="text-gray-500 text-xs mt-0.5">{g.label}</div>
             </div>
@@ -238,7 +244,7 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
             className="w-full bg-[#F5C518] hover:bg-[#ffd700] disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: '1.1rem', letterSpacing: '0.05em' }}
           >
-            {loading ? 'ENREGISTREMENT...' : hasPrediction ? '✅ METTRE À JOUR' : '⚽ VALIDER MON PRONOSTIC'}
+            {loading ? 'ENREGISTREMENT...' : hasPrediction ? 'METTRE À JOUR' : 'VALIDER MON PRONOSTIC'}
           </button>
         )}
 
@@ -250,9 +256,9 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
               ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
               : 'bg-red-500/10 text-red-400 border border-red-500/20'
           }`}>
-            {currentPrediction.status === 'correct_score' && `🎯 Score exact ! +300 🪙`}
-            {currentPrediction.status === 'correct_winner' && `✅ Bon vainqueur ! +100 🪙`}
-            {currentPrediction.status === 'wrong' && `❌ Pas cette fois...`}
+            {currentPrediction.status === 'correct_score' && <span className="flex items-center justify-center gap-2"><Target size={15} /> Score exact ! +300</span>}
+            {currentPrediction.status === 'correct_winner' && <span className="flex items-center justify-center gap-2"><CheckCircle2 size={15} /> Bon vainqueur ! +100</span>}
+            {currentPrediction.status === 'wrong' && <span className="flex items-center justify-center gap-2"><XCircle size={15} /> Pas cette fois…</span>}
           </div>
         )}
       </div>

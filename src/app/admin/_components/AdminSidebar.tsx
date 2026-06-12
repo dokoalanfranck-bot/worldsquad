@@ -31,8 +31,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/admin', icon: LayoutDashboard, label: "Vue d'ensemble" },
-  { href: '/admin/tracking', icon: Activity, label: '📊 Tracking' },
-  { href: '/admin/live', icon: Radio, label: '🔴 Live Control' },
+  { href: '/admin/tracking', icon: Activity, label: 'Tracking' },
+  { href: '/admin/live', icon: Radio, label: 'Live Control' },
   { href: '/admin/teams', icon: Globe, label: 'Équipes & Groupes' },
   { href: '/admin/matches', icon: Calendar, label: 'Matchs' },
   { href: '/admin/users', icon: Users, label: 'Utilisateurs' },
@@ -41,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/battles', icon: Swords, label: 'Battles' },
   { href: '/admin/transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { href: '/admin/notifications', icon: Bell, label: 'Notifications Push' },
-  { href: '/admin/music', icon: Music, label: '🎵 Musique' },
+  { href: '/admin/music', icon: Music, label: 'Musique' },
 ]
 
 interface AdminSidebarProps {

@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Calendar, Layers, Swords, Users,
   Trophy, ShoppingBag, Settings, Crown, Globe, Gift,
-  Menu, X, Shield, ChevronRight, type LucideIcon, Star,
+  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard,
 } from 'lucide-react'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User } from '@/types'
@@ -38,7 +38,7 @@ const DRAWER_ITEMS: { href: string; icon: LucideIcon; label: string; color?: str
   { href: '/group',       icon: Users,        label: 'Mon Groupe' },
   { href: '/leaderboard', icon: Trophy,       label: 'Classement' },
   { href: '/shop',        icon: ShoppingBag,  label: 'Boutique' },
-  { href: '/supporter-card', icon: Star, label: '🎴 Ma Carte Supporter' },
+  { href: '/supporter-card', icon: CreditCard, label: 'Ma Carte Supporter' },
   { href: '/settings',    icon: Settings,     label: 'Paramètres' },
 ]
 
