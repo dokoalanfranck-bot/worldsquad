@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isBot, botAutoSteal } from '@/lib/battle-bot'
 
 export async function POST(
   _req: NextRequest,
@@ -30,9 +31,12 @@ export async function POST(
     ? (winnerId === battle.challenger_id ? battle.opponent_id : battle.challenger_id)
     : null
 
+  // If bot won, skip pick_reward — bot will auto-steal instantly
+  const botWon = winnerId ? await isBot(winnerId) : false
+
   // Déterminer la prochaine phase — pick_reward si le perdant a des cartes que le gagnant n'a pas
   let nextPhase: 'pick_reward' | 'finished' = 'finished'
-  if (winnerId && loserId) {
+  if (!botWon && winnerId && loserId) {
     const [{ data: loserCards }, { data: winnerCards }] = await Promise.all([
       admin.from('user_cards').select('card_id').eq('user_id', loserId),
       admin.from('user_cards').select('card_id').eq('user_id', winnerId),
@@ -53,6 +57,12 @@ export async function POST(
     .select('id')
 
   if (!updated || updated.length === 0) return NextResponse.json({ success: true, alreadyDone: true })
+
+  // Bot won: auto-steal handles everything (steal + stats + reward_card_id update)
+  if (botWon && winnerId && loserId) {
+    await botAutoSteal(battleId, winnerId, loserId)
+    return NextResponse.json({ success: true })
+  }
 
   // Mise à jour des stats vainqueur
   if (winnerId) {

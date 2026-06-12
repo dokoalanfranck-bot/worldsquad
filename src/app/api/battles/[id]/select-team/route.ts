@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { computeCohesion, simulateMatch } from '@/lib/battle-engine'
+import { isBot, botSelectTeam } from '@/lib/battle-bot'
 import type { Card } from '@/types'
 
 export async function POST(
@@ -61,6 +62,13 @@ export async function POST(
 
   const updateField = isChallenger ? 'challenger_team' : 'opponent_team'
   await admin.from('battles').update({ [updateField]: team }).eq('id', battleId)
+
+  // If other side is a bot, trigger its team selection asynchronously (fire and forget)
+  const otherId = isChallenger ? battle.opponent_id : battle.challenger_id
+  if (await isBot(otherId as string)) {
+    void botSelectTeam(battleId, otherId as string).catch(console.error)
+    return NextResponse.json({ success: true })
+  }
 
   // Re-fetch pour voir si l'adversaire a déjà soumis
   const { data: updated } = await admin

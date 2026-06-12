@@ -27,12 +27,15 @@ export function MatchmakingClient({ userId }: Props) {
   const [elapsed, setElapsed] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const hasMatchedRef = useRef(false)
+  const botTriggeredRef = useRef(false)
 
   function cleanup() {
     if (intervalRef.current) clearInterval(intervalRef.current)
     if (pollRef.current) clearInterval(pollRef.current)
+    if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current)
     if (channelRef.current) {
       channelRef.current.untrack()
       supabase.removeChannel(channelRef.current)
@@ -52,6 +55,21 @@ export function MatchmakingClient({ userId }: Props) {
     setStatus('searching')
     setElapsed(0)
     hasMatchedRef.current = false
+    botTriggeredRef.current = false
+
+    // After 20 real seconds with no human found, silently create a bot match
+    botTimeoutRef.current = setTimeout(async () => {
+      if (hasMatchedRef.current || botTriggeredRef.current) return
+      botTriggeredRef.current = true
+      try {
+        const res = await fetch('/api/battles/create-bot-match', { method: 'POST' })
+        const data = await res.json() as { battleId?: string }
+        if (data.battleId) navigateToBattle(data.battleId)
+        else botTriggeredRef.current = false
+      } catch {
+        botTriggeredRef.current = false
+      }
+    }, 20000)
 
     // Canal Presence partagé par tous les joueurs qui cherchent
     const ch = supabase.channel('matchmaking-global', {
@@ -138,6 +156,7 @@ export function MatchmakingClient({ userId }: Props) {
   async function cancelSearch() {
     cleanup()
     hasMatchedRef.current = false
+    botTriggeredRef.current = false
     setStatus('idle')
     setElapsed(0)
   }
