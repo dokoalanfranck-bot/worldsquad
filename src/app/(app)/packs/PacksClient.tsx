@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { useMusicContext } from '@/components/MusicProvider'
+import { ShareSheet } from '@/components/ShareSheet'
 import { PACK_CONFIGS, RARITY_COLORS, RARITY_GLOW } from '@/types'
 import type { Card, CardRarity } from '@/types'
 import toast from 'react-hot-toast'
@@ -147,7 +148,7 @@ interface Props {
   pseudo: string
 }
 
-export function PacksClient({ initialCoins, pseudo: _pseudo }: Props) {
+export function PacksClient({ initialCoins, pseudo }: Props) {
   const [coins, setCoins] = useState(initialCoins)
   const [phase, setPhase] = useState<Phase>('idle')
   const [selectedPack, setSelectedPack] = useState<PackKey | null>(null)
@@ -423,7 +424,7 @@ export function PacksClient({ initialCoins, pseudo: _pseudo }: Props) {
                   })}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap justify-center">
                   <button
                     onClick={reset}
                     className="bg-[#F5C518] hover:bg-[#ffd700] text-black font-black px-8 py-3 rounded-xl transition-all hover:scale-105"
@@ -437,6 +438,19 @@ export function PacksClient({ initialCoins, pseudo: _pseudo }: Props) {
                   >
                     Voir ma collection →
                   </a>
+                  {(() => {
+                    const best = cards.find((c) => c.rarity === 'Legend') ?? cards.find((c) => c.rarity === 'Epic')
+                    if (!best) return null
+                    return (
+                      <ShareSheet
+                        url={`/share/pack?card=${best.id}&pseudo=${encodeURIComponent(pseudo)}`}
+                        title={`J'ai obtenu ${best.name} (${best.rarity}) sur WorldSquad ! ⚽`}
+                        text={`Je viens d'ouvrir un pack et j'ai obtenu ${best.name} ${best.rarity === 'Legend' ? '🏆 LÉGENDAIRE' : '⚡ ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
+                        label="Partager ma carte"
+                        variant="outline"
+                      />
+                    )
+                  })()}
                 </div>
               </motion.div>
             )}

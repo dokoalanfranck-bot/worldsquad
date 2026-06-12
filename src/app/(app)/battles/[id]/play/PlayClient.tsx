@@ -9,6 +9,7 @@ import { Trophy, X, Swords, ArrowLeft, Flame, Check, Clock, Search } from 'lucid
 import type { Card } from '@/types'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { ShareSheet } from '@/components/ShareSheet'
 import { TeamSelectionClient } from './TeamSelectionClient'
 import { MatchAnimationClient } from './MatchAnimationClient'
 
@@ -169,6 +170,16 @@ export function PlayClient({ initialBattle, currentUserId, myCards }: Props) {
               <p className="text-white font-bold text-sm">{rewardCard.name}</p>
               <p className="text-white/40 text-xs capitalize">{rewardCard.rarity}</p>
             </div>
+          )}
+          {iWon && (
+            <ShareSheet
+              url={`/share/battle/${battle.id}`}
+              title={`J'ai battu ${them?.pseudo ?? 'mon adversaire'} en battle sur WorldSquad ! ⚔️${rewardCard ? ` J'ai volé la carte ${rewardCard.name} !` : ''}`}
+              text={`Je viens de remporter un battle WorldSquad !${rewardCard ? ` Carte volée : ${rewardCard.name} (${rewardCard.rarity})` : ''} Affronte-moi sur WorldSquad ⚽`}
+              label="Partager ma victoire"
+              variant="gold"
+              className="w-full"
+            />
           )}
           <div className="flex gap-3 w-full">
             <Link
