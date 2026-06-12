@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { GameCard } from '@/components/ui/Card'
 import { Clock, Star, Users, ChevronRight } from 'lucide-react'
@@ -25,10 +26,12 @@ function isCoachCard(card: Card): boolean {
 }
 
 export function TeamSelectionClient({ battle, currentUserId, myCards }: Props) {
+  const router = useRouter()
   const [selectedPlayers, setSelectedPlayers] = useState<Card[]>([])
   const [selectedCoach, setSelectedCoach] = useState<Card | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [waitSeconds, setWaitSeconds] = useState(0)
 
   const isChallenger = battle.challenger_id === currentUserId
   const me = isChallenger ? battle.challenger : battle.opponent
@@ -95,13 +98,17 @@ export function TeamSelectionClient({ battle, currentUserId, myCards }: Props) {
     }
   }
 
-  // Auto-recovery: if human team is already saved but bot hasn't responded, re-trigger after 2s
+  // Auto-recovery: re-trigger bot selection every 6s while waiting
   useEffect(() => {
     if (!alreadySubmitted && !submitted) return
-    const t = setTimeout(() => {
+    const first = setTimeout(() => {
       fetch(`/api/battles/${battle.id}/trigger-bot`, { method: 'POST' }).catch(() => {})
-    }, 2000)
-    return () => clearTimeout(t)
+    }, 1000)
+    const retry = setInterval(() => {
+      fetch(`/api/battles/${battle.id}/trigger-bot`, { method: 'POST' }).catch(() => {})
+    }, 6000)
+    const counter = setInterval(() => setWaitSeconds((s) => s + 1), 1000)
+    return () => { clearTimeout(first); clearInterval(retry); clearInterval(counter) }
   }, [alreadySubmitted, submitted, battle.id])
 
   if (alreadySubmitted || submitted) {
@@ -114,7 +121,16 @@ export function TeamSelectionClient({ battle, currentUserId, myCards }: Props) {
         >
           <Clock className="w-10 h-10 text-[#F5C518] mx-auto mb-3 animate-pulse" />
           <p className="text-white font-bold text-lg mb-1">Équipe confirmée</p>
-          <p className="text-gray-400 text-sm">En attente de {them?.pseudo}…</p>
+          <p className="text-gray-400 text-sm mb-1">En attente de {them?.pseudo ?? '…'}</p>
+          <p className="text-gray-700 text-xs">{waitSeconds}s</p>
+          {waitSeconds >= 15 && (
+            <button
+              onClick={() => router.push('/battles/matchmaking')}
+              className="mt-4 text-xs text-red-400/60 hover:text-red-400 transition-colors underline underline-offset-2"
+            >
+              Abandonner et chercher un nouvel adversaire
+            </button>
+          )}
         </motion.div>
 
         {/* Aperçu équipe */}

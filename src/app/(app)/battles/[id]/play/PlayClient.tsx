@@ -92,13 +92,35 @@ export function PlayClient({ initialBattle, currentUserId, myCards }: Props) {
         filter: `id=eq.${battle.id}`,
       }, ({ new: updated }) => {
         setBattle(updated as Battle)
-        // Reset pick state when round advances
         setPickedCard(null)
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [battle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling fallback for team_selection phase (in case Realtime misses the update)
+  useEffect(() => {
+    if (battle.type !== 'team_match') return
+    if (battle.phase !== 'team_selection') return
+
+    const myTeam = isChallenger ? battle.challenger_team : battle.opponent_team
+    if (!myTeam) return // user hasn't submitted yet, no need to poll
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/battles/${battle.id}/state`)
+        if (!res.ok) return
+        const data = await res.json() as { phase?: string; challenger_team?: unknown; opponent_team?: unknown; winner_id?: string; match_events?: unknown; final_score?: unknown; match_start_at?: string; challenger_cohesion?: number; opponent_cohesion?: number }
+        if (data.phase && data.phase !== 'team_selection') {
+          setBattle((prev: Battle) => ({ ...prev, ...data }))
+          clearInterval(poll)
+        }
+      } catch { /* réseau */ }
+    }, 4000)
+
+    return () => clearInterval(poll)
+  }, [battle.id, battle.phase, battle.type, isChallenger, battle.challenger_team, battle.opponent_team]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reveal round results with delay
   useEffect(() => {
