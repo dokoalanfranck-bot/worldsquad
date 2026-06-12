@@ -46,15 +46,25 @@ export async function botSelectTeam(battleId: string, botId: string): Promise<vo
     .map((r) => r.card as unknown as Card)
     .filter(Boolean)
 
-  if (allCards.length < 4) return
+  // If bot has fewer than 4 cards, fall back to random cards from the global table
+  let teamCards = allCards
+  if (teamCards.length < 4) {
+    const { data: fallbackRows } = await admin
+      .from('cards')
+      .select('id, name, rarity, image_url, stats, type, nation, position, flag')
+      .limit(20)
+    teamCards = ((fallbackRows ?? []) as unknown as Card[]).filter(Boolean)
+  }
 
-  const sorted = sortByStrength(allCards)
+  if (teamCards.length < 4) return
+
+  const sorted = sortByStrength(teamCards)
   const players = sorted.slice(0, 3)
   const coach = sorted[3]
   const team: Team = { players, coach }
 
-  // Artificial thinking delay (1.2 – 2.8s)
-  await new Promise((r) => setTimeout(r, 1200 + Math.random() * 1600))
+  // Short thinking delay so the UI feels natural (500 – 1200ms)
+  await new Promise((r) => setTimeout(r, 500 + Math.random() * 700))
 
   const field = isChallenger ? 'challenger_team' : 'opponent_team'
   await admin.from('battles').update({ [field]: team }).eq('id', battleId)

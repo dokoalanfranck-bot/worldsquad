@@ -63,10 +63,11 @@ export async function POST(
   const updateField = isChallenger ? 'challenger_team' : 'opponent_team'
   await admin.from('battles').update({ [updateField]: team }).eq('id', battleId)
 
-  // If other side is a bot, trigger its team selection asynchronously (fire and forget)
+  // If other side is a bot, run team selection synchronously before responding
+  // (fire-and-forget is unreliable in Vercel serverless — the process dies after response)
   const otherId = isChallenger ? battle.opponent_id : battle.challenger_id
   if (await isBot(otherId as string)) {
-    void botSelectTeam(battleId, otherId as string).catch(console.error)
+    await botSelectTeam(battleId, otherId as string)
     return NextResponse.json({ success: true })
   }
 
