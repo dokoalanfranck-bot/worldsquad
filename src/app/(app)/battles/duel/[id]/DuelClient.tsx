@@ -129,10 +129,10 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
     return () => clearInterval(t)
   }, [])
 
-  // Bot fallback after 20s (only challenger triggers it)
+  // Bot fallback after 50s (only challenger triggers it)
   useEffect(() => {
     if (!isChallenger || botFiredRef.current) return
-    if (elapsed < 20) return
+    if (elapsed < 50) return
     botFiredRef.current = true
     fetch(`/api/duels/${duel.id}/add-bot`, { method: 'POST' })
       .then((r) => r.json())
@@ -169,19 +169,19 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
           RECHERCHE…
         </h2>
         <p className="text-gray-500 text-sm">
-          {elapsed < 15 ? 'En attente d\'un adversaire…' : 'Presque là…'}
+          {elapsed < 40 ? 'En attente d\'un adversaire…' : 'Presque là…'}
         </p>
         <div className="mt-3 flex items-center justify-center gap-2">
           <div className="h-1 w-32 bg-white/5 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-[#F5C518] rounded-full"
-              animate={{ width: `${Math.min(100, (elapsed / 20) * 100)}%` }}
+              animate={{ width: `${Math.min(100, (elapsed / 50) * 100)}%` }}
               transition={{ duration: 0.5 }}
             />
           </div>
           <span className="text-gray-600 text-xs font-mono">{elapsed}s</span>
         </div>
-        {elapsed >= 20 && (
+        {elapsed >= 50 && (
           <p className="text-gray-600 text-xs mt-2 animate-pulse">Connexion d'un bot…</p>
         )}
       </div>
@@ -444,7 +444,7 @@ function PickingView({
 // ── AnimationView ─────────────────────────────────────────────────────────────
 
 function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallenger: boolean; me: Profile; them: Profile }) {
-  const DURATION_MS = 22000
+  const DURATION_MS = 30000
   const [elapsed, setElapsed] = useState(0)
   const [visibleEvents, setVisibleEvents] = useState<DuelEvent[]>([])
   const [challengerGoals, setChallengerGoals] = useState(0)

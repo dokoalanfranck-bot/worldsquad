@@ -111,7 +111,7 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
           {[
             { icon: '🔍', label: 'Matchmaking', desc: 'Adversaire humain en 20s, bot sinon' },
             { icon: '🃏', label: 'Sélection', desc: '3 joueurs + 1 coach · 45 secondes' },
-            { icon: '⚽', label: 'Match live', desc: 'Simulation animée · 22 secondes' },
+            { icon: '⚽', label: 'Match live', desc: 'Simulation animée · 30 secondes' },
             { icon: '🎴', label: 'Vol de carte', desc: 'Le gagnant vole la meilleure carte adverse' },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-3">
