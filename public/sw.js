@@ -1,93 +1,56 @@
-const CACHE_NAME = 'worldsquad-v1'
-const OFFLINE_URL = '/offline.html'
+// WorldSquad Service Worker v2
+const CACHE_NAME = 'worldsquad-v2'
+const OFFLINE_URL = '/'
 
-const PRECACHE = [
-  '/',
-  '/dashboard',
-  '/offline.html',
-  '/manifest.webmanifest',
-]
-
-// ── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE))
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll([OFFLINE_URL, '/manifest.webmanifest']).catch(() => {}))
+      .then(() => self.skipWaiting())
   )
-  self.skipWaiting()
 })
 
-// ── Activate ─────────────────────────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   )
-  self.clients.claim()
 })
 
-// ── Fetch: network-first for navigation, cache-first for assets ──────────────
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url)
+  // Skip non-GET, cross-origin, API and admin routes
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) return
+
+  // Network-first for navigation (SSR pages)
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
-    )
+    event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL).then((r) => r || Response.error())))
     return
   }
 
-  // API calls — always network, no caching
-  if (event.request.url.includes('/api/')) return
-
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') return response
-        const clone = response.clone()
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
-        return response
+  // Cache-first for Next.js static bundles only
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached
+        return fetch(event.request).then((res) => {
+          if (res.ok) { const clone = res.clone(); caches.open(CACHE_NAME).then((c) => c.put(event.request, clone)) }
+          return res
+        })
       })
-    })
-  )
+    )
+  }
 })
 
-// ── Push notifications ────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
-  let data = { title: 'WorldSquad', body: 'Nouvelle notification ⚽', icon: '/api/icons/192', badge: '/api/icons/192', tag: 'general', url: '/dashboard' }
-
-  try {
-    if (event.data) data = { ...data, ...event.data.json() }
-  } catch (_) {}
-
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon,
-      badge: data.badge,
-      tag: data.tag,
-      data: { url: data.url },
-      vibrate: [100, 50, 100],
-      requireInteraction: data.tag === 'battle' || data.tag === 'match',
-    })
-  )
+  if (!event.data) return
+  let p; try { p = event.data.json() } catch { p = { title: 'WorldSquad', body: event.data.text() } }
+  event.waitUntil(self.registration.showNotification(p.title || 'WorldSquad', { body: p.body || '', icon: '/api/icons/192', data: p.url || '/', vibrate: [100, 50, 100] }))
 })
 
-// ── Notification click ────────────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = event.notification.data?.url ?? '/dashboard'
-
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clients) => {
-        const existing = clients.find((c) => c.url.includes(self.location.origin))
-        if (existing) {
-          existing.focus()
-          existing.navigate(url)
-        } else {
-          self.clients.openWindow(url)
-        }
-      })
-  )
+  const url = event.notification.data || '/'
+  event.waitUntil(clients.matchAll({ type: 'window' }).then((ws) => { for (const w of ws) { if (w.url === url && 'focus' in w) return w.focus() } if (clients.openWindow) return clients.openWindow(url) }))
 })

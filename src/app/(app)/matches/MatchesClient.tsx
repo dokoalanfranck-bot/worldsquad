@@ -152,7 +152,7 @@ export function MatchesClient({ matches, predictionsByMatch, userNation }: Props
             <h2 className="text-[11px] font-bold text-white/30 uppercase tracking-wider mb-3 capitalize flex items-center gap-2">
               {date} <span className="text-white/15">({dayMatches.length})</span>
             </h2>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {dayMatches.map((match) => (
                 <MatchCard key={match.id} match={match} prediction={predictionsByMatch[match.id]} userNation={userNation} />
               ))}

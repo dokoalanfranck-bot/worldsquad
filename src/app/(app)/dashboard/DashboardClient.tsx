@@ -268,10 +268,10 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
   const winRate = profile.battles_played > 0 ? Math.round((profile.battles_won / profile.battles_played) * 100) : 0
 
   return (
-    <div className="max-w-xl mx-auto pb-28">
+    <div className="max-w-2xl lg:max-w-5xl mx-auto pb-28">
 
       {/* ── Hero banner FIFA/Panini ─────────────────────────────────────── */}
-      <div className="wc26-hero wc-stripe-top px-4 pt-8 pb-6 mb-5">
+      <div className="wc26-hero wc-stripe-top px-4 lg:px-8 pt-8 lg:pt-10 pb-6 mb-5">
         {/* Top line: brand + tournament */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -302,161 +302,173 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
       </div>
 
       {/* ── Content below hero ─────────────────────────────────────────── */}
-      <div className="px-4">
+      <div className="px-4 lg:px-8">
+        <div className="lg:flex lg:gap-6 lg:items-start">
 
-      {/* ── Stats strip ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        {[
-          { icon: Target, label: 'Pronos', value: profile.predictions_correct, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-          { icon: Trophy, label: 'Victoires', value: profile.battles_won, color: 'text-[#F5C518]', bg: 'bg-[#F5C518]/10' },
-          { icon: TrendingUp, label: 'Win rate', value: profile.battles_played > 0 ? `${winRate}%` : '—', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-        ].map(({ icon: Icon, label, value, color, bg }) => (
-          <div key={label} className="glass rounded-xl p-3 border border-white/5 text-center">
-            <div className={`w-7 h-7 rounded-lg ${bg} flex items-center justify-center mx-auto mb-2`}>
-              <Icon size={14} className={color} />
-            </div>
-            <p className={`font-black text-lg leading-none ${color}`} style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{value}</p>
-            <p className="text-white/30 text-[10px] mt-0.5">{label}</p>
-          </div>
-        ))}
-      </div>
+          {/* ── RIGHT sidebar (desktop) / TOP cards (mobile) ─────────── */}
+          <div className="lg:w-72 lg:flex-shrink-0 lg:order-2">
 
-      {/* ── Daily reward ───────────────────────────────────────────────── */}
-      <div className="mb-5">
-        <DailyReward initial={dailyReward} />
-      </div>
-
-      {/* ── Live scores ────────────────────────────────────────────────── */}
-      <LiveScores initialLive={liveMatches} initialFinished={recentFinished} />
-
-      {/* ── Next match ─────────────────────────────────────────────────── */}
-      {nextMatch && (
-        <Link href={`/matches/${nextMatch.id}`}>
-          <motion.div
-            whileTap={{ scale: 0.99 }}
-            className="glass rounded-2xl p-5 border border-white/5 hover:border-[#F5C518]/20 transition-colors mb-5 cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-white/40 text-[10px] uppercase tracking-widest">Prochain match</p>
-                <p className="text-white/60 text-xs mt-0.5">
-                  {new Date(nextMatch.match_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </p>
-              </div>
-              <span className="text-[10px] font-black uppercase bg-white/5 text-white/40 px-2 py-1 rounded-lg border border-white/5">
-                {nextMatch.phase}
-              </span>
-            </div>
-            <div className="flex items-center">
-              <div className="flex-1 text-center">
-                <span className="text-4xl">{nextMatch.flag_a ?? '🏳'}</span>
-                <p className="text-white font-black text-sm mt-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{nextMatch.team_a}</p>
-              </div>
-              <div className="px-4 text-center">
-                <p className="text-white/20 font-black text-sm mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>VS</p>
-                <Countdown targetDate={nextMatch.match_date} />
-              </div>
-              <div className="flex-1 text-center">
-                <span className="text-4xl">{nextMatch.flag_b ?? '🏳'}</span>
-                <p className="text-white font-black text-sm mt-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{nextMatch.team_b}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center justify-center gap-1.5 text-[#F5C518] text-sm font-bold">
-              <Target size={13} />
-              <span>Faire mon pronostic</span>
-              <ChevronRight size={13} />
-            </div>
-          </motion.div>
-        </Link>
-      )}
-
-      {/* ── Quick actions ──────────────────────────────────────────────── */}
-      <div className="mb-5">
-        <p className="text-white/40 text-[10px] uppercase tracking-widest mb-3">Jouer</p>
-        <div className="grid grid-cols-2 gap-3">
-          <QuickAction href="/battles" icon={Swords} label="DUELS" sub="Défie d'autres joueurs" accent="bg-orange-500/15 text-orange-400" />
-          <QuickAction href="/packs" icon={Gift} label="PACKS" sub="Ouvre des cartes" accent="bg-amber-500/15 text-amber-400" />
-          <QuickAction href="/matches" icon={Calendar} label="PRONOSTICS" sub="Prédit les matchs" accent="bg-violet-500/15 text-violet-400" />
-          <QuickAction href="/shop" icon={ShoppingBag} label="BOUTIQUE" sub="Acheter des coins" accent="bg-blue-500/15 text-blue-400" />
-        </div>
-      </div>
-
-      {/* ── Recent predictions ─────────────────────────────────────────── */}
-      <div className="mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-white/40 text-[10px] uppercase tracking-widest">Mes pronostics</p>
-          <Link href="/matches" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
-            Voir tout <ChevronRight size={12} />
-          </Link>
-        </div>
-        {recentPredictions.length === 0 ? (
-          <div className="glass rounded-2xl p-6 border border-white/5 text-center">
-            <Calendar size={28} className="text-white/20 mx-auto mb-2" />
-            <p className="text-white/40 text-sm">Aucun pronostic pour l&apos;instant</p>
-            <Link href="/matches" className="inline-block mt-3 text-[#F5C518] text-sm font-bold">
-              Voir les matchs →
-            </Link>
-          </div>
-        ) : (
-          <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
-            {recentPredictions.slice(0, 5).map((pred) => (
-              <Link key={pred.id} href={`/matches/${pred.match?.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span>{pred.match?.flag_a ?? '🏳'}</span>
-                  <span className="text-white/60 text-xs truncate">{pred.match?.team_a}</span>
-                  <span className="text-white font-black text-sm tabular-nums">{pred.pred_score_a}–{pred.pred_score_b}</span>
-                  <span className="text-white/60 text-xs truncate">{pred.match?.team_b}</span>
-                  <span>{pred.match?.flag_b ?? '🏳'}</span>
-                </div>
-                <div className="flex-shrink-0">
-                  {pred.status === 'correct_score' && <span className="flex items-center gap-1 text-[10px] font-black text-green-400 bg-green-500/10 px-2 py-0.5 rounded-lg"><CheckCircle2 size={9} /> +300</span>}
-                  {pred.status === 'correct_winner' && <span className="flex items-center gap-1 text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-lg"><CheckCircle2 size={9} /> +100</span>}
-                  {pred.status === 'wrong' && <span className="flex items-center gap-1 text-[10px] font-black text-red-400 bg-red-500/10 px-2 py-0.5 rounded-lg"><XCircle size={9} /> Raté</span>}
-                  {pred.status === 'pending' && <span className="flex items-center gap-1 text-[10px] font-black text-white/30 bg-white/5 px-2 py-0.5 rounded-lg"><Clock size={9} /> Attente</span>}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Group ──────────────────────────────────────────────────────── */}
-      {group ? (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-white/40 text-[10px] uppercase tracking-widest">{group.name}</p>
-            <Link href="/group" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
-              Groupe <ChevronRight size={12} />
-            </Link>
-          </div>
-          <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
-            {activities.length === 0 ? (
-              <p className="px-4 py-5 text-white/30 text-sm text-center">Aucune activité récente</p>
-            ) : (
-              activities.slice(0, 5).map((a) => (
-                <div key={a.id} className="flex items-start gap-3 px-4 py-3">
-                  <div className="w-7 h-7 rounded-full bg-[#F5C518]/15 flex items-center justify-center text-[11px] font-black text-[#F5C518] flex-shrink-0">
-                    {a.user?.pseudo?.slice(0, 1) ?? '?'}
+            {/* Stats strip */}
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              {[
+                { icon: Target, label: 'Pronos', value: profile.predictions_correct, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+                { icon: Trophy, label: 'Victoires', value: profile.battles_won, color: 'text-[#F5C518]', bg: 'bg-[#F5C518]/10' },
+                { icon: TrendingUp, label: 'Win rate', value: profile.battles_played > 0 ? `${winRate}%` : '—', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+              ].map(({ icon: Icon, label, value, color, bg }) => (
+                <div key={label} className="glass rounded-xl p-3 border border-white/5 text-center">
+                  <div className={`w-7 h-7 rounded-lg ${bg} flex items-center justify-center mx-auto mb-2`}>
+                    <Icon size={14} className={color} />
                   </div>
-                  <p className="text-white/50 text-xs leading-relaxed">{a.message}</p>
+                  <p className={`font-black text-lg leading-none ${color}`} style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{value}</p>
+                  <p className="text-white/30 text-[10px] mt-0.5">{label}</p>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="glass rounded-2xl p-6 border border-white/5 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
-            <Users size={22} className="text-white/30" />
-          </div>
-          <p className="text-white font-bold text-sm mb-1">Pas encore dans un groupe</p>
-          <p className="text-white/30 text-xs mb-4">Rejoins tes amis pour jouer ensemble</p>
-          <Link href="/group" className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-white/10 transition-colors">
-            <Users size={14} /> Créer ou rejoindre un groupe
-          </Link>
-        </div>
-      )}
+              ))}
+            </div>
 
+            {/* Daily reward */}
+            <div className="mb-5">
+              <DailyReward initial={dailyReward} />
+            </div>
+
+            {/* Quick actions */}
+            <div className="mb-5">
+              <p className="text-white/40 text-[10px] uppercase tracking-widest mb-3">Jouer</p>
+              <div className="grid grid-cols-2 gap-3">
+                <QuickAction href="/battles" icon={Swords} label="DUELS" sub="Défie d'autres joueurs" accent="bg-orange-500/15 text-orange-400" />
+                <QuickAction href="/packs" icon={Gift} label="PACKS" sub="Ouvre des cartes" accent="bg-amber-500/15 text-amber-400" />
+                <QuickAction href="/matches" icon={Calendar} label="PRONOSTICS" sub="Prédit les matchs" accent="bg-violet-500/15 text-violet-400" />
+                <QuickAction href="/shop" icon={ShoppingBag} label="BOUTIQUE" sub="Acheter des coins" accent="bg-blue-500/15 text-blue-400" />
+              </div>
+            </div>
+
+          </div>{/* end sidebar */}
+
+          {/* ── LEFT main content (desktop) / REST (mobile) ──────────── */}
+          <div className="lg:flex-1 lg:min-w-0 lg:order-1">
+
+            {/* Live scores */}
+            <LiveScores initialLive={liveMatches} initialFinished={recentFinished} />
+
+            {/* Next match */}
+            {nextMatch && (
+              <Link href={`/matches/${nextMatch.id}`}>
+                <motion.div
+                  whileTap={{ scale: 0.99 }}
+                  className="glass rounded-2xl p-5 border border-white/5 hover:border-[#F5C518]/20 transition-colors mb-5 cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-white/40 text-[10px] uppercase tracking-widest">Prochain match</p>
+                      <p className="text-white/60 text-xs mt-0.5">
+                        {new Date(nextMatch.match_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase bg-white/5 text-white/40 px-2 py-1 rounded-lg border border-white/5">
+                      {nextMatch.phase}
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="flex-1 text-center">
+                      <span className="text-4xl">{nextMatch.flag_a ?? '🏳'}</span>
+                      <p className="text-white font-black text-sm mt-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{nextMatch.team_a}</p>
+                    </div>
+                    <div className="px-4 text-center">
+                      <p className="text-white/20 font-black text-sm mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>VS</p>
+                      <Countdown targetDate={nextMatch.match_date} />
+                    </div>
+                    <div className="flex-1 text-center">
+                      <span className="text-4xl">{nextMatch.flag_b ?? '🏳'}</span>
+                      <p className="text-white font-black text-sm mt-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{nextMatch.team_b}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center justify-center gap-1.5 text-[#F5C518] text-sm font-bold">
+                    <Target size={13} />
+                    <span>Faire mon pronostic</span>
+                    <ChevronRight size={13} />
+                  </div>
+                </motion.div>
+              </Link>
+            )}
+
+            {/* Recent predictions */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-white/40 text-[10px] uppercase tracking-widest">Mes pronostics</p>
+                <Link href="/matches" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
+                  Voir tout <ChevronRight size={12} />
+                </Link>
+              </div>
+              {recentPredictions.length === 0 ? (
+                <div className="glass rounded-2xl p-6 border border-white/5 text-center">
+                  <Calendar size={28} className="text-white/20 mx-auto mb-2" />
+                  <p className="text-white/40 text-sm">Aucun pronostic pour l&apos;instant</p>
+                  <Link href="/matches" className="inline-block mt-3 text-[#F5C518] text-sm font-bold">
+                    Voir les matchs →
+                  </Link>
+                </div>
+              ) : (
+                <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+                  {recentPredictions.slice(0, 5).map((pred) => (
+                    <Link key={pred.id} href={`/matches/${pred.match?.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span>{pred.match?.flag_a ?? '🏳'}</span>
+                        <span className="text-white/60 text-xs truncate">{pred.match?.team_a}</span>
+                        <span className="text-white font-black text-sm tabular-nums">{pred.pred_score_a}–{pred.pred_score_b}</span>
+                        <span className="text-white/60 text-xs truncate">{pred.match?.team_b}</span>
+                        <span>{pred.match?.flag_b ?? '🏳'}</span>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {pred.status === 'correct_score' && <span className="flex items-center gap-1 text-[10px] font-black text-green-400 bg-green-500/10 px-2 py-0.5 rounded-lg"><CheckCircle2 size={9} /> +300</span>}
+                        {pred.status === 'correct_winner' && <span className="flex items-center gap-1 text-[10px] font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-lg"><CheckCircle2 size={9} /> +100</span>}
+                        {pred.status === 'wrong' && <span className="flex items-center gap-1 text-[10px] font-black text-red-400 bg-red-500/10 px-2 py-0.5 rounded-lg"><XCircle size={9} /> Raté</span>}
+                        {pred.status === 'pending' && <span className="flex items-center gap-1 text-[10px] font-black text-white/30 bg-white/5 px-2 py-0.5 rounded-lg"><Clock size={9} /> Attente</span>}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Group */}
+            {group ? (
+              <div className="mb-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-white/40 text-[10px] uppercase tracking-widest">{group.name}</p>
+                  <Link href="/group" className="flex items-center gap-1 text-[#F5C518] text-xs font-bold hover:opacity-80">
+                    Groupe <ChevronRight size={12} />
+                  </Link>
+                </div>
+                <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+                  {activities.length === 0 ? (
+                    <p className="px-4 py-5 text-white/30 text-sm text-center">Aucune activité récente</p>
+                  ) : (
+                    activities.slice(0, 5).map((a) => (
+                      <div key={a.id} className="flex items-start gap-3 px-4 py-3">
+                        <div className="w-7 h-7 rounded-full bg-[#F5C518]/15 flex items-center justify-center text-[11px] font-black text-[#F5C518] flex-shrink-0">
+                          {a.user?.pseudo?.slice(0, 1) ?? '?'}
+                        </div>
+                        <p className="text-white/50 text-xs leading-relaxed">{a.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="glass rounded-2xl p-6 border border-white/5 text-center mb-5">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                  <Users size={22} className="text-white/30" />
+                </div>
+                <p className="text-white font-bold text-sm mb-1">Pas encore dans un groupe</p>
+                <p className="text-white/30 text-xs mb-4">Rejoins tes amis pour jouer ensemble</p>
+                <Link href="/group" className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-white/10 transition-colors">
+                  <Users size={14} /> Créer ou rejoindre un groupe
+                </Link>
+              </div>
+            )}
+
+          </div>{/* end main */}
+
+        </div>
       </div>{/* end content wrapper */}
     </div>
   )

@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -183,7 +181,11 @@ body {
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .dashboard-content { padding-left: 0; }
-@media (min-width: 1024px) { .dashboard-content { padding-left: 256px; } }
+@media (min-width: 1024px) {
+  .dashboard-content { padding-left: 256px; }
+  /* On large screens, Bebas Neue headings can scale up */
+  .font-bebas, [style*="Bebas Neue"] { letter-spacing: 0.03em; }
+}
 
 /* ── Countdown ───────────────────────────────────────────────────────────── */
 .countdown-digit {

@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from 'next'
+import { Bebas_Neue, Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { PWAProvider } from '@/components/PWAProvider'
+
+const bebasNeue = Bebas_Neue({ weight: '400', subsets: ['latin'], variable: '--font-bebas', display: 'swap' })
+const inter = Inter({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700', '800', '900'], variable: '--font-inter', display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'WorldSquad — Vis la Coupe du Monde 2026',
@@ -26,8 +30,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#0A0A0F' },
-    { media: '(prefers-color-scheme: light)', color: '#0A0A0F' },
+    { media: '(prefers-color-scheme: dark)', color: '#091524' },
+    { media: '(prefers-color-scheme: light)', color: '#091524' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -40,11 +44,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="bg-[#0A0A0F] text-white min-h-screen">
+      <body className={`${inter.variable} ${bebasNeue.variable} text-white min-h-screen`} style={{ background: 'var(--bg-primary)', fontFamily: 'var(--font-inter, Inter, sans-serif)' }}>
         {children}
         <PWAProvider />
         <Toaster
