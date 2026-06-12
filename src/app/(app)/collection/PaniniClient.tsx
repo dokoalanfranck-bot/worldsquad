@@ -58,8 +58,8 @@ function Sticker({ card, owned }: { card: Card; owned: boolean }) {
         aspectRatio: '3/4',
         border: owned ? `1.5px solid ${color}55` : '1.5px solid #ffffff10',
         background: owned
-          ? `linear-gradient(160deg, ${color}18 0%, #0c0c18 60%)`
-          : '#0a0a14',
+          ? `linear-gradient(160deg, ${color}18 0%, #091524 60%)`
+          : '#060F1A',
         boxShadow: owned && (isLegend || isEpic) ? `0 0 10px ${color}30` : undefined,
         filter: owned ? undefined : 'brightness(0.4) grayscale(0.6)',
       }}

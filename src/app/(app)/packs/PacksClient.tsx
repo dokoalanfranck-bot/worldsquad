@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Globe, Sparkles, Trophy } from 'lucide-react'
 import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { useMusicContext } from '@/components/MusicProvider'
@@ -98,7 +99,7 @@ function RevealCard({ card, index, shouldReveal, totalCards }: RevealCardProps) 
               letterSpacing: '0.05em',
             }}
           >
-            {card.rarity === 'Legend' ? '⚡ LÉGENDAIRE !' : '✨ ÉPIQUE !'}
+            {card.rarity === 'Legend' ? 'LÉGENDAIRE' : 'ÉPIQUE'}
           </motion.div>
         )}
       </AnimatePresence>
@@ -119,7 +120,7 @@ function RevealCard({ card, index, shouldReveal, totalCards }: RevealCardProps) 
           <GameCard card={card} owned size={totalCards <= 3 ? 'lg' : 'md'} />
         </div>
 
-        {/* Back — card back design */}
+        {/* Back — official Panini-style card back */}
         <div
           style={{
             backfaceVisibility: 'hidden',
@@ -127,17 +128,19 @@ function RevealCard({ card, index, shouldReveal, totalCards }: RevealCardProps) 
             position: 'absolute',
             inset: 0,
           }}
-          className="rounded-xl bg-gradient-to-br from-[#0a0a0f] to-[#111118] border-2 border-[#F5C518]/30 flex items-center justify-center"
+          className="rounded-xl flex flex-col overflow-hidden border-2 border-[#F5C518]/25"
         >
-          <div className="text-center">
-            <div className="text-3xl mb-1">🏆</div>
-            <div className="text-[#F5C518]/40 font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              WORLD
+          {/* Red/gold stripe at top */}
+          <div className="h-2 w-full" style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518)' }} />
+          <div className="flex-1 flex flex-col items-center justify-center gap-1 p-2" style={{ background: 'linear-gradient(160deg, #0A1F3D, #060F1A)' }}>
+            <div className="w-8 h-8 rounded-full border-2 border-[#F5C518]/40 flex items-center justify-center mb-1">
+              <Globe size={14} className="text-[#F5C518]/60" />
             </div>
-            <div className="text-[#F5C518]/40 font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              SQUAD
-            </div>
+            <div className="text-[#F5C518]/50 font-black text-xs leading-none text-center" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
+            <div className="text-[#F5C518]/50 font-black text-xs leading-none text-center" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
+            <div className="text-white/15 font-bold text-[9px] mt-1 text-center">2026</div>
           </div>
+          <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F5C518, #C8102E)' }} />
         </div>
       </motion.div>
     </motion.div>
@@ -264,7 +267,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                         boxShadow: `0 0 20px ${config.color}25`,
                       }}
                     >
-                      <span className="text-4xl z-10">{config.icon}</span>
+                      <Globe size={36} className="z-10 opacity-60" style={{ color: config.color }} />
                       {/* Shimmer */}
                       <motion.div
                         className="absolute inset-0 opacity-20"
@@ -313,7 +316,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                       style={{ background: canAfford ? config.color : '#374151', fontFamily: 'Bebas Neue, sans-serif' }}
                       disabled={!canAfford}
                     >
-                      {config.cost.toLocaleString()} 🪙
+                      {config.cost.toLocaleString()} COINS
                     </button>
                   </motion.div>
                 )
@@ -347,7 +350,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                 boxShadow: `0 0 80px ${packColorOf(selectedPack)}60`,
               }}
             >
-              <span className="text-6xl">{PACK_CONFIGS[selectedPack].icon}</span>
+              <Globe size={52} style={{ color: packColorOf(selectedPack), opacity: 0.8 }} />
               <span className="text-white font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                 {PACK_CONFIGS[selectedPack].name}
               </span>
@@ -383,7 +386,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                 className="text-3xl font-black text-white text-center"
                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}
               >
-                🎉 TES NOUVELLES CARTES !
+                TES NOUVELLES CARTES !
               </motion.h2>
             )}
 
@@ -457,8 +460,8 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                         />
                         <ShareSheet
                           url={`/share/pack?card=${best.id}&pseudo=${encodeURIComponent(pseudo)}`}
-                          title={`J'ai obtenu ${best.name} (${best.rarity}) sur WorldSquad ! ⚽`}
-                          text={`Je viens d'ouvrir un pack et j'ai obtenu ${best.name} ${best.rarity === 'Legend' ? '🏆 LÉGENDAIRE' : '⚡ ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
+                          title={`J'ai obtenu ${best.name} (${best.rarity}) sur WorldSquad !`}
+                          text={`Je viens d'ouvrir un pack et j'ai obtenu ${best.name} ${best.rarity === 'Legend' ? 'LÉGENDAIRE' : 'ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
                           label="Partager"
                           variant="outline"
                         />

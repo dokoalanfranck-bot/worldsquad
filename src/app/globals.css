@@ -4,18 +4,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design System — FIFA / Panini World Cup 2026 ─────────────────────────── */
 :root {
-  --bg-primary: #0A0A0F;
-  --bg-card: #0D0D17;
-  --bg-elevated: #12121f;
-  --accent-gold: #F5C518;
-  --accent-neon: #00D4FF;
-  --accent-purple: #A855F7;
-  --text-primary: #FFFFFF;
-  --text-secondary: #9CA3AF;
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  /* Safe area insets for iPhone notch / Dynamic Island */
-  --safe-top: env(safe-area-inset-top);
+  /* Backgrounds */
+  --bg-primary:   #091524;   /* FIFA deep navy */
+  --bg-card:      #0D1E31;   /* Card surface */
+  --bg-elevated:  #122033;   /* Elevated surface */
+  --bg-sidebar:   #060F1A;   /* Sidebar / nav */
+
+  /* Brand accents */
+  --accent-gold:   #F5C518;  /* Panini gold */
+  --accent-red:    #C8102E;  /* FIFA red */
+  --accent-blue:   #009ADE;  /* FIFA blue light */
+
+  /* Text */
+  --text-primary:   #FFFFFF;
+  --text-secondary: rgba(255,255,255,0.55);
+  --text-muted:     rgba(255,255,255,0.25);
+
+  /* Borders */
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-gold:   rgba(245,197,24,0.25);
+
+  /* Safe areas */
+  --safe-top:    env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
 }
 
@@ -24,10 +36,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html {
-  /* Prevent elastic bounce scroll on iOS */
-  overscroll-behavior: none;
-}
+html { overscroll-behavior: none; }
 
 body {
   background-color: var(--bg-primary);
@@ -37,63 +46,81 @@ body {
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   min-height: 100dvh;
-  /* Smooth scroll on iOS */
   -webkit-overflow-scrolling: touch;
 }
 
-/* Hide scrollbars but keep functionality */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
+/* ── Typography ──────────────────────────────────────────────────────────── */
 .font-bebas { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
 
-/* Glass morphism */
+/* ── Surfaces ────────────────────────────────────────────────────────────── */
+
+/* Panel — the main card surface on the FIFA blue background */
 .glass {
-  background: rgba(255,255,255,0.03);
+  background: rgba(6, 20, 38, 0.65);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.07);
 }
 
 .glass-elevated {
-  background: rgba(255,255,255,0.06);
+  background: rgba(13, 30, 49, 0.85);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* Holo card effect */
+/* Gold-border panel */
+.panel-gold {
+  background: rgba(6, 20, 38, 0.75);
+  border: 1px solid rgba(245,197,24,0.20);
+}
+
+/* ── Divider FIFA gold ────────────────────────────────────────────────────── */
+.fifa-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+  opacity: 0.4;
+}
+
+/* Thin gold stripe at top of section headers (like official FIFA materials) */
+.wc-stripe-top {
+  position: relative;
+}
+.wc-stripe-top::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-red), var(--accent-gold));
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── Holographic card effect ─────────────────────────────────────────────── */
 @keyframes holo-shift {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
 .holo-effect {
   background: linear-gradient(
-    125deg,
-    transparent 0%,
-    rgba(255,0,128,0.15) 10%,
-    rgba(255,165,0,0.15) 20%,
-    rgba(255,255,0,0.15) 30%,
-    rgba(0,255,128,0.15) 40%,
-    rgba(0,200,255,0.15) 50%,
-    rgba(128,0,255,0.15) 60%,
-    rgba(255,0,200,0.15) 70%,
-    transparent 100%
+    125deg, transparent 0%, rgba(255,0,128,.12) 10%, rgba(255,165,0,.12) 20%,
+    rgba(255,255,0,.12) 30%, rgba(0,255,128,.12) 40%, rgba(0,200,255,.12) 50%,
+    rgba(128,0,255,.12) 60%, rgba(255,0,200,.12) 70%, transparent 100%
   );
   background-size: 300% 300%;
   animation: holo-shift 4s ease infinite;
   mix-blend-mode: screen;
 }
 
-/* Text shimmer */
+/* ── Text shimmer ────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  100% { background-position:  200% center; }
 }
-
 .text-shimmer {
   background: linear-gradient(90deg, #F5C518 0%, #fff 40%, #F5C518 60%, #F5C518 100%);
   background-size: 200% auto;
@@ -103,84 +130,87 @@ body {
   animation: shimmer 3s linear infinite;
 }
 
-/* Glow animations */
+/* ── Glow animations ─────────────────────────────────────────────────────── */
 @keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 0 10px rgba(245,197,24,0.3); }
-  50%       { box-shadow: 0 0 30px rgba(245,197,24,0.6); }
+  0%, 100% { box-shadow: 0 0 10px rgba(245,197,24,.3); }
+  50%       { box-shadow: 0 0 30px rgba(245,197,24,.6); }
 }
 .pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }
 
 @keyframes pulse-neon {
-  0%, 100% { box-shadow: 0 0 10px rgba(0,212,255,0.3); }
-  50%       { box-shadow: 0 0 30px rgba(0,212,255,0.6); }
+  0%, 100% { box-shadow: 0 0 10px rgba(0,154,222,.3); }
+  50%       { box-shadow: 0 0 30px rgba(0,154,222,.6); }
 }
 .pulse-neon { animation: pulse-neon 2s ease-in-out infinite; }
 
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 10px rgba(200,16,46,.3); }
+  50%       { box-shadow: 0 0 30px rgba(200,16,46,.6); }
+}
+.pulse-red { animation: pulse-red 2s ease-in-out infinite; }
+
 @keyframes pulse-purple {
-  0%, 100% { box-shadow: 0 0 10px rgba(168,85,247,0.3); }
-  50%       { box-shadow: 0 0 30px rgba(168,85,247,0.6); }
+  0%, 100% { box-shadow: 0 0 10px rgba(168,85,247,.3); }
+  50%       { box-shadow: 0 0 30px rgba(168,85,247,.6); }
 }
 .pulse-purple { animation: pulse-purple 2s ease-in-out infinite; }
 
-/* VIP border */
+/* ── VIP border ──────────────────────────────────────────────────────────── */
 @keyframes vip-border {
   0%, 100% { border-color: #F5C518; }
-  50%       { border-color: #fff; }
+  50%       { border-color: #fff;   }
 }
 .vip-border { animation: vip-border 2s linear infinite; border-width: 2px; border-style: solid; }
 
-/* Skeleton loading */
+/* ── Skeleton ────────────────────────────────────────────────────────────── */
 @keyframes loading-shimmer {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
-
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.04);
   border-radius: 8px;
 }
 .skeleton::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
   animation: loading-shimmer 1.5s infinite;
 }
 
-/* Layout */
+/* ── Layout ──────────────────────────────────────────────────────────────── */
 .dashboard-content { padding-left: 0; }
 @media (min-width: 1024px) { .dashboard-content { padding-left: 256px; } }
 
-/* Countdown digits */
+/* ── Countdown ───────────────────────────────────────────────────────────── */
 .countdown-digit {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 2rem;
   color: var(--accent-gold);
-  text-shadow: 0 0 20px rgba(245,197,24,0.5);
+  text-shadow: 0 0 20px rgba(245,197,24,.5);
 }
 
-/* Scrolling ticker */
+/* ── Ticker ──────────────────────────────────────────────────────────────── */
 @keyframes scroll-left {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-.animate-scroll-left {
-  animation: scroll-left 40s linear infinite;
-}
+.animate-scroll-left { animation: scroll-left 40s linear infinite; }
 .animate-scroll-left:hover { animation-play-state: paused; }
 
-/* ── Card flip 3D ─────────────────────────────────── */
+/* ── Card 3D ─────────────────────────────────────────────────────────────── */
 .card-3d { transform-style: preserve-3d; }
 .card-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 
-/* ── Rarity flash animations ─────────────────────── */
+/* ── Rarity flash ────────────────────────────────────────────────────────── */
 @keyframes legend-flash {
-  0%   { opacity: 0; transform: scale(0.8); }
+  0%   { opacity: 0; transform: scale(.8); }
   30%  { opacity: 1; transform: scale(1.1); }
   70%  { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(.9); }
 }
 .legend-flash { animation: legend-flash 1.2s ease-out forwards; }
 
@@ -190,59 +220,61 @@ body {
   80%  { opacity: 1; }
   100% { opacity: 0; }
 }
-.epic-flash { animation: epic-flash 0.9s ease-out forwards; }
+.epic-flash { animation: epic-flash .9s ease-out forwards; }
 
-/* ── Page transition ─────────────────────────────── */
+/* ── Page transition ─────────────────────────────────────────────────────── */
 @keyframes page-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.page-enter { animation: page-in 0.3s ease-out both; }
+.page-enter { animation: page-in .3s ease-out both; }
 
-/* ── Bottom sheet (mobile modal) ─────────────────── */
+/* ── Bottom sheet ────────────────────────────────────────────────────────── */
 .bottom-sheet {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: flex-end; justify-content: center;
 }
-
 .bottom-sheet-panel {
-  width: 100%;
-  max-width: 480px;
+  width: 100%; max-width: 480px;
   border-radius: 24px 24px 0 0;
   padding-bottom: max(env(safe-area-inset-bottom), 16px);
-  background: #12121f;
+  background: var(--bg-elevated);
   border-top: 1px solid rgba(255,255,255,0.1);
 }
-
 @media (min-width: 640px) {
-  .bottom-sheet {
-    align-items: center;
-  }
-  .bottom-sheet-panel {
-    max-width: 420px;
-    border-radius: 24px;
-    padding-bottom: 24px;
-  }
+  .bottom-sheet { align-items: center; }
+  .bottom-sheet-panel { max-width: 420px; border-radius: 24px; padding-bottom: 24px; }
 }
 
-/* ── Touch targets ───────────────────────────────── */
+/* ── Touch targets ───────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {
-  button, a {
-    min-height: 40px;
-  }
-  /* Pack cards: full-width on tiny screens */
-  .pack-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  button, a { min-height: 40px; }
+  .pack-grid { grid-template-columns: 1fr 1fr; }
 }
 
-/* ── Floating label animation ────────────────────── */
+/* ── Float animation ─────────────────────────────────────────────────────── */
 @keyframes float-up {
   0%   { opacity: 1; transform: translateY(0) scale(1); }
   100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
 }
 .float-up { animation: float-up 1s ease-out forwards; }
+
+/* ── World Cup 2026 hero gradient background ─────────────────────────────── */
+.wc26-hero {
+  background: linear-gradient(160deg, #0A1F3D 0%, #091524 50%, #06111E 100%);
+  position: relative;
+  overflow: hidden;
+}
+.wc26-hero::before {
+  content: '2026';
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(80px, 25vw, 180px);
+  color: rgba(245,197,24,0.04);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  user-select: none;
+}

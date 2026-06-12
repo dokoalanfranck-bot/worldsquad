@@ -82,7 +82,7 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <>
       {/* ── Desktop Sidebar ─────────────────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-[#0D0D17] border-r border-white/5 z-40 py-6 px-4">
+      <aside className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 border-r border-white/5 z-40 py-6 px-4" style={{ background: 'var(--bg-sidebar)' }}>
         <Link href="/dashboard" className="flex items-center gap-2 mb-8 px-2">
           <Globe size={22} className="text-[#F5C518]" />
           <span className="text-2xl font-black text-white tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
@@ -151,8 +151,8 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* ── Mobile Bottom Nav ────────────────────────────────────────────── */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0D0D17]/95 backdrop-blur-xl border-t border-white/5"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 4px)' }}
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-xl border-t border-white/5"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 4px)', background: 'rgba(6,15,26,0.95)' }}
       >
         <div className="relative flex items-end justify-around px-1">
           {/* Left */}
@@ -227,8 +227,8 @@ export function Sidebar({ user }: SidebarProps) {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-              className="lg:hidden fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl bg-[#0D0D17] border-t border-white/10"
-              style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
+              className="lg:hidden fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl border-t border-white/10"
+              style={{ background: 'var(--bg-sidebar)', paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
             >
               {/* Handle */}
               <div className="flex items-center justify-between px-5 pt-4 pb-2">
@@ -277,7 +277,7 @@ export function Sidebar({ user }: SidebarProps) {
                 )}
 
                 {/* Nav items */}
-                <div className="rounded-2xl overflow-hidden border border-white/5 bg-[#12121f]">
+                <div className="rounded-2xl overflow-hidden border border-white/5" style={{ background: 'var(--bg-elevated)' }}>
                   {DRAWER_ITEMS.map((item, i) => {
                     const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                     return (

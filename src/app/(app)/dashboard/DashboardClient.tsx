@@ -6,8 +6,7 @@ import Link from 'next/link'
 import {
   Calendar, Gift, Swords, ShoppingBag, Crown, Target,
   CheckCircle2, XCircle, Clock, Users, Flame, ChevronRight,
-  TrendingUp, Zap, type LucideIcon, CircleDollarSign, Trophy,
-  Star, Radio,
+  TrendingUp, type LucideIcon, Trophy, Star, Globe,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
@@ -269,27 +268,41 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
   const winRate = profile.battles_played > 0 ? Math.round((profile.battles_won / profile.battles_played) * 100) : 0
 
   return (
-    <div className="px-4 py-5 max-w-xl mx-auto pb-28">
+    <div className="max-w-xl mx-auto pb-28">
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <p className="text-white/40 text-xs uppercase tracking-widest mb-0.5">WorldSquad</p>
-          <h1 className="text-3xl font-black text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            {profile.pseudo.toUpperCase()}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm">{flag(profile.nation)}</span>
-            <span className="text-white/40 text-xs">{profile.nation}</span>
-            {profile.is_vip && (
-              <span className="flex items-center gap-0.5 text-[10px] font-black text-[#F5C518] bg-[#F5C518]/10 px-1.5 py-0.5 rounded border border-[#F5C518]/20">
-                <Crown size={9} /> VIP
-              </span>
-            )}
+      {/* ── Hero banner FIFA/Panini ─────────────────────────────────────── */}
+      <div className="wc26-hero wc-stripe-top px-4 pt-8 pb-6 mb-5">
+        {/* Top line: brand + tournament */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Globe size={16} className="text-[#F5C518]" />
+            <span className="text-[#F5C518] font-black text-xs uppercase tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WorldSquad</span>
           </div>
+          <span className="text-white/20 text-[10px] font-bold uppercase tracking-widest">FIFA World Cup 2026</span>
         </div>
-        <CoinDisplay amount={profile.coins} size="lg" />
+
+        {/* Player identity */}
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">{flag(profile.nation)}</span>
+              <span className="text-white/40 text-xs font-bold uppercase">{profile.nation}</span>
+              {profile.is_vip && (
+                <span className="flex items-center gap-0.5 text-[10px] font-black text-[#F5C518] bg-[#F5C518]/10 px-1.5 py-0.5 rounded border border-[#F5C518]/20">
+                  <Crown size={9} /> VIP
+                </span>
+              )}
+            </div>
+            <h1 className="text-5xl font-black text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              {profile.pseudo.toUpperCase()}
+            </h1>
+          </div>
+          <CoinDisplay amount={profile.coins} size="lg" />
+        </div>
       </div>
+
+      {/* ── Content below hero ─────────────────────────────────────────── */}
+      <div className="px-4">
 
       {/* ── Stats strip ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -443,6 +456,8 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
           </Link>
         </div>
       )}
+
+      </div>{/* end content wrapper */}
     </div>
   )
 }

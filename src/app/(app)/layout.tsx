@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!profile) redirect('/signup')
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F]">
+    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <Sidebar user={profile as User} />
       <main className="dashboard-content min-h-screen pb-20 lg:pb-0">
         <PingProvider />
