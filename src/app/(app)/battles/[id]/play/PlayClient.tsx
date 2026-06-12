@@ -702,9 +702,17 @@ function TeamMatchPickReward({
               <Clock size={28} className="text-white/30 animate-pulse" />
             </div>
           ) : cards.length === 0 ? (
-            <div className="glass rounded-2xl p-8 text-center border border-white/5">
+            <div className="glass rounded-2xl p-8 text-center border border-white/5 flex flex-col items-center gap-4">
               <p className="text-white/40 text-sm">L'adversaire ne possède aucune carte que vous n'avez pas déjà</p>
-              <p className="text-white/20 text-xs mt-1">La victoire est déjà enregistrée ✓</p>
+              <p className="text-white/20 text-xs">La victoire est déjà enregistrée ✓</p>
+              <button
+                onClick={async () => {
+                  await fetch(`/api/battles/${battleId}/skip-reward`, { method: 'POST' })
+                }}
+                className="mt-2 px-6 py-2.5 rounded-xl bg-[#F5C518] text-black font-black text-sm hover:bg-[#ffd700] transition-all active:scale-95"
+              >
+                Terminer la partie →
+              </button>
             </div>
           ) : (
             <>
