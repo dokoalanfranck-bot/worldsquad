@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
+import { useMusicContext } from '@/components/MusicProvider'
 import { PACK_CONFIGS, RARITY_COLORS, RARITY_GLOW } from '@/types'
 import type { Card, CardRarity } from '@/types'
 import toast from 'react-hot-toast'
@@ -152,6 +153,7 @@ export function PacksClient({ initialCoins, pseudo: _pseudo }: Props) {
   const [selectedPack, setSelectedPack] = useState<PackKey | null>(null)
   const [cards, setCards] = useState<Card[]>([])
   const [loading, setLoading] = useState(false)
+  const { playPackOpening, stopPackOpening } = useMusicContext()
 
   const packEntries = Object.entries(PACK_CONFIGS) as [PackKey, (typeof PACK_CONFIGS)[PackKey]][]
 
@@ -167,7 +169,8 @@ export function PacksClient({ initialCoins, pseudo: _pseudo }: Props) {
     setLoading(true)
     setSelectedPack(packKey)
     setPhase('shaking')
-    vibrate([30, 20, 30, 20, 100]) // Pack selected feedback
+    vibrate([30, 20, 30, 20, 100])
+    playPackOpening()
 
     // Wait for shaking animation
     await new Promise((r) => setTimeout(r, 1400))
@@ -205,6 +208,7 @@ export function PacksClient({ initialCoins, pseudo: _pseudo }: Props) {
     setPhase('idle')
     setSelectedPack(null)
     setCards([])
+    stopPackOpening()
   }
 
   const packColorOf = (key: PackKey) => PACK_CONFIGS[key].color
