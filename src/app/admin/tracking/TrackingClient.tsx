@@ -13,16 +13,18 @@ import {
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Stats {
   totalUsers: number; newUsersToday: number; newUsersWeek: number; vipCount: number
+  onlineCount: number
   totalDuels: number; duelsToday: number; activeDuels: number; botDuelsToday: number
   totalPredictions: number; predictionsToday: number
   totalUserCards: number; purchasesToday: number
   coinsIn: number; coinsOut: number
 }
+interface OnlineUser { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; last_seen_at: string; battles_played: number }
 interface SignupRow { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; coins: number; created_at: string }
 interface DuelRow { id: string; created_at: string; is_bot: boolean; challenger_pseudo: string; opponent_pseudo: string; challenger_score: number | null; opponent_score: number | null; winner_id: string | null; coins_stake: number; challenger_id: string }
 interface PredictionRow { id: string; user_id: string; created_at: string; status: string; coins_won: number }
 interface PurchaseRow { id: string; user_id: string; pack_type: string; coins_granted: number; amount_paid: number; status: string; created_at: string }
-interface UserRow { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; coins: number; battles_won: number; battles_played: number; predictions_correct: number; battle_streak: number; best_streak: number; created_at: string; win_rate: number; losses: number }
+interface UserRow { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; coins: number; battles_won: number; battles_played: number; predictions_correct: number; battle_streak: number; best_streak: number; created_at: string; last_seen_at?: string | null; win_rate: number; losses: number }
 interface ChartPoint { hour: number; count: number }
 
 interface Props {
@@ -32,6 +34,7 @@ interface Props {
   recentPredictions: PredictionRow[]
   recentPurchases: PurchaseRow[]
   topUsers: UserRow[]
+  onlineUsers: OnlineUser[]
   duelChart: ChartPoint[]
   fetchedAt: string
 }
@@ -153,7 +156,7 @@ function HourChart({ data }: { data: ChartPoint[] }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export function TrackingClient({ stats, recentSignups, recentDuels, recentPredictions, recentPurchases, topUsers, duelChart, fetchedAt }: Props) {
+export function TrackingClient({ stats, recentSignups, recentDuels, recentPredictions, recentPurchases, topUsers, onlineUsers, duelChart, fetchedAt }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<'overview' | 'activity' | 'users'>('overview')
   const [refreshing, setRefreshing] = useState(false)
@@ -247,6 +250,44 @@ export function TrackingClient({ stats, recentSignups, recentDuels, recentPredic
           <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
 
             {/* KPI Grid */}
+            {/* Online users — hero block */}
+            <div className="glass rounded-xl p-5 border border-green-500/20">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#0D0D17] animate-pulse" />
+                    <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-green-400" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-white font-black text-2xl leading-none">{stats.onlineCount}</p>
+                    <p className="text-green-400 text-xs font-bold uppercase tracking-wider">En ligne maintenant</p>
+                  </div>
+                </div>
+                <p className="text-white/30 text-xs">actif dans les 5 dernières min</p>
+              </div>
+              {onlineUsers.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {onlineUsers.map((u) => (
+                    <Link key={u.id} href={`/admin/users/${u.id}`}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
+                        {u.photo_url ? <img src={u.photo_url} alt={u.pseudo} className="w-full h-full object-cover" /> : u.pseudo[0].toUpperCase()}
+                      </div>
+                      <span className="text-white text-xs font-semibold">{u.pseudo}</span>
+                      <span className="text-white/40 text-[10px]">{flag(u.nation)}</span>
+                      {u.is_vip && <Crown className="w-3 h-3 text-yellow-400" />}
+                      <span className="text-green-500 text-[10px]">{timeAgo(u.last_seen_at)}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-white/30 text-sm">Aucun joueur actif pour l'instant</p>
+              )}
+            </div>
+
             <div>
               <p className="text-white/40 text-xs uppercase tracking-wider mb-3">Utilisateurs</p>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -402,7 +443,7 @@ export function TrackingClient({ stats, recentSignups, recentDuels, recentPredic
                       <th className="px-3 py-3 text-center">Série</th>
                       <th className="px-3 py-3 text-center">Pronos ✓</th>
                       <th className="px-3 py-3 text-right">Coins</th>
-                      <th className="px-3 py-3 text-right">Inscrit</th>
+                      <th className="px-3 py-3 text-right">Vu</th>
                       <th className="px-3 py-3" />
                     </tr>
                   </thead>
@@ -414,8 +455,13 @@ export function TrackingClient({ stats, recentSignups, recentDuels, recentPredic
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
                               <span className="text-white/20 text-xs w-5 text-right">{i + 1}</span>
-                              <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
-                                {u.photo_url ? <img src={u.photo_url} alt={u.pseudo} className="w-full h-full object-cover" /> : u.pseudo[0].toUpperCase()}
+                              <div className="relative w-7 h-7 flex-shrink-0">
+                                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold overflow-hidden">
+                                  {u.photo_url ? <img src={u.photo_url} alt={u.pseudo} className="w-full h-full object-cover" /> : u.pseudo[0].toUpperCase()}
+                                </div>
+                                {u.last_seen_at && (Date.now() - new Date(u.last_seen_at).getTime()) < 5 * 60 * 1000 && (
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[#0D0D17]" />
+                                )}
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5">
@@ -441,7 +487,11 @@ export function TrackingClient({ stats, recentSignups, recentDuels, recentPredic
                           </td>
                           <td className="px-3 py-3 text-center text-green-400 font-bold">{u.predictions_correct}</td>
                           <td className="px-3 py-3 text-right text-yellow-400 font-bold">{u.coins.toLocaleString()}</td>
-                          <td className="px-3 py-3 text-right text-white/30 text-xs">{timeAgo(u.created_at)}</td>
+                          <td className="px-3 py-3 text-right text-xs">
+                            {u.last_seen_at
+                              ? <span className={`font-medium ${(Date.now() - new Date(u.last_seen_at).getTime()) < 5 * 60 * 1000 ? 'text-green-400' : 'text-white/30'}`}>{timeAgo(u.last_seen_at)}</span>
+                              : <span className="text-white/20">jamais</span>}
+                          </td>
                           <td className="px-3 py-3 text-right">
                             <Link href={`/admin/users/${u.id}`} className="text-blue-400 hover:text-blue-300 text-xs transition-colors">Voir →</Link>
                           </td>

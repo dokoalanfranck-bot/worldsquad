@@ -11,12 +11,15 @@ export default async function TrackingPage() {
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7)
   const todayStr = todayStart.toISOString()
   const weekStr = weekStart.toISOString()
+  const onlineThreshold = new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+  const last24h = new Date(now.getTime() - 24 * 3600 * 1000).toISOString()
 
   const [
     { count: totalUsers },
     { count: newUsersToday },
     { count: newUsersWeek },
     { count: vipCount },
+    { count: onlineCount },
     { count: totalDuels },
     { count: duelsToday },
     { count: activeDuels },
@@ -32,11 +35,13 @@ export default async function TrackingPage() {
     { data: topUsers },
     { data: coinStats },
     { data: duelsByHour },
+    { data: onlineUsers },
   ] = await Promise.all([
     admin.from('users').select('*', { count: 'exact', head: true }),
     admin.from('users').select('*', { count: 'exact', head: true }).gte('created_at', todayStr),
     admin.from('users').select('*', { count: 'exact', head: true }).gte('created_at', weekStr),
     admin.from('users').select('*', { count: 'exact', head: true }).eq('is_vip', true),
+    admin.from('users').select('*', { count: 'exact', head: true }).gte('last_seen_at', onlineThreshold),
     admin.from('duels').select('*', { count: 'exact', head: true }),
     admin.from('duels').select('*', { count: 'exact', head: true }).gte('created_at', todayStr),
     admin.from('duels').select('*', { count: 'exact', head: true }).in('status', ['open', 'picking']),
@@ -59,13 +64,19 @@ export default async function TrackingPage() {
     admin.from('purchases').select('id, user_id, pack_type, coins_granted, amount_paid, status, created_at').order('created_at', { ascending: false }).limit(10),
     // Top users by engagement
     admin.from('users')
-      .select('id, pseudo, nation, photo_url, is_vip, coins, battles_won, battles_played, predictions_correct, battle_streak, best_streak, created_at')
+      .select('id, pseudo, nation, photo_url, is_vip, coins, battles_won, battles_played, predictions_correct, battle_streak, best_streak, created_at, last_seen_at')
       .order('battles_played', { ascending: false })
       .limit(50),
     // Coin transactions today
     admin.from('coin_transactions').select('amount, reason').gte('created_at', todayStr),
     // Duels last 24h for activity graph
-    admin.from('duels').select('created_at').gte('created_at', new Date(now.getTime() - 24 * 3600 * 1000).toISOString()).order('created_at', { ascending: true }),
+    admin.from('duels').select('created_at').gte('created_at', last24h).order('created_at', { ascending: true }),
+    // Online users (last 5 min)
+    admin.from('users')
+      .select('id, pseudo, nation, photo_url, is_vip, last_seen_at, battles_played')
+      .gte('last_seen_at', onlineThreshold)
+      .order('last_seen_at', { ascending: false })
+      .limit(50),
   ])
 
   // Enrich recent duels with challenger pseudo
@@ -101,6 +112,7 @@ export default async function TrackingPage() {
         newUsersToday: newUsersToday ?? 0,
         newUsersWeek: newUsersWeek ?? 0,
         vipCount: vipCount ?? 0,
+        onlineCount: onlineCount ?? 0,
         totalDuels: totalDuels ?? 0,
         duelsToday: duelsToday ?? 0,
         activeDuels: activeDuels ?? 0,
@@ -121,6 +133,7 @@ export default async function TrackingPage() {
         win_rate: u.battles_played > 0 ? Math.round((u.battles_won / u.battles_played) * 100) : 0,
         losses: u.battles_played - u.battles_won,
       }))}
+      onlineUsers={onlineUsers ?? []}
       duelChart={duelChart}
       fetchedAt={now.toISOString()}
     />

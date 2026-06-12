@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MusicProvider } from '@/components/MusicProvider'
 import { OnboardingGuide } from '@/components/OnboardingGuide'
+import { PingProvider } from '@/components/PingProvider'
 import type { User } from '@/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-[#0A0A0F]">
       <Sidebar user={profile as User} />
       <main className="dashboard-content min-h-screen pb-20 lg:pb-0">
+        <PingProvider />
         <MusicProvider>
           {children}
           <OnboardingGuide />
