@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MusicProvider } from '@/components/MusicProvider'
+import { OnboardingGuide } from '@/components/OnboardingGuide'
 import type { User } from '@/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="dashboard-content min-h-screen pb-20 lg:pb-0">
         <MusicProvider>
           {children}
+          <OnboardingGuide />
         </MusicProvider>
       </main>
     </div>
