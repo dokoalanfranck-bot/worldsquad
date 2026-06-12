@@ -25,7 +25,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // Bot picks: top 4 cards from global cards table (best rarity mix)
   const { data: cards } = await admin
     .from('cards')
-    .select('id, name, rarity, image_url, stats, type, nation, position, flag')
+    .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
     .order('rarity', { ascending: false })
     .limit(40)
 

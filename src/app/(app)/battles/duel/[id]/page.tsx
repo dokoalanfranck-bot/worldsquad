@@ -21,7 +21,7 @@ export default async function DuelPage({ params }: { params: Promise<{ id: strin
     duel.opponent_id
       ? admin.from('users').select('id, pseudo, nation, photo_url').eq('id', duel.opponent_id).single()
       : Promise.resolve({ data: null }),
-    admin.from('user_cards').select('card:cards(id,name,rarity,image_url,stats,type,nation,position,flag)').eq('user_id', user.id),
+    admin.from('user_cards').select('card:cards(id,name,rarity,image_url,stats,type,nation,description,created_at)').eq('user_id', user.id),
     duel.reward_card_id
       ? admin.from('cards').select('*').eq('id', duel.reward_card_id).single()
       : Promise.resolve({ data: null }),
