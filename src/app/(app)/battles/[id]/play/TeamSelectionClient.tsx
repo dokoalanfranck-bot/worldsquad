@@ -125,7 +125,10 @@ export function TeamSelectionClient({ battle, currentUserId, myCards }: Props) {
           <p className="text-gray-700 text-xs">{waitSeconds}s</p>
           {waitSeconds >= 15 && (
             <button
-              onClick={() => router.push('/battles/matchmaking')}
+              onClick={async () => {
+                await fetch(`/api/battles/${battle.id}/abandon`, { method: 'POST' }).catch(() => {})
+                router.push('/battles/matchmaking')
+              }}
               className="mt-4 text-xs text-red-400/60 hover:text-red-400 transition-colors underline underline-offset-2"
             >
               Abandonner et chercher un nouvel adversaire
