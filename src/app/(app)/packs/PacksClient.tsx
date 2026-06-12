@@ -6,6 +6,7 @@ import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { useMusicContext } from '@/components/MusicProvider'
 import { ShareSheet } from '@/components/ShareSheet'
+import { InstagramStoryShare } from '@/components/InstagramStoryShare'
 import { PACK_CONFIGS, RARITY_COLORS, RARITY_GLOW } from '@/types'
 import type { Card, CardRarity } from '@/types'
 import toast from 'react-hot-toast'
@@ -442,13 +443,26 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                     const best = cards.find((c) => c.rarity === 'Legend') ?? cards.find((c) => c.rarity === 'Epic')
                     if (!best) return null
                     return (
-                      <ShareSheet
-                        url={`/share/pack?card=${best.id}&pseudo=${encodeURIComponent(pseudo)}`}
-                        title={`J'ai obtenu ${best.name} (${best.rarity}) sur WorldSquad ! ⚽`}
-                        text={`Je viens d'ouvrir un pack et j'ai obtenu ${best.name} ${best.rarity === 'Legend' ? '🏆 LÉGENDAIRE' : '⚡ ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
-                        label="Partager ma carte"
-                        variant="outline"
-                      />
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.85, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ delay: 0.6, type: 'spring', damping: 18, stiffness: 260 }}
+                        className="flex gap-2 flex-wrap justify-center"
+                      >
+                        <InstagramStoryShare
+                          name={best.name}
+                          rarity={best.rarity as 'Epic' | 'Legend'}
+                          nation={best.nation ?? ''}
+                          pseudo={pseudo}
+                        />
+                        <ShareSheet
+                          url={`/share/pack?card=${best.id}&pseudo=${encodeURIComponent(pseudo)}`}
+                          title={`J'ai obtenu ${best.name} (${best.rarity}) sur WorldSquad ! ⚽`}
+                          text={`Je viens d'ouvrir un pack et j'ai obtenu ${best.name} ${best.rarity === 'Legend' ? '🏆 LÉGENDAIRE' : '⚡ ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
+                          label="Partager"
+                          variant="outline"
+                        />
+                      </motion.div>
                     )
                   })()}
                 </div>

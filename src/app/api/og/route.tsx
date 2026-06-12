@@ -207,6 +207,124 @@ export async function GET(req: NextRequest) {
     )
   }
 
+  if (type === 'story') {
+    const name   = p.get('name')   ?? 'Joueur'
+    const rarity = p.get('rarity') ?? 'Common'
+    const nation = p.get('nation') ?? ''
+    const pseudo = p.get('pseudo') ?? ''
+    const cfg    = RARITY_CONFIG[rarity as keyof typeof RARITY_CONFIG] ?? RARITY_CONFIG.Common
+
+    return new ImageResponse(
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        width: '1080px', height: '1920px',
+        background: `linear-gradient(165deg, #0A0A0F 0%, #13131f 40%, ${cfg.color}12 75%, #0A0A0F 100%)`,
+        color: 'white', fontFamily: 'sans-serif', position: 'relative', overflow: 'hidden',
+      }}>
+        {/* top glow blob */}
+        <div style={{
+          position: 'absolute', top: '-200px', left: '50%',
+          width: '900px', height: '900px', borderRadius: '50%',
+          background: `${cfg.color}18`,
+          transform: 'translateX(-50%)',
+        }} />
+        {/* bottom glow */}
+        <div style={{
+          position: 'absolute', bottom: '-150px', right: '-100px',
+          width: '600px', height: '600px', borderRadius: '50%',
+          background: `${cfg.color}10`,
+        }} />
+
+        {/* top brand bar */}
+        <div style={{ width: '100%', height: '8px', background: `linear-gradient(90deg, ${cfg.color}00, ${cfg.color}, ${cfg.color}00)` }} />
+
+        {/* brand */}
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: '60px' }}>
+          <span style={{ fontSize: '36px', marginRight: '14px' }}>⚽</span>
+          <span style={{ fontSize: '22px', fontWeight: 'bold', color: 'rgba(255,255,255,0.3)', letterSpacing: '5px' }}>
+            WORLDSQUAD 2026
+          </span>
+        </div>
+
+        {/* main icon */}
+        <div style={{
+          fontSize: '260px', lineHeight: '1',
+          marginTop: '140px', marginBottom: '0px',
+          filter: 'drop-shadow(0 0 80px ' + cfg.color + '60)',
+        }}>
+          {cfg.emoji}
+        </div>
+
+        {/* rarity badge */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginTop: '48px', padding: '18px 60px',
+          background: `${cfg.color}20`, border: `2px solid ${cfg.color}60`,
+          borderRadius: '100px',
+        }}>
+          <span style={{ fontSize: '28px', fontWeight: '900', color: cfg.color, letterSpacing: '6px' }}>
+            {cfg.label}
+          </span>
+        </div>
+
+        {/* card name */}
+        <div style={{
+          fontSize: '110px', fontWeight: '900', lineHeight: '0.95',
+          textAlign: 'center', letterSpacing: '-2px',
+          marginTop: '56px', padding: '0 80px',
+        }}>
+          {name}
+        </div>
+
+        {/* nation */}
+        {nation && (
+          <div style={{
+            fontSize: '38px', color: 'rgba(255,255,255,0.5)',
+            marginTop: '20px', letterSpacing: '2px',
+          }}>
+            {nation}
+          </div>
+        )}
+
+        {/* obtained by */}
+        <div style={{
+          marginTop: '60px', fontSize: '28px',
+          color: 'rgba(255,255,255,0.3)',
+        }}>
+          Obtenu par{' '}
+          <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '900' }}>{pseudo}</span>
+        </div>
+
+        {/* CTA */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginTop: '80px', padding: '28px 80px',
+          background: '#F5C518', borderRadius: '24px',
+        }}>
+          <span style={{ fontSize: '32px', fontWeight: '900', color: '#000', letterSpacing: '1px' }}>
+            Rejoins l'aventure →
+          </span>
+        </div>
+
+        {/* footer */}
+        <div style={{
+          position: 'absolute', bottom: '60px',
+          fontSize: '24px', color: 'rgba(255,255,255,0.2)', letterSpacing: '2px',
+        }}>
+          worldsquad.vercel.app
+        </div>
+
+        {/* bottom bar */}
+        <div style={{
+          position: 'absolute', bottom: '0',
+          width: '100%', height: '8px',
+          background: `linear-gradient(90deg, ${cfg.color}00, ${cfg.color}, ${cfg.color}00)`,
+        }} />
+      </div>,
+      { width: 1080, height: 1920 }
+    )
+  }
+
   // type === 'supporter'
   const pseudo    = p.get('pseudo')    ?? 'Fan'
   const nation    = p.get('nation')    ?? 'World'
