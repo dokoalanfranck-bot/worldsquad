@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { MusicProvider } from '@/components/MusicProvider'
 import { OnboardingGuide } from '@/components/OnboardingGuide'
 import { PingProvider } from '@/components/PingProvider'
+import { InstallPrompt } from '@/components/InstallPrompt'
 import type { User } from '@/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <MusicProvider>
           {children}
           <OnboardingGuide />
+          <InstallPrompt alreadyClaimed={!!(profile as User).install_reward_claimed} />
         </MusicProvider>
       </main>
     </div>

@@ -25,6 +25,7 @@ export interface User {
   best_streak: number
   daily_reward_claimed_at: string | null
   daily_streak: number
+  install_reward_claimed: boolean
   created_at: string
 }
 
