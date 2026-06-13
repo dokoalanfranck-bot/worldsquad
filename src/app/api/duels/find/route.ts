@@ -37,7 +37,7 @@ export async function POST() {
 
   if (openDuels && openDuels.length > 0) {
     const duelId = openDuels[0].id
-    const deadline = new Date(Date.now() + 45000).toISOString()
+    const deadline = new Date(Date.now() + 30000).toISOString()
     await admin
       .from('duels')
       .update({ opponent_id: user.id, status: 'picking', picks_deadline: deadline })

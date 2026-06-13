@@ -35,7 +35,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const coach = pool.find(isCoach) ?? pool[3]
   const botPicks: Card[] = coach ? [...players, coach] : players.slice(0, 4)
 
-  const deadline = new Date(Date.now() + 45000).toISOString()
+  const deadline = new Date(Date.now() + 30000).toISOString()
 
   const { data: updated } = await admin
     .from('duels')
