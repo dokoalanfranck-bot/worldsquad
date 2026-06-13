@@ -2,9 +2,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { creditCoins } from '@/lib/coins'
 
 export const MISSION_REWARDS = {
-  prediction: 50,
+  prediction: 300,
   pack: 30,
-  battle: 100,
+  battle: 300,
   bonus: 200,
 } as const
 
