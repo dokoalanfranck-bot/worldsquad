@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { openPack } from '@/lib/packs'
 import { debitCoins, creditCoins } from '@/lib/coins'
+import { completeMission } from '@/lib/missions'
 import { PACK_CONFIGS } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -43,5 +44,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error }, { status: 500 })
   }
 
-  return NextResponse.json({ cards, newBalance })
+  const mission = await completeMission(user.id, 'pack')
+  return NextResponse.json({ cards, newBalance, mission: mission.alreadyDone ? null : { coins: mission.coins } })
 }

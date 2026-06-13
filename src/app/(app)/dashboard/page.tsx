@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
+import { getTodayMissions } from '@/lib/missions'
 
 const STREAK_REWARDS = [100, 150, 200, 250, 350, 500, 750]
 
@@ -10,7 +11,7 @@ export default async function DashboardPage() {
 
   if (!authUser) redirect('/login')
 
-  const [{ data: profile }, { data: nextMatch }, { data: recentPredictions }, { data: groupData }, { data: liveMatches }, { data: recentFinished }] =
+  const [{ data: profile }, { data: nextMatch }, { data: recentPredictions }, { data: groupData }, { data: liveMatches }, { data: recentFinished }, todayMissions] =
     await Promise.all([
       supabase.from('users').select('*').eq('id', authUser.id).single(),
       supabase
@@ -43,6 +44,7 @@ export default async function DashboardPage() {
         .eq('status', 'finished')
         .order('match_date', { ascending: false })
         .limit(4),
+      getTodayMissions(authUser.id),
     ])
 
   if (!profile) redirect('/signup')
@@ -85,6 +87,7 @@ export default async function DashboardPage() {
       group={groupData?.group as unknown as { id: string; name: string; code: string } | null}
       groupActivity={groupActivity ?? []}
       dailyReward={{ canClaim, nextClaim, streak, todayReward }}
+      missions={todayMissions}
       liveMatches={liveMatches ?? []}
       recentFinished={recentFinished ?? []}
     />

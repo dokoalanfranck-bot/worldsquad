@@ -10,7 +10,9 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
+import { DailyMissions } from '@/components/DailyMissions'
 import type { User, Match, Prediction, GroupActivity } from '@/types'
+import type { DailyMissionsRow } from '@/lib/missions'
 import toast from 'react-hot-toast'
 
 interface DailyRewardState {
@@ -27,6 +29,7 @@ interface Props {
   group: { id: string; name: string; code: string } | null
   groupActivity: (GroupActivity & { user: { pseudo: string; photo_url: string | null } | null })[]
   dailyReward: DailyRewardState
+  missions: DailyMissionsRow | null
   liveMatches: Match[]
   recentFinished: Match[]
 }
@@ -252,7 +255,7 @@ function QuickAction({ href, icon: Icon, label, sub, accent }: { href: string; i
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, liveMatches, recentFinished }: Props) {
+export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, missions, liveMatches, recentFinished }: Props) {
   const [activities, setActivities] = useState(groupActivity)
   const supabase = createClient()
 
@@ -325,10 +328,8 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
               ))}
             </div>
 
-            {/* Daily reward */}
-            <div className="mb-5">
-              <DailyReward initial={dailyReward} />
-            </div>
+            {/* Daily missions */}
+            <DailyMissions initial={missions} streak={dailyReward.streak} />
 
             {/* Quick actions */}
             <div className="mb-5">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { simulateDuel, pickRewardCard } from '@/lib/duel-engine'
+import { completeMission } from '@/lib/missions'
 import type { Card } from '@/types'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -151,6 +152,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       reward_card_id: rewardCardId,
       status: 'finished',
     }).eq('id', duelId)
+
+    // Complete battle mission for the winner
+    if (winnerId) {
+      await completeMission(winnerId, 'battle')
+    }
   }
 
   return NextResponse.json({ success: true })

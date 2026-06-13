@@ -199,6 +199,11 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
     setCards(data.cards ?? [])
     if (data.newBalance !== undefined) setCoins(data.newBalance)
 
+    // Show mission toast if first pack today
+    if (data.mission?.coins) {
+      setTimeout(() => toast.success(`Mission du jour +${data.mission.coins} coins !`, { icon: '🎁' }), 800)
+    }
+
     // Short dealing pause then start revealing
     await new Promise((r) => setTimeout(r, 600))
     setPhase('revealing')

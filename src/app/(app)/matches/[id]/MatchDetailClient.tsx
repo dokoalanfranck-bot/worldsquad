@@ -110,6 +110,19 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
         const { error } = await supabase.from('predictions').insert(payload)
         if (error) throw error
         toast.success('Pronostic enregistré !')
+        // Complete mission (non-blocking — fire & forget)
+        fetch('/api/missions/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'prediction' }),
+        })
+          .then((r) => r.json())
+          .then((data: { coins?: number; alreadyDone?: boolean }) => {
+            if (!data.alreadyDone && data.coins) {
+              toast.success(`Mission du jour +${data.coins} coins !`, { icon: '🎯' })
+            }
+          })
+          .catch(() => {})
       }
 
       router.refresh()
