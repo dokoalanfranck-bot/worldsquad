@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Video, X, Copy, Check, Clock, ChevronRight, Mic } from 'lucide-react'
+import { Video, X, Copy, Check, Clock, ChevronRight, Mic, Film } from 'lucide-react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 
 interface ScriptLine {
@@ -326,6 +327,18 @@ export function PubClient() {
           </div>
         ))}
       </div>
+
+      {/* B-roll scenes shortcut */}
+      <Link href="/admin/pub/scenes" className="flex items-center gap-4 glass rounded-2xl p-4 border border-[#C8102E]/20 hover:border-[#C8102E]/40 transition-all group mb-8">
+        <div className="w-10 h-10 rounded-xl bg-[#C8102E]/12 flex items-center justify-center flex-shrink-0">
+          <Film size={18} className="text-[#C8102E]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-white text-base leading-none mb-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.06em' }}>SÉQUENCES VIDÉO B-ROLL</p>
+          <p className="text-white/30 text-xs">4 animations plein écran à screen-recorder pour ton montage</p>
+        </div>
+        <ChevronRight size={16} className="text-white/20 group-hover:text-[#C8102E]/60 group-hover:translate-x-1 transition-all flex-shrink-0" />
+      </Link>
 
       {/* Script cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
