@@ -11,8 +11,10 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { DailyMissions } from '@/components/DailyMissions'
+import { FlashChallengeBanner } from '@/components/FlashChallengeBanner'
 import type { User, Match, Prediction, GroupActivity } from '@/types'
 import type { DailyMissionsRow } from '@/lib/missions'
+import type { FlashChallenge } from '@/lib/flash-challenges'
 import toast from 'react-hot-toast'
 
 interface DailyRewardState {
@@ -32,6 +34,7 @@ interface Props {
   missions: DailyMissionsRow | null
   liveMatches: Match[]
   recentFinished: Match[]
+  flashChallenges: FlashChallenge[]
 }
 
 const NATION_FLAGS: Record<string, string> = {
@@ -255,7 +258,7 @@ function QuickAction({ href, icon: Icon, label, sub, accent }: { href: string; i
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, missions, liveMatches, recentFinished }: Props) {
+export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, missions, liveMatches, recentFinished, flashChallenges }: Props) {
   const [activities, setActivities] = useState(groupActivity)
   const supabase = createClient()
 
@@ -346,6 +349,11 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
 
           {/* ── LEFT main content (desktop) / REST (mobile) ──────────── */}
           <div className="lg:flex-1 lg:min-w-0 lg:order-1">
+
+            {/* Flash challenge banners — top priority */}
+            {flashChallenges.map((fc) => (
+              <FlashChallengeBanner key={fc.id} challenge={fc} />
+            ))}
 
             {/* Live scores */}
             <LiveScores initialLive={liveMatches} initialFinished={recentFinished} />

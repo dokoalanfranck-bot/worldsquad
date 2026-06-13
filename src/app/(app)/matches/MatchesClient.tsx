@@ -3,36 +3,74 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Star, Calendar, Users, Filter, Circle } from 'lucide-react'
+import { Star, Calendar, Users, Filter, Circle, Zap } from 'lucide-react'
 import type { Match, Prediction } from '@/types'
 
-type Filter = 'all' | 'mine' | 'today' | 'group' | 'knockout'
+type FilterKey = 'all' | 'mine' | 'today' | 'group' | 'knockout'
 
 interface Props {
   matches: Match[]
   predictionsByMatch: Record<string, Prediction>
   userNation: string
+  flashMatchIds?: Set<string>
 }
 
-function MatchCard({ match, prediction, userNation }: { match: Match; prediction?: Prediction; userNation: string }) {
+function MatchCard({
+  match,
+  prediction,
+  userNation,
+  isFlash,
+}: {
+  match: Match
+  prediction?: Prediction
+  userNation: string
+  isFlash: boolean
+}) {
   const isMyNation = match.team_a === userNation || match.team_b === userNation
 
   return (
     <Link href={`/matches/${match.id}`}>
       <motion.div
         whileTap={{ scale: 0.99 }}
-        className={`glass rounded-2xl p-4 border transition-all cursor-pointer ${isMyNation ? 'border-[#F5C518]/20 hover:border-[#F5C518]/35' : 'border-white/5 hover:border-white/10'}`}
+        className={`glass rounded-2xl p-4 border transition-all cursor-pointer relative overflow-hidden ${
+          isFlash
+            ? 'border-[#F5C518]/40 hover:border-[#F5C518]/60'
+            : isMyNation
+            ? 'border-[#F5C518]/20 hover:border-[#F5C518]/35'
+            : 'border-white/5 hover:border-white/10'
+        }`}
+        style={isFlash ? { boxShadow: '0 0 24px rgba(245,197,24,0.12)' } : undefined}
       >
+        {/* Flash top stripe */}
+        {isFlash && (
+          <motion.div
+            className="absolute top-0 left-0 right-0 h-0.5"
+            style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518, #C8102E)', backgroundSize: '200%' }}
+            animate={{ backgroundPosition: ['0% 0%', '100% 0%', '0% 0%'] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+          />
+        )}
+
         {/* Top row */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {match.group_name && (
               <span className="text-[10px] font-bold text-white/30 uppercase">Groupe {match.group_name}</span>
             )}
-            {isMyNation && (
+            {isMyNation && !isFlash && (
               <span className="flex items-center gap-1 text-[10px] font-bold text-[#F5C518] bg-[#F5C518]/10 px-2 py-0.5 rounded-full">
                 <Star size={8} fill="currentColor" /> Ta nation
               </span>
+            )}
+            {isFlash && (
+              <motion.span
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+                className="flex items-center gap-1 text-[10px] font-black text-[#F5C518] bg-[#F5C518]/15 px-2 py-0.5 rounded-full"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+              >
+                <Zap size={8} fill="currentColor" /> DÉFI FLASH
+              </motion.span>
             )}
           </div>
           <div>
@@ -56,8 +94,10 @@ function MatchCard({ match, prediction, userNation }: { match: Match; prediction
           </div>
           <div className="px-4 text-center min-w-[80px]">
             {match.status !== 'upcoming' && match.score_a !== null ? (
-              <div className={`text-2xl font-black tabular-nums ${match.status === 'live' ? 'text-red-400' : 'text-white'}`}
-                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              <div
+                className={`text-2xl font-black tabular-nums ${match.status === 'live' ? 'text-red-400' : 'text-white'}`}
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+              >
                 {match.score_a} — {match.score_b}
               </div>
             ) : (
@@ -74,30 +114,38 @@ function MatchCard({ match, prediction, userNation }: { match: Match; prediction
           </div>
         </div>
 
-        {/* Prediction result */}
-        {prediction && (
+        {/* Prediction or CTA */}
+        {prediction ? (
           <div className="mt-3 flex items-center justify-center gap-2 text-xs">
             <span className="text-white/30">Mon prono :</span>
             <span className="text-[#F5C518] font-bold">{prediction.pred_score_a} — {prediction.pred_score_b}</span>
             {prediction.status !== 'pending' && (
-              <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${prediction.status === 'correct_score' ? 'text-green-400 bg-green-500/10' : prediction.status === 'correct_winner' ? 'text-blue-400 bg-blue-500/10' : 'text-red-400 bg-red-500/10'}`}>
+              <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
+                prediction.status === 'correct_score' ? 'text-green-400 bg-green-500/10' :
+                prediction.status === 'correct_winner' ? 'text-blue-400 bg-blue-500/10' :
+                'text-red-400 bg-red-500/10'
+              }`}>
                 {prediction.status === 'correct_score' ? '+300' : prediction.status === 'correct_winner' ? '+100' : 'Raté'}
               </span>
             )}
           </div>
-        )}
-
-        {match.status === 'upcoming' && !prediction && (
+        ) : match.status === 'upcoming' ? (
           <div className="mt-3 text-center">
-            <span className="text-[10px] text-[#F5C518] font-bold">Pronostiquer →</span>
+            {isFlash ? (
+              <span className="text-[10px] font-black text-[#F5C518] flex items-center justify-center gap-1">
+                <Zap size={9} fill="currentColor" /> Pronostiquer · Bonus coins →
+              </span>
+            ) : (
+              <span className="text-[10px] text-[#F5C518] font-bold">Pronostiquer →</span>
+            )}
           </div>
-        )}
+        ) : null}
       </motion.div>
     </Link>
   )
 }
 
-const FILTERS: { key: Filter; label: string; icon: React.ReactNode }[] = [
+const FILTERS: { key: FilterKey; label: string; icon: React.ReactNode }[] = [
   { key: 'all', label: 'Tous', icon: <Filter size={11} /> },
   { key: 'mine', label: 'Ma nation', icon: <Star size={11} /> },
   { key: 'today', label: "Aujourd'hui", icon: <Calendar size={11} /> },
@@ -105,9 +153,10 @@ const FILTERS: { key: Filter; label: string; icon: React.ReactNode }[] = [
   { key: 'knockout', label: 'Knockout', icon: null },
 ]
 
-export function MatchesClient({ matches, predictionsByMatch, userNation }: Props) {
-  const [filter, setFilter] = useState<Filter>('all')
+export function MatchesClient({ matches, predictionsByMatch, userNation, flashMatchIds }: Props) {
+  const [filter, setFilter] = useState<FilterKey>('all')
   const todayStr = new Date().toDateString()
+  const flashIds = flashMatchIds ?? new Set<string>()
 
   const filtered = matches.filter((m) => {
     if (filter === 'mine') return m.team_a === userNation || m.team_b === userNation
@@ -117,7 +166,14 @@ export function MatchesClient({ matches, predictionsByMatch, userNation }: Props
     return true
   })
 
-  const grouped = filtered.reduce((acc, m) => {
+  // Flash matches first within each day
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const aFlash = flashIds.has(a.id) ? -1 : 0
+    const bFlash = flashIds.has(b.id) ? -1 : 0
+    return aFlash - bFlash
+  })
+
+  const grouped = sortedFiltered.reduce((acc, m) => {
     const key = new Date(m.match_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
     return { ...acc, [key]: [...(acc[key] ?? []), m] }
   }, {} as Record<string, Match[]>)
@@ -138,8 +194,13 @@ export function MatchesClient({ matches, predictionsByMatch, userNation }: Props
       {/* Filters */}
       <div className="flex gap-2 flex-wrap mb-6">
         {FILTERS.map((f) => (
-          <button key={f.key} onClick={() => setFilter(f.key)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${filter === f.key ? 'bg-[#F5C518] text-black' : 'bg-white/5 text-white/40 hover:bg-white/10 border border-white/5'}`}>
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              filter === f.key ? 'bg-[#F5C518] text-black' : 'bg-white/5 text-white/40 hover:bg-white/10 border border-white/5'
+            }`}
+          >
             {f.icon}{f.label}
           </button>
         ))}
@@ -154,7 +215,13 @@ export function MatchesClient({ matches, predictionsByMatch, userNation }: Props
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {dayMatches.map((match) => (
-                <MatchCard key={match.id} match={match} prediction={predictionsByMatch[match.id]} userNation={userNation} />
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  prediction={predictionsByMatch[match.id]}
+                  userNation={userNation}
+                  isFlash={flashIds.has(match.id)}
+                />
               ))}
             </div>
           </div>

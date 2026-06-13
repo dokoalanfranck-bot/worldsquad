@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { CheckCircle2, XCircle, Lock, Circle, Clock, Target } from 'lucide-react'
+import { CheckCircle2, XCircle, Lock, Circle, Clock, Target, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { Match, Prediction } from '@/types'
+import type { FlashChallenge } from '@/lib/flash-challenges'
 
 interface Props {
   match: Match
   currentPrediction: Prediction | null
   groupPredictions: (Prediction & { user: { pseudo: string; photo_url: string | null; nation: string } | null })[]
   userId: string
+  flashChallenge: FlashChallenge | null
 }
 
 function ScorePicker({
@@ -71,7 +73,7 @@ function ScorePicker({
   )
 }
 
-export function MatchDetailClient({ match, currentPrediction, groupPredictions, userId }: Props) {
+export function MatchDetailClient({ match, currentPrediction, groupPredictions, userId, flashChallenge }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -110,6 +112,21 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
         const { error } = await supabase.from('predictions').insert(payload)
         if (error) throw error
         toast.success('Pronostic enregistré !')
+        // Flash challenge reward (non-blocking)
+        if (flashChallenge) {
+          fetch('/api/flash-challenges/reward', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ matchId: match.id }),
+          })
+            .then((r) => r.json())
+            .then((data: { active?: boolean; alreadyClaimed?: boolean; coins?: number }) => {
+              if (data.active && !data.alreadyClaimed && data.coins) {
+                setTimeout(() => toast.success(`⚡ Défi Flash ! +${data.coins} coins bonus !`, { icon: '⚡', duration: 4000 }), 600)
+              }
+            })
+            .catch(() => {})
+        }
         // Complete mission (non-blocking — fire & forget)
         fetch('/api/missions/complete', {
           method: 'POST',
@@ -185,6 +202,35 @@ export function MatchDetailClient({ match, currentPrediction, groupPredictions, 
           </div>
         )}
       </div>
+
+      {/* Flash challenge banner */}
+      {flashChallenge && match.status === 'upcoming' && !currentPrediction && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl p-4 mb-6 border border-[#F5C518]/30 flex items-center gap-3"
+          style={{ background: 'linear-gradient(135deg, rgba(245,197,24,0.08), rgba(200,16,46,0.05))' }}
+        >
+          <motion.div
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 1.4, repeat: Infinity }}
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(245,197,24,0.18)' }}
+          >
+            <Zap size={18} className="text-[#F5C518]" fill="currentColor" />
+          </motion.div>
+          <div>
+            <p className="text-[#F5C518] font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              ⚡ DÉFI FLASH ACTIF
+            </p>
+            <p className="text-white/50 text-xs">
+              Fais ton pronostic maintenant et reçois{' '}
+              <span className="text-[#F5C518] font-bold">+{flashChallenge.bonus_coins} coins</span>{' '}
+              en bonus instantané !
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Prediction form */}
       <div className="glass-elevated rounded-2xl p-6 mb-6">

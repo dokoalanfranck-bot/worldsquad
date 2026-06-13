@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_cache } from 'next/cache'
 import { MatchesClient } from './MatchesClient'
+import { getActiveFlashChallenges } from '@/lib/flash-challenges'
 import type { Prediction } from '@/types'
 
 // Matchs mis en cache 60 secondes (changent rarement)
@@ -19,10 +20,11 @@ export default async function MatchesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [matches, { data: predictions }, { data: profile }] = await Promise.all([
+  const [matches, { data: predictions }, { data: profile }, flashChallenges] = await Promise.all([
     getMatches(),
     supabase.from('predictions').select('*').eq('user_id', user!.id),
     supabase.from('users').select('nation').eq('id', user!.id).single(),
+    getActiveFlashChallenges(),
   ])
 
   // Dédupliquer par ID (sécurité si doublons en base)
@@ -35,11 +37,14 @@ export default async function MatchesPage() {
     {} as Record<string, Prediction>
   )
 
+  const flashMatchIds = new Set(flashChallenges.map((fc) => fc.match_id))
+
   return (
     <MatchesClient
       matches={uniqueMatches}
       predictionsByMatch={predictionsByMatch}
       userNation={profile?.nation ?? ''}
+      flashMatchIds={flashMatchIds}
     />
   )
 }
