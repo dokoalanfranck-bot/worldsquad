@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Globe, Sparkles, Trophy } from 'lucide-react'
+import { Globe, ChevronRight } from 'lucide-react'
 import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { useMusicContext } from '@/components/MusicProvider'
@@ -13,140 +13,352 @@ import type { Card, CardRarity } from '@/types'
 import toast from 'react-hot-toast'
 
 type PackKey = keyof typeof PACK_CONFIGS
-type Phase = 'idle' | 'shaking' | 'dealing' | 'revealing' | 'done'
-
-interface RevealCardProps {
-  card: Card
-  index: number
-  shouldReveal: boolean
-  totalCards: number
-}
+type Phase = 'idle' | 'shaking' | 'opening'
 
 function vibrate(pattern: number | number[]) {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-    navigator.vibrate(pattern)
-  }
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern)
 }
 
-function RevealCard({ card, index, shouldReveal, totalCards }: RevealCardProps) {
-  const [flipped, setFlipped] = useState(false)
-  const [glowing, setGlowing] = useState(false)
-
-  useEffect(() => {
-    if (!shouldReveal) return
-    const t1 = setTimeout(() => {
-      setFlipped(true)
-      // Haptic feedback based on rarity
-      if (card.rarity === 'Legend') vibrate([40, 30, 80, 30, 150])
-      else if (card.rarity === 'Epic') vibrate([40, 30, 80])
-      else vibrate(25)
-      setTimeout(() => setGlowing(true), 400)
-    }, index * 750)
-    return () => clearTimeout(t1)
-  }, [shouldReveal, index, card.rarity])
-
+// ── Single card (face-down until tapped) ────────────────────────────────────
+function TapRevealCard({
+  card,
+  isActive,
+  isRevealed,
+  onTap,
+  size,
+}: {
+  card: Card
+  isActive: boolean
+  isRevealed: boolean
+  onTap: () => void
+  size: 'lg' | 'md' | 'sm'
+}) {
   const isSpecial = card.rarity === 'Epic' || card.rarity === 'Legend'
+  const particleCount = card.rarity === 'Legend' ? 16 : 10
 
   return (
     <motion.div
-      initial={{ y: 60, opacity: 0, scale: 0.8 }}
-      animate={{ y: 0, opacity: 1, scale: 1 }}
-      transition={{ delay: index * 0.2, duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+      initial={{ y: 100, opacity: 0, scale: 0.75 }}
+      animate={{
+        y: 0,
+        opacity: isRevealed || isActive ? 1 : 0.45,
+        scale: isActive && !isRevealed ? 1.06 : 1,
+      }}
+      transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+      onClick={() => isActive && !isRevealed && onTap()}
       className="relative flex-shrink-0"
-      style={{ perspective: 900 }}
+      style={{ perspective: 1000, cursor: isActive && !isRevealed ? 'pointer' : 'default' }}
     >
-      {/* Legend/Epic burst */}
+      {/* Pulsing ring on active */}
+      {isActive && !isRevealed && (
+        <motion.div
+          className="absolute -inset-2 rounded-2xl"
+          animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.04, 1] }}
+          transition={{ duration: 1.1, repeat: Infinity }}
+          style={{ border: '2px solid #F5C518', boxShadow: '0 0 24px rgba(245,197,24,0.55)', zIndex: -1 }}
+        />
+      )}
+
+      {/* Particle burst on reveal */}
       <AnimatePresence>
-        {glowing && isSpecial && (
+        {isRevealed && isSpecial && (
           <>
-            {Array.from({ length: 12 }).map((_, i) => (
+            {Array.from({ length: particleCount }).map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-2 h-2 rounded-full pointer-events-none z-20"
-                style={{
-                  background: RARITY_COLORS[card.rarity],
-                  top: '50%',
-                  left: '50%',
-                }}
+                className="absolute w-2 h-2 rounded-full pointer-events-none"
+                style={{ background: RARITY_COLORS[card.rarity], top: '50%', left: '50%', zIndex: 20 }}
                 initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
                 animate={{
                   scale: [0, 1, 0],
-                  x: Math.cos((i / 12) * Math.PI * 2) * (card.rarity === 'Legend' ? 120 : 80),
-                  y: Math.sin((i / 12) * Math.PI * 2) * (card.rarity === 'Legend' ? 120 : 80),
+                  x: Math.cos((i / particleCount) * Math.PI * 2) * (card.rarity === 'Legend' ? 140 : 90),
+                  y: Math.sin((i / particleCount) * Math.PI * 2) * (card.rarity === 'Legend' ? 140 : 90),
                   opacity: [1, 1, 0],
                 }}
-                transition={{ duration: 0.9, ease: 'easeOut' }}
+                transition={{ duration: 0.95, ease: 'easeOut' }}
               />
             ))}
           </>
         )}
       </AnimatePresence>
 
-      {/* Rarity label pop */}
+      {/* Rarity badge pop */}
       <AnimatePresence>
-        {glowing && isSpecial && (
+        {isRevealed && isSpecial && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.8 }}
-            animate={{ opacity: 1, y: -24, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="absolute -top-2 left-1/2 -translate-x-1/2 z-30 font-black text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+            initial={{ opacity: 0, y: -8, scale: 0.8 }}
+            animate={{ opacity: 1, y: -28, scale: 1 }}
+            className="absolute -top-2 left-1/2 -translate-x-1/2 font-black text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
             style={{
               color: RARITY_COLORS[card.rarity],
               background: `${RARITY_COLORS[card.rarity]}20`,
               border: `1px solid ${RARITY_COLORS[card.rarity]}60`,
               fontFamily: 'Bebas Neue, sans-serif',
-              letterSpacing: '0.05em',
+              zIndex: 30,
             }}
           >
-            {card.rarity === 'Legend' ? 'LÉGENDAIRE' : 'ÉPIQUE'}
+            {card.rarity === 'Legend' ? '⚡ LÉGENDAIRE !' : '✦ ÉPIQUE !'}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Card with 3D flip */}
+      {/* 3D flip */}
       <motion.div
         style={{
           transformStyle: 'preserve-3d',
-          boxShadow: glowing ? RARITY_GLOW[card.rarity] : 'none',
+          boxShadow: isRevealed ? RARITY_GLOW[card.rarity] : 'none',
           borderRadius: '0.75rem',
           transition: 'box-shadow 0.4s ease',
         }}
-        animate={{ rotateY: flipped ? 0 : 180 }}
+        animate={{ rotateY: isRevealed ? 0 : 180 }}
         transition={{ duration: 0.65, ease: [0.4, 0, 0.2, 1] }}
       >
-        {/* Front — actual card */}
+        {/* Front */}
         <div style={{ backfaceVisibility: 'hidden' }}>
-          <GameCard card={card} owned size={totalCards <= 3 ? 'lg' : 'md'} />
+          <GameCard card={card} owned size={size} />
         </div>
-
-        {/* Back — official Panini-style card back */}
+        {/* Back — WorldSquad Panini style */}
         <div
-          style={{
-            backfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-            position: 'absolute',
-            inset: 0,
-          }}
+          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', position: 'absolute', inset: 0 }}
           className="rounded-xl flex flex-col overflow-hidden border-2 border-[#F5C518]/25"
         >
-          {/* Red/gold stripe at top */}
           <div className="h-2 w-full" style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518)' }} />
-          <div className="flex-1 flex flex-col items-center justify-center gap-1 p-2" style={{ background: 'linear-gradient(160deg, #0A1F3D, #060F1A)' }}>
+          <div
+            className="flex-1 flex flex-col items-center justify-center gap-1 p-2"
+            style={{ background: 'linear-gradient(160deg, #0A1F3D, #060F1A)' }}
+          >
             <div className="w-8 h-8 rounded-full border-2 border-[#F5C518]/40 flex items-center justify-center mb-1">
               <Globe size={14} className="text-[#F5C518]/60" />
             </div>
-            <div className="text-[#F5C518]/50 font-black text-xs leading-none text-center" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
-            <div className="text-[#F5C518]/50 font-black text-xs leading-none text-center" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
-            <div className="text-white/15 font-bold text-[9px] mt-1 text-center">2026</div>
+            <div className="text-[#F5C518]/50 font-black text-xs" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
+            <div className="text-[#F5C518]/50 font-black text-xs" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
+            <div className="text-white/15 font-bold text-[9px] mt-1">2026</div>
           </div>
           <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F5C518, #C8102E)' }} />
         </div>
       </motion.div>
+
+      {/* "Tap" hint */}
+      {isActive && !isRevealed && (
+        <motion.p
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 0.9, repeat: Infinity }}
+          className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[#F5C518] text-xs font-black whitespace-nowrap"
+          style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+        >
+          APPUIE !
+        </motion.p>
+      )}
     </motion.div>
   )
 }
 
+// ── Full-screen reveal overlay ───────────────────────────────────────────────
+function PackRevealOverlay({
+  cards,
+  packColor,
+  packName,
+  onClose,
+  pseudo,
+}: {
+  cards: Card[]
+  packColor: string
+  packName: string
+  onClose: () => void
+  pseudo: string
+}) {
+  const [revealedCount, setRevealedCount] = useState(0)
+  const [legendFlash, setLegendFlash] = useState(false)
+  const allRevealed = revealedCount >= cards.length
+  const nextCard = cards[revealedCount]
+  const cardSize: 'lg' | 'md' | 'sm' = cards.length <= 3 ? 'lg' : cards.length <= 5 ? 'md' : 'sm'
+
+  function revealNext() {
+    if (revealedCount >= cards.length) return
+
+    const card = cards[revealedCount]
+    if (card.rarity === 'Legend') {
+      vibrate([40, 30, 80, 30, 150])
+      setLegendFlash(true)
+      setTimeout(() => {
+        setLegendFlash(false)
+        setRevealedCount((n) => n + 1)
+      }, 650)
+    } else {
+      if (card.rarity === 'Epic') vibrate([40, 30, 80])
+      else vibrate(25)
+      setRevealedCount((n) => n + 1)
+    }
+  }
+
+  const isLegendNext = nextCard?.rarity === 'Legend'
+  const bestCard = cards.find((c) => c.rarity === 'Legend') ?? cards.find((c) => c.rarity === 'Epic')
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex flex-col select-none"
+      style={{ background: 'linear-gradient(180deg, #030810 0%, #060d18 100%)' }}
+    >
+      {/* Legend flash burst */}
+      <AnimatePresence>
+        {legendFlash && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
+            transition={{ duration: 0.55 }}
+            className="fixed inset-0 pointer-events-none"
+            style={{
+              zIndex: 60,
+              background: 'radial-gradient(ellipse at center, rgba(245,197,24,0.92) 0%, rgba(245,197,24,0.3) 40%, transparent 70%)',
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-6 pb-3 flex-shrink-0">
+        <div>
+          <p className="text-white/30 text-[10px] uppercase tracking-widest font-semibold">Pack ouvert</p>
+          <p className="font-black text-base" style={{ fontFamily: 'Bebas Neue, sans-serif', color: packColor }}>
+            {packName}
+          </p>
+        </div>
+        {/* Progress dots */}
+        <div className="flex items-center gap-2">
+          {cards.map((card, i) => (
+            <motion.div
+              key={i}
+              className="rounded-full transition-all duration-300"
+              animate={{
+                width: i < revealedCount ? '10px' : '8px',
+                height: i < revealedCount ? '10px' : '8px',
+                background: i < revealedCount
+                  ? (card.rarity === 'Legend' ? '#F5C518' : card.rarity === 'Epic' ? '#A855F7' : card.rarity === 'Rare' ? '#00D4FF' : '#9CA3AF')
+                  : 'rgba(255,255,255,0.15)',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Cards area */}
+      <div className="flex-1 flex items-center justify-center overflow-hidden px-3">
+        <div
+          className="flex items-end justify-center"
+          style={{ gap: cards.length > 4 ? '8px' : '12px' }}
+        >
+          {cards.map((card, i) => (
+            <TapRevealCard
+              key={`${card.id}-${i}`}
+              card={card}
+              isActive={i === revealedCount}
+              isRevealed={i < revealedCount}
+              onTap={revealNext}
+              size={cardSize}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom area */}
+      <div className="px-5 pb-8 pt-8 flex-shrink-0 flex flex-col items-center gap-3">
+        <AnimatePresence mode="wait">
+          {!allRevealed ? (
+            <motion.button
+              key="reveal-btn"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={revealNext}
+              className="w-full max-w-sm py-4 rounded-2xl font-black text-xl flex items-center justify-center gap-2"
+              style={{
+                fontFamily: 'Bebas Neue, sans-serif',
+                background: isLegendNext
+                  ? 'linear-gradient(135deg, #F5C518, #FFD700)'
+                  : 'rgba(255,255,255,0.08)',
+                color: isLegendNext ? '#000' : '#fff',
+                border: isLegendNext ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                boxShadow: isLegendNext ? '0 4px 30px rgba(245,197,24,0.5)' : 'none',
+              }}
+            >
+              {isLegendNext ? '⚡ RÉVÉLER LA LÉGENDE' : 'RETOURNER LA CARTE'}
+              <ChevronRight size={18} />
+            </motion.button>
+          ) : (
+            <motion.div
+              key="done"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-sm flex flex-col items-center gap-3"
+            >
+              {/* Rarity recap */}
+              <div className="flex gap-2 flex-wrap justify-center">
+                {(['Legend', 'Epic', 'Rare', 'Common'] as CardRarity[]).map((rarity) => {
+                  const count = cards.filter((c) => c.rarity === rarity).length
+                  if (count === 0) return null
+                  return (
+                    <div
+                      key={rarity}
+                      className="px-3 py-1 rounded-lg text-xs font-bold"
+                      style={{
+                        background: `${RARITY_COLORS[rarity]}20`,
+                        color: RARITY_COLORS[rarity],
+                        border: `1px solid ${RARITY_COLORS[rarity]}40`,
+                      }}
+                    >
+                      {count}× {rarity}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={onClose}
+                className="w-full py-4 rounded-2xl font-black text-black text-xl"
+                style={{
+                  fontFamily: 'Bebas Neue, sans-serif',
+                  background: 'linear-gradient(135deg, #F5C518, #FFD700)',
+                  boxShadow: '0 4px 24px rgba(245,197,24,0.4)',
+                }}
+              >
+                OUVRIR UN AUTRE PACK
+              </button>
+
+              {bestCard && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="flex gap-2 flex-wrap justify-center"
+                >
+                  <InstagramStoryShare
+                    name={bestCard.name}
+                    rarity={bestCard.rarity as 'Epic' | 'Legend'}
+                    nation={bestCard.nation ?? ''}
+                    pseudo={pseudo}
+                  />
+                  <ShareSheet
+                    url={`/share/pack?card=${bestCard.id}&pseudo=${encodeURIComponent(pseudo)}`}
+                    title={`J'ai obtenu ${bestCard.name} (${bestCard.rarity}) sur WorldSquad !`}
+                    text={`Je viens d'ouvrir un pack et j'ai obtenu ${bestCard.name} ${bestCard.rarity === 'Legend' ? 'LÉGENDAIRE' : 'ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
+                    label="Partager"
+                    variant="outline"
+                  />
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Main client ──────────────────────────────────────────────────────────────
 interface Props {
   initialCoins: number
   pseudo: string
@@ -177,11 +389,8 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
     vibrate([30, 20, 30, 20, 100])
     playPackOpening()
 
-    // Wait for shaking animation
     await new Promise((r) => setTimeout(r, 1400))
-    setPhase('dealing')
 
-    // Call API (debit + card selection)
     const res = await fetch('/api/packs/open', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -193,28 +402,21 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
       toast.error(data.error ?? 'Erreur lors de l\'ouverture')
       setPhase('idle')
       setLoading(false)
+      stopPackOpening()
       return
     }
 
     setCards(data.cards ?? [])
     if (data.newBalance !== undefined) setCoins(data.newBalance)
-
-    // Show mission toast if first pack today
     if (data.mission?.coins) {
-      setTimeout(() => toast.success(`Mission du jour +${data.mission.coins} coins !`, { icon: '🎁' }), 800)
+      setTimeout(() => toast.success(`Mission du jour +${data.mission.coins} coins !`, { icon: '🎁' }), 1000)
     }
 
-    // Short dealing pause then start revealing
-    await new Promise((r) => setTimeout(r, 600))
-    setPhase('revealing')
-
-    // Auto-done after all cards revealed
-    const totalRevealTime = (data.cards?.length ?? 0) * 750 + 1200
-    setTimeout(() => setPhase('done'), totalRevealTime)
+    setPhase('opening')
     setLoading(false)
-  }, [coins, loading])
+  }, [coins, loading, playPackOpening, stopPackOpening])
 
-  const reset = () => {
+  function reset() {
     setPhase('idle')
     setSelectedPack(null)
     setCards([])
@@ -237,6 +439,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
       </div>
 
       <AnimatePresence mode="wait">
+
         {/* ── PACK SELECTION ── */}
         {phase === 'idle' && (
           <motion.div
@@ -273,7 +476,6 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                       }}
                     >
                       <Globe size={36} className="z-10 opacity-60" style={{ color: config.color }} />
-                      {/* Shimmer */}
                       <motion.div
                         className="absolute inset-0 opacity-20"
                         style={{
@@ -285,12 +487,12 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                       />
                     </div>
 
-                    {/* Name */}
-                    <h3 className="font-black text-white text-base leading-tight" style={{ fontFamily: 'Bebas Neue, sans-serif', color: config.color }}>
+                    <h3
+                      className="font-black text-base leading-tight"
+                      style={{ fontFamily: 'Bebas Neue, sans-serif', color: config.color }}
+                    >
                       {config.name}
                     </h3>
-
-                    {/* Cards count */}
                     <p className="text-gray-500 text-xs">{config.cards} cartes</p>
 
                     {/* Odds */}
@@ -315,7 +517,6 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                         ))}
                     </div>
 
-                    {/* Buy button */}
                     <button
                       className="w-full py-2.5 rounded-xl font-black text-black text-sm transition-all hover:brightness-110 disabled:opacity-50"
                       style={{ background: canAfford ? config.color : '#374151', fontFamily: 'Bebas Neue, sans-serif' }}
@@ -359,10 +560,11 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
               <span className="text-white font-black text-sm" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                 {PACK_CONFIGS[selectedPack].name}
               </span>
-              {/* Animated shimmer */}
               <motion.div
                 className="absolute inset-0"
-                style={{ background: `linear-gradient(45deg, transparent 40%, ${packColorOf(selectedPack)}50 50%, transparent 60%)` }}
+                style={{
+                  background: `linear-gradient(45deg, transparent 40%, ${packColorOf(selectedPack)}50 50%, transparent 60%)`,
+                }}
                 animate={{ x: ['-100%', '200%'] }}
                 transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 0.3 }}
               />
@@ -370,113 +572,18 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
           </motion.div>
         )}
 
-        {/* ── DEALING + REVEALING + DONE ── */}
-        {(phase === 'dealing' || phase === 'revealing' || phase === 'done') && (
-          <motion.div
-            key="reveal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center gap-10"
-          >
-            {phase !== 'done' && (
-              <p className="text-gray-500 text-sm uppercase tracking-widest animate-pulse font-semibold">
-                {phase === 'dealing' ? 'Distribution…' : 'Révélation…'}
-              </p>
-            )}
+      </AnimatePresence>
 
-            {phase === 'done' && (
-              <motion.h2
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-3xl font-black text-white text-center"
-                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-              >
-                TES NOUVELLES CARTES !
-              </motion.h2>
-            )}
-
-            {/* Cards */}
-            <div className={`flex items-end justify-center gap-2 sm:gap-4 flex-wrap ${cards.length > 3 ? 'max-w-2xl' : 'max-w-lg'} mx-auto px-2`}>
-              {cards.map((card, i) => (
-                <RevealCard
-                  key={`${card.id}-${i}`}
-                  card={card}
-                  index={i}
-                  shouldReveal={phase === 'revealing' || phase === 'done'}
-                  totalCards={cards.length}
-                />
-              ))}
-            </div>
-
-            {/* Summary on done */}
-            {phase === 'done' && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="flex flex-col items-center gap-4"
-              >
-                {/* Rarity breakdown */}
-                <div className="flex gap-3 flex-wrap justify-center">
-                  {(['Legend', 'Epic', 'Rare', 'Common'] as CardRarity[]).map((rarity) => {
-                    const count = cards.filter((c) => c.rarity === rarity).length
-                    if (count === 0) return null
-                    return (
-                      <div
-                        key={rarity}
-                        className="px-3 py-1 rounded-lg text-xs font-bold"
-                        style={{ background: `${RARITY_COLORS[rarity]}20`, color: RARITY_COLORS[rarity], border: `1px solid ${RARITY_COLORS[rarity]}40` }}
-                      >
-                        {count}× {rarity}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="flex gap-3 flex-wrap justify-center">
-                  <button
-                    onClick={reset}
-                    className="bg-[#F5C518] hover:bg-[#ffd700] text-black font-black px-8 py-3 rounded-xl transition-all hover:scale-105"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                  >
-                    OUVRIR UN AUTRE PACK
-                  </button>
-                  <a
-                    href="/collection"
-                    className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold px-6 py-3 rounded-xl transition-all text-sm flex items-center"
-                  >
-                    Voir ma collection →
-                  </a>
-                  {(() => {
-                    const best = cards.find((c) => c.rarity === 'Legend') ?? cards.find((c) => c.rarity === 'Epic')
-                    if (!best) return null
-                    return (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.85, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        transition={{ delay: 0.6, type: 'spring', damping: 18, stiffness: 260 }}
-                        className="flex gap-2 flex-wrap justify-center"
-                      >
-                        <InstagramStoryShare
-                          name={best.name}
-                          rarity={best.rarity as 'Epic' | 'Legend'}
-                          nation={best.nation ?? ''}
-                          pseudo={pseudo}
-                        />
-                        <ShareSheet
-                          url={`/share/pack?card=${best.id}&pseudo=${encodeURIComponent(pseudo)}`}
-                          title={`J'ai obtenu ${best.name} (${best.rarity}) sur WorldSquad !`}
-                          text={`Je viens d'ouvrir un pack et j'ai obtenu ${best.name} ${best.rarity === 'Legend' ? 'LÉGENDAIRE' : 'ÉPIQUE'} ! Rejoins-moi sur WorldSquad`}
-                          label="Partager"
-                          variant="outline"
-                        />
-                      </motion.div>
-                    )
-                  })()}
-                </div>
-              </motion.div>
-            )}
-          </motion.div>
+      {/* ── FULL-SCREEN REVEAL OVERLAY ── */}
+      <AnimatePresence>
+        {phase === 'opening' && selectedPack && (
+          <PackRevealOverlay
+            cards={cards}
+            packColor={packColorOf(selectedPack)}
+            packName={PACK_CONFIGS[selectedPack].name}
+            onClose={reset}
+            pseudo={pseudo}
+          />
         )}
       </AnimatePresence>
     </div>
