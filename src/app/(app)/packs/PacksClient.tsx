@@ -391,29 +391,36 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
 
     await new Promise((r) => setTimeout(r, 1400))
 
-    const res = await fetch('/api/packs/open', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ packType: packKey }),
-    })
-    const data = await res.json()
+    try {
+      const res = await fetch('/api/packs/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packType: packKey }),
+      })
+      const data = await res.json()
 
-    if (!res.ok) {
-      toast.error(data.error ?? 'Erreur lors de l\'ouverture')
+      if (!res.ok) {
+        toast.error(data.error ?? 'Erreur lors de l\'ouverture')
+        setPhase('idle')
+        setLoading(false)
+        stopPackOpening()
+        return
+      }
+
+      setCards(data.cards ?? [])
+      if (data.newBalance !== undefined) setCoins(data.newBalance)
+      if (data.mission?.coins) {
+        setTimeout(() => toast.success(`Mission du jour +${data.mission.coins} coins !`, { icon: '🎁' }), 1000)
+      }
+
+      setPhase('opening')
+      setLoading(false)
+    } catch {
+      toast.error('Erreur réseau — réessaie')
       setPhase('idle')
       setLoading(false)
       stopPackOpening()
-      return
     }
-
-    setCards(data.cards ?? [])
-    if (data.newBalance !== undefined) setCoins(data.newBalance)
-    if (data.mission?.coins) {
-      setTimeout(() => toast.success(`Mission du jour +${data.mission.coins} coins !`, { icon: '🎁' }), 1000)
-    }
-
-    setPhase('opening')
-    setLoading(false)
   }, [coins, loading, playPackOpening, stopPackOpening])
 
   function reset() {
