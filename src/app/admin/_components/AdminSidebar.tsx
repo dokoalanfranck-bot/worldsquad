@@ -19,6 +19,8 @@ import {
   Radio,
   Music,
   Activity,
+  Video,
+  Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -42,6 +44,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { href: '/admin/notifications', icon: Bell, label: 'Notifications Push' },
   { href: '/admin/music', icon: Music, label: 'Musique' },
+  { href: '/admin/flash-challenges', icon: Zap, label: 'Défis Flash' },
+  { href: '/admin/pub', icon: Video, label: 'Espace Pub' },
 ]
 
 interface AdminSidebarProps {
