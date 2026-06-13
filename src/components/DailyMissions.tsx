@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Target, Gift, Swords, CheckCircle2, Circle, Flame, Zap } from 'lucide-react'
+import { Target, Gift, Swords, CheckCircle2, Circle, Flame, Zap, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { DailyMissionsRow } from '@/lib/missions'
 import { MISSION_REWARDS } from '@/lib/missions'
@@ -109,16 +110,15 @@ export function DailyMissions({ initial, streak }: Props) {
 
       {/* Mission rows */}
       <div className="px-4 py-2 space-y-2">
-        {MISSIONS.map(({ key, icon: Icon, label, coins, color, bg, border }) => {
+        {MISSIONS.map(({ key, icon: Icon, label, sub, coins, color, bg, border }) => {
           const done = missions[key]
-          return (
+          const inner = (
             <motion.div
-              key={key}
               layout
               className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                 done
                   ? 'bg-white/3 border-white/5 opacity-60'
-                  : `${bg} ${border}`
+                  : `${bg} ${border} hover:brightness-110`
               }`}
             >
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${done ? 'bg-white/5' : bg}`}>
@@ -138,13 +138,19 @@ export function DailyMissions({ initial, streak }: Props) {
                     <CheckCircle2 size={18} className="text-green-400" />
                   </motion.div>
                 ) : (
-                  <motion.div key="pending" className="flex items-center gap-1">
+                  <motion.div key="pending" className="flex items-center gap-1.5">
                     <span className={`text-xs font-black ${color}`}>+{coins}</span>
-                    <Circle size={16} className="text-white/15" />
+                    <ChevronRight size={13} className="text-white/25" />
                   </motion.div>
                 )}
               </AnimatePresence>
             </motion.div>
+          )
+
+          return done ? (
+            <div key={key}>{inner}</div>
+          ) : (
+            <Link key={key} href={sub}>{inner}</Link>
           )
         })}
       </div>
