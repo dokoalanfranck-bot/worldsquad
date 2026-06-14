@@ -2,7 +2,8 @@
 
 import { useEffect, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Tv2, RefreshCw, Play } from 'lucide-react'
+import { Tv2, RefreshCw, Play, Users } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null
@@ -212,6 +213,24 @@ export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, stream
 
   const refresh = useCallback(() => router.refresh(), [router])
 
+  // Supabase Presence — compteur de viewers en temps réel
+  const [supabase] = useState(() => createClient())
+  const [viewerCount, setViewerCount] = useState(0)
+
+  useEffect(() => {
+    if (!isReady) return
+    const uid = `v-${Math.random().toString(36).slice(2, 9)}`
+    const channel = supabase.channel('live-room', { config: { presence: { key: uid } } })
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        setViewerCount(Object.keys(channel.presenceState()).length)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') await channel.track({ at: new Date().toISOString() })
+      })
+    return () => { supabase.removeChannel(channel) }
+  }, [isReady, supabase])
+
   // Auto-refresh quand en attente (pas de compte à rebours)
   useEffect(() => {
     if (isReady) return
@@ -229,11 +248,17 @@ export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, stream
         <div className="mb-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-3 mb-1">
+              <div className="flex items-center gap-2 mb-1">
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/25">
                   <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                   <span className="text-red-400 text-[11px] font-bold tracking-widest">EN DIRECT</span>
                 </div>
+                {viewerCount > 0 && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+                    <Users className="w-3 h-3 text-white/35" />
+                    <span className="text-white/50 text-[11px] font-semibold tabular-nums">{viewerCount}</span>
+                  </div>
+                )}
               </div>
               <h1
                 className="text-4xl lg:text-5xl font-black text-white leading-none"

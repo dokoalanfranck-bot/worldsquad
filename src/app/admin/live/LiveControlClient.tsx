@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload } from 'lucide-react'
+import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -51,8 +51,22 @@ function StreamPanel() {
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [viewerCount, setViewerCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [supabase] = useState(() => createClient())
   const videoId = extractYouTubeId(config.youtube_url)
+
+  // Compteur de viewers en temps réel (admin écoute sans se tracker)
+  useEffect(() => {
+    if (!config.is_active) { setViewerCount(0); return }
+    const channel = supabase.channel('live-room')
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        setViewerCount(Object.keys(channel.presenceState()).length)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [config.is_active, supabase])
 
   async function uploadThumbnail(file: File) {
     setUploading(true)
@@ -159,9 +173,19 @@ function StreamPanel() {
         </div>
         <div className="flex items-center gap-3">
           {config.is_active && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/25">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-              <span className="text-red-400 text-[10px] font-bold tracking-widest">ACTIF</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/25">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                <span className="text-red-400 text-[10px] font-bold tracking-widest">ACTIF</span>
+              </div>
+              {viewerCount > 0 && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+                  <Users className="w-3 h-3 text-white/35" />
+                  <span className="text-white/50 text-[10px] font-bold tabular-nums">
+                    {viewerCount} spectateur{viewerCount > 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <button
