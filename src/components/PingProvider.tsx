@@ -6,7 +6,7 @@ export function PingProvider() {
   useEffect(() => {
     const ping = () => fetch('/api/ping', { method: 'POST' }).catch(() => {})
     ping()
-    const t = setInterval(ping, 60000)
+    const t = setInterval(ping, 30000)
     return () => clearInterval(t)
   }, [])
 

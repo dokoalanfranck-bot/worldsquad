@@ -12,7 +12,8 @@ export default async function TrackingPage() {
   const todayStr = todayStart.toISOString()
   const weekStr = weekStart.toISOString()
   const last24h = new Date(now.getTime() - 24 * 3600 * 1000).toISOString()
-  const onlineThreshold = new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+  const onlineThreshold = new Date(now.getTime() - 15 * 60 * 1000).toISOString()
+  const yesterdayStr = new Date(todayStart.getTime() - 24 * 3600 * 1000).toISOString()
   const todayDate = todayStart.toISOString().split('T')[0]
 
   const [
@@ -117,6 +118,16 @@ export default async function TrackingPage() {
     admin.from('duels').select('id, created_at, is_bot, bot_name, challenger_id, opponent_id, status, coins_stake').in('status', ['open', 'picking']).order('created_at', { ascending: false }).limit(20),
     // Card source breakdown today
     admin.from('user_cards').select('obtained_via').gte('obtained_at', todayStr),
+  ])
+
+  const [
+    { count: newUsersYesterday },
+    { count: duelsYesterday },
+    { count: predictionsYesterday },
+  ] = await Promise.all([
+    admin.from('users').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
+    admin.from('duels').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
+    admin.from('predictions').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
   ])
 
   // Enrich recent finished duels
@@ -248,6 +259,9 @@ export default async function TrackingPage() {
         flashClaimsToday: flashClaimsToday ?? 0,
         cardsBySource,
         reasonBreakdown,
+        newUsersYesterday: newUsersYesterday ?? 0,
+        duelsYesterday: duelsYesterday ?? 0,
+        predictionsYesterday: predictionsYesterday ?? 0,
       }}
       recentSignups={recentSignups ?? []}
       recentDuels={recentDuels}
