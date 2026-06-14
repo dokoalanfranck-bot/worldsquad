@@ -74,9 +74,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const winnerId = challengerScore > opponentScore
       ? duel.challenger_id
-      : opponentScore > challengerScore
-        ? duel.opponent_id ?? null
-        : null // draw
+      : opponentScore > challengerScore && duel.opponent_id
+        ? duel.opponent_id
+        : null // draw or bot-won (bot has no user id)
+
+    const botWon = !!duel.is_bot && opponentScore > challengerScore
 
     // Assign reward card: best card from loser's picks that winner doesn't already own
     let rewardCardId: string | null = null
@@ -134,8 +136,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }).eq('id', oppId)
       const { data: q } = await admin.from('users').select('battles_played').eq('id', challId).single()
       await admin.from('users').update({ battle_streak: 0, battles_played: (q?.battles_played ?? 0) + 1 }).eq('id', challId)
+    } else if (botWon) {
+      // Bot won — human lost: reset streak
+      const { data: cp } = await admin.from('users').select('battles_played').eq('id', challId).single()
+      await admin.from('users').update({ battle_streak: 0, battles_played: (cp?.battles_played ?? 0) + 1 }).eq('id', challId)
     } else {
-      // Draw — increment battles_played for both
+      // Actual draw — increment battles_played for both, no streak change
       const [{ data: cp }, { data: oq }] = await Promise.all([
         admin.from('users').select('battles_played').eq('id', challId).single(),
         oppId ? admin.from('users').select('battles_played').eq('id', oppId).single() : Promise.resolve({ data: null }),

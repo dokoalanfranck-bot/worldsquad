@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Globe, ChevronRight } from 'lucide-react'
+import { Globe, ChevronRight, Sparkles } from 'lucide-react'
 import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { useMusicContext } from '@/components/MusicProvider'
@@ -25,37 +25,36 @@ function TapRevealCard({
   isActive,
   isRevealed,
   onTap,
-  size,
 }: {
   card: Card
   isActive: boolean
   isRevealed: boolean
   onTap: () => void
-  size: 'lg' | 'md' | 'sm'
 }) {
   const isSpecial = card.rarity === 'Epic' || card.rarity === 'Legend'
-  const particleCount = card.rarity === 'Legend' ? 16 : 10
+  const particleCount = card.rarity === 'Legend' ? 14 : 10
+  const particleRadius = card.rarity === 'Legend' ? 75 : 52
 
   return (
     <motion.div
-      initial={{ y: 100, opacity: 0, scale: 0.75 }}
+      initial={{ y: 60, opacity: 0, scale: 0.8 }}
       animate={{
         y: 0,
         opacity: isRevealed || isActive ? 1 : 0.45,
-        scale: isActive && !isRevealed ? 1.06 : 1,
+        scale: isActive && !isRevealed ? 1.04 : 1,
       }}
       transition={{ type: 'spring', stiffness: 280, damping: 22 }}
       onClick={() => isActive && !isRevealed && onTap()}
-      className="relative flex-shrink-0"
-      style={{ perspective: 1000, cursor: isActive && !isRevealed ? 'pointer' : 'default' }}
+      className="relative"
+      style={{ cursor: isActive && !isRevealed ? 'pointer' : 'default' }}
     >
       {/* Pulsing ring on active */}
       {isActive && !isRevealed && (
         <motion.div
-          className="absolute -inset-2 rounded-2xl"
-          animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.04, 1] }}
+          className="absolute -inset-1.5 rounded-xl"
+          animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.03, 1] }}
           transition={{ duration: 1.1, repeat: Infinity }}
-          style={{ border: '2px solid #F5C518', boxShadow: '0 0 24px rgba(245,197,24,0.55)', zIndex: -1 }}
+          style={{ border: '2px solid #F5C518', boxShadow: '0 0 18px rgba(245,197,24,0.5)', zIndex: -1 }}
         />
       )}
 
@@ -66,16 +65,16 @@ function TapRevealCard({
             {Array.from({ length: particleCount }).map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-2 h-2 rounded-full pointer-events-none"
+                className="absolute w-1.5 h-1.5 rounded-full pointer-events-none"
                 style={{ background: RARITY_COLORS[card.rarity], top: '50%', left: '50%', zIndex: 20 }}
                 initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
                 animate={{
                   scale: [0, 1, 0],
-                  x: Math.cos((i / particleCount) * Math.PI * 2) * (card.rarity === 'Legend' ? 140 : 90),
-                  y: Math.sin((i / particleCount) * Math.PI * 2) * (card.rarity === 'Legend' ? 140 : 90),
+                  x: Math.cos((i / particleCount) * Math.PI * 2) * particleRadius,
+                  y: Math.sin((i / particleCount) * Math.PI * 2) * particleRadius,
                   opacity: [1, 1, 0],
                 }}
-                transition={{ duration: 0.95, ease: 'easeOut' }}
+                transition={{ duration: 0.85, ease: 'easeOut' }}
               />
             ))}
           </>
@@ -86,9 +85,9 @@ function TapRevealCard({
       <AnimatePresence>
         {isRevealed && isSpecial && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.8 }}
-            animate={{ opacity: 1, y: -28, scale: 1 }}
-            className="absolute -top-2 left-1/2 -translate-x-1/2 font-black text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+            initial={{ opacity: 0, y: -6, scale: 0.8 }}
+            animate={{ opacity: 1, y: -24, scale: 1 }}
+            className="absolute -top-1 left-1/2 -translate-x-1/2 font-black text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap"
             style={{
               color: RARITY_COLORS[card.rarity],
               background: `${RARITY_COLORS[card.rarity]}20`,
@@ -111,39 +110,39 @@ function TapRevealCard({
           transition: 'box-shadow 0.4s ease',
         }}
         animate={{ rotateY: isRevealed ? 0 : 180 }}
-        transition={{ duration: 0.65, ease: [0.4, 0, 0.2, 1] }}
+        transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
       >
         {/* Front */}
         <div style={{ backfaceVisibility: 'hidden' }}>
-          <GameCard card={card} owned size={size} />
+          <GameCard card={card} owned size="sm" />
         </div>
-        {/* Back — WorldSquad Panini style */}
+        {/* Back */}
         <div
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', position: 'absolute', inset: 0 }}
           className="rounded-xl flex flex-col overflow-hidden border-2 border-[#F5C518]/25"
         >
-          <div className="h-2 w-full" style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518)' }} />
+          <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518)' }} />
           <div
-            className="flex-1 flex flex-col items-center justify-center gap-1 p-2"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 p-1.5"
             style={{ background: 'linear-gradient(160deg, #0A1F3D, #060F1A)' }}
           >
-            <div className="w-8 h-8 rounded-full border-2 border-[#F5C518]/40 flex items-center justify-center mb-1">
-              <Globe size={14} className="text-[#F5C518]/60" />
+            <div className="w-7 h-7 rounded-full border border-[#F5C518]/40 flex items-center justify-center mb-0.5">
+              <Globe size={12} className="text-[#F5C518]/60" />
             </div>
-            <div className="text-[#F5C518]/50 font-black text-xs" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
-            <div className="text-[#F5C518]/50 font-black text-xs" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
-            <div className="text-white/15 font-bold text-[9px] mt-1">2026</div>
+            <div className="text-[#F5C518]/50 font-black text-[10px]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
+            <div className="text-[#F5C518]/50 font-black text-[10px]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
+            <div className="text-white/15 font-bold text-[8px] mt-0.5">2026</div>
           </div>
-          <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F5C518, #C8102E)' }} />
+          <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #F5C518, #C8102E)' }} />
         </div>
       </motion.div>
 
       {/* "Tap" hint */}
       {isActive && !isRevealed && (
         <motion.p
-          animate={{ y: [0, -4, 0] }}
+          animate={{ y: [0, -3, 0] }}
           transition={{ duration: 0.9, repeat: Infinity }}
-          className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[#F5C518] text-xs font-black whitespace-nowrap"
+          className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[#F5C518] text-[9px] font-black whitespace-nowrap"
           style={{ fontFamily: 'Bebas Neue, sans-serif' }}
         >
           APPUIE !
@@ -171,11 +170,9 @@ function PackRevealOverlay({
   const [legendFlash, setLegendFlash] = useState(false)
   const allRevealed = revealedCount >= cards.length
   const nextCard = cards[revealedCount]
-  const cardSize: 'lg' | 'md' | 'sm' = cards.length <= 3 ? 'lg' : cards.length <= 5 ? 'md' : 'sm'
 
   function revealNext() {
     if (revealedCount >= cards.length) return
-
     const card = cards[revealedCount]
     if (card.rarity === 'Legend') {
       vibrate([40, 30, 80, 30, 150])
@@ -193,6 +190,9 @@ function PackRevealOverlay({
 
   const isLegendNext = nextCard?.rarity === 'Legend'
   const bestCard = cards.find((c) => c.rarity === 'Legend') ?? cards.find((c) => c.rarity === 'Epic')
+
+  // Grid columns: 3 for ≤6 cards, adapt for more
+  const cols = Math.min(3, cards.length)
 
   return (
     <motion.div
@@ -219,57 +219,61 @@ function PackRevealOverlay({
       </AnimatePresence>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-6 pb-3 flex-shrink-0">
+      <div className="flex items-center justify-between px-5 pt-safe pt-6 pb-2 flex-shrink-0">
         <div>
           <p className="text-white/30 text-[10px] uppercase tracking-widest font-semibold">Pack ouvert</p>
-          <p className="font-black text-base" style={{ fontFamily: 'Bebas Neue, sans-serif', color: packColor }}>
+          <p className="font-black text-lg" style={{ fontFamily: 'Bebas Neue, sans-serif', color: packColor }}>
             {packName}
           </p>
         </div>
         {/* Progress dots */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {cards.map((card, i) => (
             <motion.div
               key={i}
-              className="rounded-full transition-all duration-300"
+              className="rounded-full"
               animate={{
-                width: i < revealedCount ? '10px' : '8px',
-                height: i < revealedCount ? '10px' : '8px',
+                width: i < revealedCount ? '10px' : '7px',
+                height: i < revealedCount ? '10px' : '7px',
                 background: i < revealedCount
                   ? (card.rarity === 'Legend' ? '#F5C518' : card.rarity === 'Epic' ? '#A855F7' : card.rarity === 'Rare' ? '#00D4FF' : '#9CA3AF')
                   : 'rgba(255,255,255,0.15)',
               }}
+              transition={{ duration: 0.2 }}
             />
           ))}
         </div>
       </div>
 
-      {/* Cards area */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden px-3">
+      {/* Cards area — 3-col responsive grid */}
+      <div className="flex-1 flex items-center justify-center overflow-visible py-6 px-4">
         <div
-          className="flex items-end justify-center"
-          style={{ gap: cards.length > 4 ? '8px' : '12px' }}
+          className="grid mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${cols}, minmax(0, 96px))`,
+            gap: '12px',
+          }}
         >
           {cards.map((card, i) => (
-            <TapRevealCard
-              key={`${card.id}-${i}`}
-              card={card}
-              isActive={i === revealedCount}
-              isRevealed={i < revealedCount}
-              onTap={revealNext}
-              size={cardSize}
-            />
+            <div key={`${card.id}-${i}`} className="flex justify-center">
+              <TapRevealCard
+                card={card}
+                isActive={i === revealedCount}
+                isRevealed={i < revealedCount}
+                onTap={revealNext}
+              />
+            </div>
           ))}
         </div>
       </div>
 
       {/* Bottom area */}
-      <div className="px-5 pb-8 pt-8 flex-shrink-0 flex flex-col items-center gap-3">
+      <div className="px-5 pb-safe pb-8 pt-4 flex-shrink-0 flex flex-col items-center gap-3">
         <AnimatePresence mode="wait">
           {!allRevealed ? (
             <motion.button
               key="reveal-btn"
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               whileTap={{ scale: 0.96 }}
@@ -291,7 +295,7 @@ function PackRevealOverlay({
           ) : (
             <motion.div
               key="done"
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               className="w-full max-w-sm flex flex-col items-center gap-3"
             >
@@ -401,10 +405,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
 
       if (!res.ok) {
         toast.error(data.error ?? 'Erreur lors de l\'ouverture')
-        setPhase('idle')
-        setLoading(false)
-        stopPackOpening()
-        return
+        setPhase('idle'); setLoading(false); stopPackOpening(); return
       }
 
       setCards(data.cards ?? [])
@@ -417,9 +418,7 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
       setLoading(false)
     } catch {
       toast.error('Erreur réseau — réessaie')
-      setPhase('idle')
-      setLoading(false)
-      stopPackOpening()
+      setPhase('idle'); setLoading(false); stopPackOpening()
     }
   }, [coins, loading, playPackOpening, stopPackOpening])
 
@@ -433,16 +432,18 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
   const packColorOf = (key: PackKey) => PACK_CONFIGS[key].color
 
   return (
-    <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
+    <div className="px-4 py-6 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-4xl font-black text-white mb-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          <h1 className="text-4xl font-black text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             OUVRIR DES PACKS
           </h1>
-          <p className="text-gray-500 text-sm">Plus le pack est cher, plus tu trouveras des Légendes</p>
+          <p className="text-gray-500 text-sm mt-1">Plus le pack est cher, plus tu trouveras des Légendes</p>
         </div>
-        <CoinDisplay amount={coins} size="lg" />
+        <div className="flex-shrink-0">
+          <CoinDisplay amount={coins} size="lg" />
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -451,90 +452,98 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
         {phase === 'idle' && (
           <motion.div
             key="selection"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.25 }}
+            className="grid grid-cols-2 gap-3"
           >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
-              {packEntries.map(([key, config]) => {
-                const canAfford = coins >= config.cost
-                return (
-                  <motion.div
-                    key={key}
-                    whileHover={canAfford ? { scale: 1.04, y: -8 } : {}}
-                    whileTap={canAfford ? { scale: 0.97 } : {}}
-                    onClick={() => canAfford && handleOpenPack(key)}
-                    className={`glass rounded-2xl p-5 border text-center flex flex-col gap-3 transition-all ${
-                      canAfford ? 'cursor-pointer hover:border-white/20' : 'opacity-50 cursor-not-allowed'
-                    }`}
+            {packEntries.map(([key, config]) => {
+              const canAfford = coins >= config.cost
+              return (
+                <motion.div
+                  key={key}
+                  whileTap={canAfford ? { scale: 0.97 } : {}}
+                  onClick={() => canAfford && handleOpenPack(key)}
+                  className={`glass rounded-2xl p-4 border flex flex-col gap-2.5 transition-all ${
+                    canAfford ? 'cursor-pointer active:border-white/20' : 'opacity-45 cursor-not-allowed'
+                  }`}
+                  style={{
+                    borderColor: `${config.color}30`,
+                    boxShadow: canAfford ? `0 0 24px ${config.color}12` : 'none',
+                  }}
+                >
+                  {/* Pack visual */}
+                  <div
+                    className="w-full aspect-[3/4] rounded-xl flex items-center justify-center relative overflow-hidden"
                     style={{
-                      borderColor: `${config.color}30`,
-                      boxShadow: canAfford ? `0 0 30px ${config.color}15` : 'none',
+                      background: `linear-gradient(135deg, ${config.color}15, ${config.color}35)`,
+                      border: `2px solid ${config.color}50`,
                     }}
                   >
-                    {/* Pack visual */}
-                    <div
-                      className="w-20 h-28 mx-auto rounded-xl flex items-center justify-center relative overflow-hidden"
+                    <Globe size={40} className="z-10 opacity-60" style={{ color: config.color }} />
+                    <motion.div
+                      className="absolute inset-0"
                       style={{
-                        background: `linear-gradient(135deg, ${config.color}15, ${config.color}35)`,
-                        border: `2px solid ${config.color}50`,
-                        boxShadow: `0 0 20px ${config.color}25`,
+                        background: `linear-gradient(45deg, transparent 30%, ${config.color}60 50%, transparent 70%)`,
+                        backgroundSize: '200% 200%',
                       }}
+                      animate={{ backgroundPosition: ['0% 0%', '200% 200%'] }}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                    />
+                    {/* Card count badge */}
+                    <div
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black"
+                      style={{ background: `${config.color}30`, color: config.color, border: `1px solid ${config.color}60` }}
                     >
-                      <Globe size={36} className="z-10 opacity-60" style={{ color: config.color }} />
-                      <motion.div
-                        className="absolute inset-0 opacity-20"
-                        style={{
-                          background: `linear-gradient(45deg, transparent 30%, ${config.color}80 50%, transparent 70%)`,
-                          backgroundSize: '200% 200%',
-                        }}
-                        animate={{ backgroundPosition: ['0% 0%', '200% 200%'] }}
-                        transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
-                      />
+                      {config.cards}
                     </div>
+                  </div>
 
-                    <h3
-                      className="font-black text-base leading-tight"
-                      style={{ fontFamily: 'Bebas Neue, sans-serif', color: config.color }}
-                    >
-                      {config.name}
-                    </h3>
-                    <p className="text-gray-500 text-xs">{config.cards} cartes</p>
+                  <h3
+                    className="font-black text-base leading-none"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif', color: config.color }}
+                  >
+                    {config.name}
+                  </h3>
 
-                    {/* Odds */}
-                    <div className="space-y-1 text-left">
-                      {(Object.entries(config.odds) as [CardRarity, number][])
-                        .filter(([, v]) => v > 0)
-                        .map(([rarity, pct]) => (
-                          <div key={rarity} className="flex items-center justify-between">
-                            <span className="text-xs font-semibold" style={{ color: RARITY_COLORS[rarity] }}>
-                              {rarity}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${pct * 100}%`, background: RARITY_COLORS[rarity] }}
-                                />
-                              </div>
-                              <span className="text-xs text-gray-500 w-7 text-right">{Math.round(pct * 100)}%</span>
+                  {/* Odds compact */}
+                  <div className="space-y-0.5">
+                    {(Object.entries(config.odds) as [CardRarity, number][])
+                      .filter(([, v]) => v > 0)
+                      .map(([rarity, pct]) => (
+                        <div key={rarity} className="flex items-center justify-between">
+                          <span className="text-[10px] font-semibold" style={{ color: RARITY_COLORS[rarity] }}>
+                            {rarity}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <div className="w-10 h-0.5 bg-white/5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${pct * 100}%`, background: RARITY_COLORS[rarity] }}
+                              />
                             </div>
+                            <span className="text-[10px] text-gray-500 w-6 text-right">{Math.round(pct * 100)}%</span>
                           </div>
-                        ))}
-                    </div>
+                        </div>
+                      ))}
+                  </div>
 
-                    <button
-                      className="w-full py-2.5 rounded-xl font-black text-black text-sm transition-all hover:brightness-110 disabled:opacity-50"
-                      style={{ background: canAfford ? config.color : '#374151', fontFamily: 'Bebas Neue, sans-serif' }}
-                      disabled={!canAfford}
-                    >
-                      {config.cost.toLocaleString()} COINS
-                    </button>
-                  </motion.div>
-                )
-              })}
-            </div>
+                  {/* Cost button */}
+                  <div
+                    className="w-full py-2.5 rounded-xl font-black text-sm text-center flex items-center justify-center gap-1.5"
+                    style={{
+                      background: canAfford ? config.color : '#374151',
+                      color: canAfford ? '#000' : '#6b7280',
+                      fontFamily: 'Bebas Neue, sans-serif',
+                    }}
+                  >
+                    <Sparkles size={12} />
+                    {config.cost.toLocaleString()} COINS
+                  </div>
+                </motion.div>
+              )
+            })}
           </motion.div>
         )}
 
@@ -545,9 +554,9 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center min-h-[450px] gap-6"
+            className="flex flex-col items-center justify-center min-h-[400px] gap-6"
           >
-            <p className="text-gray-500 font-semibold text-sm uppercase tracking-widest animate-pulse">
+            <p className="text-gray-500 font-semibold text-xs uppercase tracking-widest animate-pulse">
               Ouverture en cours…
             </p>
             <motion.div
@@ -556,8 +565,10 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
                 scale: [1, 1.05, 1, 1.08, 1, 1.1, 1.12, 1.15, 1.2],
               }}
               transition={{ duration: 1.4, ease: 'easeInOut' }}
-              className="w-36 h-52 rounded-2xl flex flex-col items-center justify-center gap-2 relative overflow-hidden"
+              className="rounded-2xl flex flex-col items-center justify-center gap-2 relative overflow-hidden"
               style={{
+                width: 140,
+                height: 196,
                 background: `linear-gradient(135deg, ${packColorOf(selectedPack)}20, ${packColorOf(selectedPack)}50)`,
                 border: `3px solid ${packColorOf(selectedPack)}`,
                 boxShadow: `0 0 80px ${packColorOf(selectedPack)}60`,

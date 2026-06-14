@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, CreditCard, ArrowDownRight } from 'lucide-react'
@@ -85,10 +85,10 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
     return () => clearInterval(poll)
   }, [duel.id, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Transition: animation → result after 23s
+  // Transition: animation → result after 26s (22s match + 4s final whistle)
   useEffect(() => {
     if (view !== 'animation') return
-    const t = setTimeout(() => setView('result'), 23000)
+    const t = setTimeout(() => setView('result'), 26000)
     return () => clearTimeout(t)
   }, [view])
 
@@ -443,119 +443,283 @@ function PickingView({
 
 // ── AnimationView ─────────────────────────────────────────────────────────────
 
+const MATCH_MS = 22000
+
 function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallenger: boolean; me: Profile; them: Profile }) {
-  const DURATION_MS = 60000
   const [elapsed, setElapsed] = useState(0)
   const [visibleEvents, setVisibleEvents] = useState<DuelEvent[]>([])
-  const [challengerGoals, setChallengerGoals] = useState(0)
-  const [opponentGoals, setOpponentGoals] = useState(0)
+  const [myGoals, setMyGoals] = useState(0)
+  const [theirGoals, setTheirGoals] = useState(0)
+  const [ballPos, setBallPos] = useState({ x: 50, y: 50 })
+  const [goalFlash, setGoalFlash] = useState<{ name: string; isMine: boolean } | null>(null)
   const startRef = useRef(Date.now())
+  const lastCountRef = useRef(0)
 
-  const events = (duel.match_events ?? []) as DuelEvent[]
-  const myScore = isChallenger ? duel.challenger_score : duel.opponent_score
-  const theirScore = isChallenger ? duel.opponent_score : duel.challenger_score
+  // Remap event timeMs (0–60000) to fit within MATCH_MS
+  const events = useMemo(() => {
+    const raw = (duel.match_events ?? []) as DuelEvent[]
+    const maxMs = raw.length > 0 ? Math.max(...raw.map((e) => e.timeMs)) : 60000
+    return raw.map((e) => ({ ...e, timeMs: Math.round((e.timeMs / maxMs) * MATCH_MS) }))
+  }, [duel.match_events])
+
+  const flag = (nation: string) => NATION_FLAGS[nation] ?? '🌍'
+  const progress = Math.min(100, (elapsed / MATCH_MS) * 100)
+  const displayMinute = Math.min(90, Math.floor((elapsed / MATCH_MS) * 90))
+  const isFinished = elapsed >= MATCH_MS
 
   useEffect(() => {
     const frame = setInterval(() => {
       const now = Date.now() - startRef.current
       setElapsed(now)
-      const visible = events.filter((e) => e.timeMs <= now)
-      setVisibleEvents(visible)
-      setChallengerGoals(visible.filter((e) => e.type === 'goal' && e.team === 'challenger').length)
-      setOpponentGoals(visible.filter((e) => e.type === 'goal' && e.team === 'opponent').length)
+
+      const vis = events.filter((e) => e.timeMs <= now)
+      const newCount = vis.length
+
+      if (newCount > lastCountRef.current) {
+        const newEvs = vis.slice(lastCountRef.current)
+        for (const ev of newEvs) {
+          const isMine = (isChallenger && ev.team === 'challenger') || (!isChallenger && ev.team === 'opponent')
+          // Ball rushes toward attacking goal (challenger attacks right, opponent attacks left)
+          const tx = ev.team === 'challenger'
+            ? (ev.type === 'goal' ? 88 : 72)
+            : (ev.type === 'goal' ? 12 : 28)
+          const ty = 35 + Math.random() * 30
+          setBallPos({ x: tx, y: ty })
+          if (ev.type === 'goal') {
+            setGoalFlash({ name: ev.playerName, isMine })
+            setTimeout(() => setGoalFlash(null), 2500)
+            setTimeout(() => setBallPos({ x: 50, y: 50 }), 2700)
+          } else {
+            setTimeout(() => setBallPos({ x: 50, y: 50 }), 1600)
+          }
+        }
+        lastCountRef.current = newCount
+      }
+
+      setVisibleEvents(vis)
+      const cG = vis.filter((e) => e.type === 'goal' && e.team === 'challenger').length
+      const oG = vis.filter((e) => e.type === 'goal' && e.team === 'opponent').length
+      setMyGoals(isChallenger ? cG : oG)
+      setTheirGoals(isChallenger ? oG : cG)
     }, 80)
     return () => clearInterval(frame)
-  }, [events])
-
-  const progress = Math.min(100, (elapsed / DURATION_MS) * 100)
-  const displayMinute = Math.floor((elapsed / DURATION_MS) * 90)
-
-  const myGoals = isChallenger ? challengerGoals : opponentGoals
-  const theirGoals = isChallenger ? opponentGoals : challengerGoals
-  const flag = (nation: string) => NATION_FLAGS[nation] ?? '🌍'
+  }, [events, isChallenger])
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen flex flex-col px-4 py-6 max-w-lg mx-auto"
+      className="min-h-screen flex flex-col px-4 py-5 max-w-lg mx-auto"
     >
       {/* Scoreboard */}
-      <div className="glass rounded-2xl p-5 mb-5 text-center">
-        <p className="flex items-center justify-center gap-1.5 text-gray-600 text-xs uppercase tracking-widest mb-3">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Match en direct
-        </p>
-        <div className="flex items-center justify-between gap-4">
+      <div className="glass rounded-2xl p-4 mb-4">
+        <div className="flex items-center gap-2">
           <div className="flex-1 text-center">
-            <p className="text-2xl mb-1">{flag(me?.nation)}</p>
-            <p className="text-white font-black text-sm truncate">{me?.pseudo}</p>
+            <p className="text-3xl leading-none">{flag(me?.nation)}</p>
+            <p className="text-white font-black text-xs mt-1 truncate">{me?.pseudo}</p>
           </div>
-          <div className="text-center">
-            <div className="text-5xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          <div className="text-center px-2 min-w-[100px]">
+            <motion.div
+              key={`${myGoals}-${theirGoals}`}
+              initial={{ scale: 1.4, color: '#F5C518' }}
+              animate={{ scale: 1, color: '#ffffff' }}
+              transition={{ duration: 0.35 }}
+              className="text-5xl font-black"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
               {myGoals} — {theirGoals}
+            </motion.div>
+            <div className="flex items-center gap-1.5 justify-center mt-1">
+              {!isFinished && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+              <span className="text-gray-500 text-xs font-mono">
+                {isFinished ? 'FT' : `${displayMinute}'`}
+              </span>
             </div>
-            <p className="text-gray-600 text-xs mt-1 font-mono">{displayMinute}&apos;</p>
           </div>
           <div className="flex-1 text-center">
-            <p className="text-2xl mb-1">{flag(them?.nation)}</p>
-            <p className="text-white font-black text-sm truncate">{them?.pseudo}</p>
+            <p className="text-3xl leading-none">{flag(them?.nation)}</p>
+            <p className="text-white font-black text-xs mt-1 truncate">{them?.pseudo}</p>
           </div>
         </div>
-
-        {/* Progress bar */}
-        <div className="mt-4 h-1 bg-white/5 rounded-full overflow-hidden">
-          <motion.div className="h-full bg-[#F5C518] rounded-full" style={{ width: `${progress}%` }} />
+        <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
+          <motion.div className="h-full bg-[#F5C518] rounded-full" style={{ width: `${progress}%` }} transition={{ duration: 0.08 }} />
         </div>
       </div>
 
+      {/* Animated pitch */}
+      <MatchPitch
+        ballPos={ballPos}
+        challengerPseudo={isChallenger ? me?.pseudo : them?.pseudo}
+        opponentPseudo={isChallenger ? them?.pseudo : me?.pseudo}
+      />
+
       {/* Events feed */}
-      <div className="flex-1 space-y-2 overflow-hidden">
+      <div className="flex-1 mt-4 space-y-1.5 overflow-hidden">
         <AnimatePresence initial={false}>
-          {[...visibleEvents].reverse().slice(0, 8).map((ev, i) => {
-            const isMyTeam = (isChallenger && ev.team === 'challenger') || (!isChallenger && ev.team === 'opponent')
+          {[...visibleEvents].reverse().slice(0, 5).map((ev, i) => {
+            const isMine = (isChallenger && ev.team === 'challenger') || (!isChallenger && ev.team === 'opponent')
+            const remMin = Math.min(90, Math.round((ev.timeMs / MATCH_MS) * 90))
             return (
               <motion.div
-                key={`${ev.minute}-${ev.type}`}
-                initial={{ opacity: 0, x: isMyTeam ? -20 : 20, height: 0 }}
-                animate={{ opacity: 1, x: 0, height: 'auto' }}
-                className={`glass rounded-xl px-4 py-3 flex items-center gap-3 border ${
+                key={`${ev.minute}-${ev.type}-${ev.playerName}`}
+                initial={{ opacity: 0, x: isMine ? -20 : 20, height: 0 }}
+                animate={{ opacity: 1 - i * 0.18, x: 0, height: 'auto' }}
+                transition={{ duration: 0.25 }}
+                className={`rounded-xl px-3 py-2 flex items-center gap-3 border ${
                   ev.type === 'goal'
-                    ? isMyTeam ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'
-                    : 'border-white/5'
+                    ? isMine ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'
+                    : 'border-white/5 bg-white/[0.02]'
                 }`}
-                style={{ opacity: 1 - i * 0.12 }}
               >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-black flex-shrink-0 ${ev.type === 'goal' ? (isMyTeam ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400') : 'bg-white/5 text-white/30'}`}>
-                  {ev.type === 'goal' ? 'BUT' : ev.type === 'chance' ? 'OCC' : 'ARR'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-bold truncate ${ev.type === 'goal' ? (isMyTeam ? 'text-green-400' : 'text-red-400') : 'text-gray-400'}`}>
-                    {ev.type === 'goal' ? 'BUT !' : ev.type === 'chance' ? 'Occasion' : 'Arrêt !'}
-                    {' '}{ev.playerName}
-                  </p>
-                </div>
-                <span className="text-gray-600 text-xs font-mono flex-shrink-0">{ev.minute}&apos;</span>
+                <span className="text-base flex-shrink-0">
+                  {ev.type === 'goal' ? '⚽' : ev.type === 'chance' ? '🎯' : '🧤'}
+                </span>
+                <p className={`text-sm font-bold flex-1 truncate ${
+                  ev.type === 'goal' ? (isMine ? 'text-green-400' : 'text-red-400') : 'text-gray-500'
+                }`}>
+                  {ev.type === 'goal' ? 'BUT !' : ev.type === 'chance' ? 'Occasion' : 'Arrêt !'}{' '}
+                  <span className="font-normal">{ev.playerName}</span>
+                </p>
+                <span className="text-xs font-mono text-gray-600 flex-shrink-0">{remMin}&apos;</span>
               </motion.div>
             )
           })}
         </AnimatePresence>
       </div>
 
-      {progress < 100 && (
-        <p className="text-center text-gray-700 text-xs mt-4 animate-pulse">Simulation en cours…</p>
-      )}
-      {progress >= 100 && (
-        <motion.p
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center text-[#F5C518] font-black text-xl mt-4"
-          style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-        >
-          COUP DE SIFFLET FINAL !
-        </motion.p>
-      )}
+      {/* Final whistle */}
+      <AnimatePresence>
+        {isFinished && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-5"
+          >
+            <p className="text-[#F5C518] font-black text-3xl tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              COUP DE SIFFLET FINAL !
+            </p>
+            <p className="text-gray-500 text-sm mt-1">Résultats dans un instant…</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Goal flash overlay */}
+      <AnimatePresence>
+        {goalFlash && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          >
+            <div className={`absolute inset-0 ${goalFlash.isMine ? 'bg-green-500/10' : 'bg-red-500/10'}`} />
+            <motion.div
+              initial={{ scale: 0.4, y: 60 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 1.1, opacity: 0, y: -30 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+              className="relative text-center z-10"
+            >
+              <p
+                className="font-black leading-none"
+                style={{
+                  fontFamily: 'Bebas Neue, sans-serif',
+                  fontSize: 'clamp(72px, 20vw, 120px)',
+                  color: goalFlash.isMine ? '#22c55e' : '#ef4444',
+                  textShadow: goalFlash.isMine
+                    ? '0 0 60px rgba(34,197,94,0.6)'
+                    : '0 0 60px rgba(239,68,68,0.6)',
+                }}
+              >
+                BUT !
+              </p>
+              <p className="text-white text-xl font-bold mt-1">⚽ {goalFlash.name}</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
+  )
+}
+
+// ── MatchPitch ────────────────────────────────────────────────────────────────
+
+function MatchPitch({ ballPos, challengerPseudo, opponentPseudo }: {
+  ballPos: { x: number; y: number }
+  challengerPseudo: string
+  opponentPseudo: string
+}) {
+  return (
+    <div
+      className="relative rounded-2xl overflow-hidden flex-shrink-0"
+      style={{
+        height: 152,
+        background: 'linear-gradient(180deg, #1a4a1a 0%, #1e5c1e 50%, #1a4a1a 100%)',
+      }}
+    >
+      {/* Grass stripes */}
+      <div
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 12px, rgba(0,0,0,0.2) 12px, rgba(0,0,0,0.2) 24px)',
+        }}
+      />
+
+      {/* Player labels */}
+      <p className="absolute top-2 left-3 text-white/35 text-[9px] font-black uppercase tracking-wide truncate max-w-[70px] z-10">
+        {challengerPseudo}
+      </p>
+      <p className="absolute top-2 right-3 text-white/35 text-[9px] font-black uppercase tracking-wide truncate max-w-[70px] text-right z-10">
+        {opponentPseudo}
+      </p>
+
+      {/* Center line */}
+      <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white/20" />
+      {/* Center circle */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20"
+        style={{ width: 60, height: 60 }}
+      />
+      {/* Center dot */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white/25" />
+
+      {/* Left penalty box */}
+      <div
+        className="absolute top-1/2 -translate-y-1/2 left-0 border-r border-t border-b border-white/15 rounded-r"
+        style={{ width: 28, height: 76 }}
+      />
+      {/* Right penalty box */}
+      <div
+        className="absolute top-1/2 -translate-y-1/2 right-0 border-l border-t border-b border-white/15 rounded-l"
+        style={{ width: 28, height: 76 }}
+      />
+
+      {/* Left goal */}
+      <div
+        className="absolute top-1/2 -translate-y-1/2 left-0 rounded-r"
+        style={{ width: 7, height: 32, background: 'rgba(255,255,255,0.12)', borderRight: '1px solid rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.3)' }}
+      />
+      {/* Right goal */}
+      <div
+        className="absolute top-1/2 -translate-y-1/2 right-0 rounded-l"
+        style={{ width: 7, height: 32, background: 'rgba(255,255,255,0.12)', borderLeft: '1px solid rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.3)' }}
+      />
+
+      {/* Ball */}
+      <motion.div
+        animate={{ left: `${ballPos.x}%`, top: `${ballPos.y}%` }}
+        transition={{ type: 'spring', stiffness: 55, damping: 11 }}
+        className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{
+          width: 14,
+          height: 14,
+          background: 'radial-gradient(circle at 35% 35%, #ffffff, #cccccc)',
+          boxShadow: '0 0 10px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.5)',
+          zIndex: 20,
+        }}
+      />
+    </div>
   )
 }
 
@@ -567,9 +731,10 @@ function ResultView({ duel, currentUserId, me, them, onReplay }: {
   const isChallenger = duel.challenger_id === currentUserId
   const winnerId = duel.winner_id as string | null
   const iWon = winnerId === currentUserId
-  const isDraw = !winnerId
   const myScore = isChallenger ? duel.challenger_score : duel.opponent_score
   const theirScore = isChallenger ? duel.opponent_score : duel.challenger_score
+  // Draw only if truly equal scores AND no winner (bot-won with different score = défaite)
+  const isDraw = !winnerId && (myScore ?? 0) === (theirScore ?? 0)
   const rewardCard = duel.reward_card as Card | null
 
   const flag = (nation: string) => NATION_FLAGS[nation] ?? '🌍'
