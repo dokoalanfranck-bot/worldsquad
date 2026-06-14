@@ -23,6 +23,13 @@ function generateRoomName(): string {
   return s
 }
 
+function toLocalInput(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 interface StreamConfig {
   youtube_url: string
   title: string
@@ -30,12 +37,15 @@ interface StreamConfig {
   is_active: boolean
   stream_type: 'jitsi' | 'youtube'
   room_name: string
+  thumbnail_url: string
+  starts_at: string
 }
 
 function StreamPanel() {
   const [config, setConfig] = useState<StreamConfig>({
     youtube_url: '', title: 'Match en Direct', subtitle: '',
     is_active: false, stream_type: 'jitsi', room_name: generateRoomName(),
+    thumbnail_url: '', starts_at: '',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -53,11 +63,20 @@ function StreamPanel() {
           is_active: data.is_active ?? false,
           stream_type: (data.stream_type as 'jitsi' | 'youtube') ?? 'jitsi',
           room_name: data.room_name ?? generateRoomName(),
+          thumbnail_url: data.thumbnail_url ?? '',
+          starts_at: data.starts_at ? toLocalInput(data.starts_at) : '',
         })
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
+
+  function buildPayload(cfg: StreamConfig) {
+    return {
+      ...cfg,
+      starts_at: cfg.starts_at ? new Date(cfg.starts_at).toISOString() : null,
+    }
+  }
 
   async function save() {
     setSaving(true)
@@ -65,7 +84,7 @@ function StreamPanel() {
       const res = await fetch('/api/admin/live-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(buildPayload(config)),
       })
       if (!res.ok) throw new Error()
       toast.success('✓ Configuration sauvegardée')
@@ -84,7 +103,7 @@ function StreamPanel() {
       const res = await fetch('/api/admin/live-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
+        body: JSON.stringify(buildPayload(next)),
       })
       if (!res.ok) throw new Error()
       toast.success(next.is_active ? '🔴 Stream activé — visible par tous les joueurs' : 'Stream désactivé')
@@ -255,7 +274,7 @@ function StreamPanel() {
           </div>
         )}
 
-        {/* Common: Title, Subtitle, Save, View */}
+        {/* Common: Title, Subtitle, Thumbnail, Starts At, Save, View */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1 border-t border-white/5">
           <div>
             <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
@@ -278,6 +297,43 @@ function StreamPanel() {
               placeholder="France 🇫🇷 vs 🇪🇸 Espagne · Demi-finale"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
             />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div>
+            <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+              Miniature (URL image)
+            </label>
+            <input
+              value={config.thumbnail_url}
+              onChange={(e) => setConfig((s) => ({ ...s, thumbnail_url: e.target.value }))}
+              placeholder="https://... .jpg / .png"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
+            />
+            {config.thumbnail_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={config.thumbnail_url}
+                alt="Miniature"
+                className="mt-2 w-full h-16 object-cover rounded-lg border border-white/8"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            )}
+          </div>
+          <div>
+            <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+              Début du match (compte à rebours)
+            </label>
+            <input
+              type="datetime-local"
+              value={config.starts_at}
+              onChange={(e) => setConfig((s) => ({ ...s, starts_at: e.target.value }))}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]"
+            />
+            <p className="text-white/20 text-[10px] mt-1">
+              Affiche un compte à rebours sur /live avant le début
+            </p>
           </div>
         </div>
 

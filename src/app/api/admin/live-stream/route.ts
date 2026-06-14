@@ -12,6 +12,8 @@ export async function GET() {
     is_active: false,
     stream_type: 'jitsi',
     room_name: null,
+    thumbnail_url: null,
+    starts_at: null,
   })
 }
 
@@ -31,6 +33,8 @@ export async function POST(req: Request) {
     is_active?: boolean
     stream_type?: string
     room_name?: string
+    thumbnail_url?: string
+    starts_at?: string | null
   }
 
   const admin = createAdminClient()
@@ -42,6 +46,8 @@ export async function POST(req: Request) {
     is_active: body.is_active ?? false,
     stream_type: body.stream_type ?? 'jitsi',
     room_name: body.room_name ?? null,
+    thumbnail_url: body.thumbnail_url ?? null,
+    starts_at: body.starts_at ?? null,
     updated_at: new Date().toISOString(),
     updated_by: profile.pseudo,
   })
