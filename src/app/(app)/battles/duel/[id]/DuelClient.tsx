@@ -187,7 +187,7 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
           RECHERCHE…
         </h2>
         <p className="text-gray-500 text-sm">
-          {elapsed < 40 ? 'En attente d\'un adversaire…' : 'Presque là…'}
+          {elapsed < 40 ? 'En attente d\'un adversaire…' : 'Adversaire trouvé !'}
         </p>
         <div className="mt-3 flex items-center justify-center gap-2">
           <div className="h-1 w-32 bg-white/5 rounded-full overflow-hidden">
@@ -199,9 +199,6 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
           </div>
           <span className="text-gray-600 text-xs font-mono">{elapsed}s</span>
         </div>
-        {elapsed >= 50 && (
-          <p className="text-gray-600 text-xs mt-2 animate-pulse">Connexion d'un bot…</p>
-        )}
       </div>
 
       <button

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import { DuelClient } from './DuelClient'
+import { botNation } from '@/lib/duel-engine'
 import type { Card } from '@/types'
 
 export default async function DuelPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +33,7 @@ export default async function DuelPage({ params }: { params: Promise<{ id: strin
   const initialDuel = {
     ...duel,
     challenger,
-    opponent: opponent ?? { id: null, pseudo: duel.bot_name ?? 'Bot', nation: '🤖', photo_url: null },
+    opponent: opponent ?? { id: null, pseudo: duel.bot_name ?? 'Joueur', nation: botNation(duel.bot_name ?? 'x'), photo_url: null },
     reward_card: rewardCard ?? null,
   }
 

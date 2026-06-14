@@ -166,7 +166,6 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm truncate">
                           {flag(them?.nation ?? '')} {them?.pseudo}
-                          {d.is_bot && <span className="ml-1.5 text-[10px] text-white/30 font-normal">Bot</span>}
                         </p>
                         <p className="text-white/30 text-xs mt-0.5 tabular-nums">
                           {myScore ?? 0} — {theirScore ?? 0}

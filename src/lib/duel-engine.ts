@@ -133,10 +133,23 @@ export function pickRewardCard(loserPicks: Card[], winnerPicks: Card[]): Card | 
 }
 
 const BOT_NAMES = [
-  'AlphaBotFC', 'TitanXI', 'OmegaSC', 'NovaCF', 'ApexFF',
-  'ZetaUnited', 'PhoenixFC', 'VortexSC', 'NexusXI', 'CypherCF',
+  'Karim_77', 'DiazXI', 'LeBlanc11', 'Torres_FC', 'Rafinha_CF',
+  'Rodrigo10', 'KDB_Eight', 'VinJr_7', 'Pedri6', 'Bellingham8',
+  'Haaland_9', 'KaneCF', 'SalahEG', 'LukaM_10', 'GriezAntoine',
+  'BenzKB9', 'DeLight_CB', 'Theo_OG', 'Lemar_MG', 'ChoupoMG',
+]
+
+const BOT_NATIONS = [
+  'France', 'Brazil', 'Argentina', 'Spain', 'Germany',
+  'Portugal', 'Morocco', 'USA', 'Japan', 'Senegal',
+  'Croatia', 'Belgium', 'Netherlands', 'Mexico', 'England',
 ]
 
 export function randomBotName(): string {
   return BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)]
+}
+
+export function botNation(name: string): string {
+  const hash = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return BOT_NATIONS[hash % BOT_NATIONS.length]
 }

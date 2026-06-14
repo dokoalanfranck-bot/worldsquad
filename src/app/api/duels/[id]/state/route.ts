@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { botNation } from '@/lib/duel-engine'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: duelId } = await params
@@ -37,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({
     ...duel,
     challenger,
-    opponent: opponent ?? { id: null, pseudo: duel.bot_name ?? 'Bot', nation: '🤖', photo_url: null },
+    opponent: opponent ?? { id: null, pseudo: duel.bot_name ?? 'Joueur', nation: botNation(duel.bot_name ?? 'x'), photo_url: null },
     reward_card: rewardCard,
   })
 }

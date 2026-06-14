@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { BattlesHub } from './BattlesHub'
+import { botNation } from '@/lib/duel-engine'
 import type { Card } from '@/types'
 
 export default async function BattlesPage() {
@@ -37,7 +38,7 @@ export default async function BattlesPage() {
     return {
       ...d,
       challenger: challenger ?? { id: d.challenger_id, pseudo: '?', nation: '', photo_url: null },
-      opponent: opponent ?? { id: null, pseudo: d.bot_name ?? 'Bot', nation: '🤖', photo_url: null },
+      opponent: opponent ?? { id: null, pseudo: d.bot_name ?? 'Joueur', nation: botNation(d.bot_name ?? 'x'), photo_url: null },
       reward_card: rewardCard,
     }
   }))
