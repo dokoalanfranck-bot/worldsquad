@@ -42,6 +42,7 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
   const supabase = createClient()
 
   const [duel, setDuel] = useState<Duel>(initialDuel)
+  const [replaying, setReplaying] = useState(false)
   const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'result'>(() => {
     if (initialDuel.status === 'finished') return 'result'
     if (initialDuel.status === 'picking') return 'picking'
@@ -108,7 +109,24 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
         )}
         {view === 'result' && (
           <ResultView key="result" duel={duel} currentUserId={currentUserId} me={me} them={them}
-            onReplay={() => router.push('/battles')} />
+            replayLoading={replaying}
+            onReplay={async () => {
+              setReplaying(true)
+              try {
+                const res = await fetch('/api/duels/find', { method: 'POST' })
+                const data = await res.json() as { duelId?: string; error?: string }
+                if (!res.ok || !data.duelId) {
+                  toast.error(data.error ?? 'Erreur matchmaking')
+                  setReplaying(false)
+                  return
+                }
+                router.push(`/battles/duel/${data.duelId}`)
+              } catch {
+                toast.error('Erreur réseau')
+                setReplaying(false)
+              }
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -725,8 +743,8 @@ function MatchPitch({ ballPos, challengerPseudo, opponentPseudo }: {
 
 // ── ResultView ────────────────────────────────────────────────────────────────
 
-function ResultView({ duel, currentUserId, me, them, onReplay }: {
-  duel: Duel; currentUserId: string; me: Profile; them: Profile; onReplay: () => void
+function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: {
+  duel: Duel; currentUserId: string; me: Profile; them: Profile; onReplay: () => void; replayLoading?: boolean
 }) {
   const isChallenger = duel.challenger_id === currentUserId
   const winnerId = duel.winner_id as string | null
@@ -823,10 +841,14 @@ function ResultView({ duel, currentUserId, me, them, onReplay }: {
       >
         <button
           onClick={onReplay}
-          className="flex-1 bg-[#F5C518] text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
+          disabled={replayLoading}
+          className="flex-1 bg-[#F5C518] disabled:opacity-60 text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
           style={{ fontFamily: 'Bebas Neue, sans-serif' }}
         >
-          <RotateCcw size={16} /> REJOUER
+          {replayLoading
+            ? <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> RECHERCHE…</>
+            : <><RotateCcw size={16} /> REJOUER</>
+          }
         </button>
         <button
           onClick={() => {

@@ -143,9 +143,9 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
                 {finished.map((d) => {
                   const isChallenger = d.challenger_id === currentUserId
                   const iWon = d.winner_id === currentUserId
-                  const isDraw = !d.winner_id
                   const myScore = isChallenger ? d.challenger_score : d.opponent_score
                   const theirScore = isChallenger ? d.opponent_score : d.challenger_score
+                  const isDraw = !d.winner_id && (myScore ?? 0) === (theirScore ?? 0)
                   const them = isChallenger ? d.opponent : d.challenger
 
                   return (
