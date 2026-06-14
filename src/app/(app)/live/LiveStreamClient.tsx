@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Tv2, RefreshCw } from 'lucide-react'
+import { Tv2, RefreshCw, Play } from 'lucide-react'
 
 function extractYouTubeId(url: string): string | null {
   if (!url) return null
@@ -24,12 +24,14 @@ declare global {
   }
 }
 
-function JitsiViewer({ roomName }: { roomName: string }) {
+function JitsiViewer({ roomName, title }: { roomName: string; title: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const apiRef = useRef<{ dispose: () => void } | null>(null)
+  const [joined, setJoined] = useState(false)
 
   useEffect(() => {
+    if (!joined) return
+
     let script: HTMLScriptElement | null = null
 
     function initJitsi() {
@@ -42,13 +44,18 @@ function JitsiViewer({ roomName }: { roomName: string }) {
         height: '100%',
         parentNode: containerRef.current,
         configOverwrite: {
+          startSilent: true,
           prejoinPageEnabled: false,
+          prejoinConfig: { enabled: false },
           startWithAudioMuted: true,
           startWithVideoMuted: true,
           disableDeepLinking: true,
           disableAudioLevels: true,
           enableNoisyMicDetection: false,
           toolbarButtons: [],
+          hideConferenceTimer: true,
+          hideParticipantsStats: true,
+          disablePolls: true,
         },
         interfaceConfigOverwrite: {
           TOOLBAR_BUTTONS: [],
@@ -57,6 +64,8 @@ function JitsiViewer({ roomName }: { roomName: string }) {
           SHOW_POWERED_BY: false,
           HIDE_INVITE_MORE_HEADER: true,
           DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+          FILM_STRIP_MAX_HEIGHT: 0,
+          DEFAULT_REMOTE_DISPLAY_NAME: 'Admin',
         },
         userInfo: { displayName: 'Spectateur' },
       })
@@ -76,7 +85,31 @@ function JitsiViewer({ roomName }: { roomName: string }) {
       if (apiRef.current) { apiRef.current.dispose(); apiRef.current = null }
       if (script && document.head.contains(script)) document.head.removeChild(script)
     }
-  }, [roomName])
+  }, [joined, roomName])
+
+  if (!joined) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black gap-4">
+        <div className="text-center mb-2">
+          <div className="flex items-center gap-1.5 justify-center mb-3">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <span className="text-red-400 text-[11px] font-bold tracking-widest">EN DIRECT</span>
+          </div>
+          <p className="text-white/60 text-sm">{title}</p>
+        </div>
+        <button
+          onClick={() => setJoined(true)}
+          className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/10 border border-white/20 hover:bg-white/15 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-full bg-red-500/80 flex items-center justify-center">
+            <Play className="w-5 h-5 text-white ml-0.5" />
+          </div>
+          <span className="text-white font-bold text-sm">Regarder le live</span>
+        </button>
+        <p className="text-white/20 text-xs">Partage d&apos;écran en temps réel</p>
+      </div>
+    )
+  }
 
   return <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 }
@@ -171,7 +204,7 @@ export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, stream
         style={{ paddingBottom: '56.25%' }}
       >
         {streamType === 'jitsi' && roomName ? (
-          <JitsiViewer roomName={roomName} />
+          <JitsiViewer roomName={roomName} title={title} />
         ) : (
           <iframe
             src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
