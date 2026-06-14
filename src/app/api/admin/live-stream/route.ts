@@ -10,6 +10,8 @@ export async function GET() {
     title: 'Match en Direct',
     subtitle: null,
     is_active: false,
+    stream_type: 'jitsi',
+    room_name: null,
   })
 }
 
@@ -27,6 +29,8 @@ export async function POST(req: Request) {
     title?: string
     subtitle?: string
     is_active?: boolean
+    stream_type?: string
+    room_name?: string
   }
 
   const admin = createAdminClient()
@@ -36,6 +40,8 @@ export async function POST(req: Request) {
     title: body.title ?? 'Match en Direct',
     subtitle: body.subtitle ?? null,
     is_active: body.is_active ?? false,
+    stream_type: body.stream_type ?? 'jitsi',
+    room_name: body.room_name ?? null,
     updated_at: new Date().toISOString(),
     updated_by: profile.pseudo,
   })

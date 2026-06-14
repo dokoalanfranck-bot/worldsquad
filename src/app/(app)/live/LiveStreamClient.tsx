@@ -22,22 +22,26 @@ interface Props {
   youtubeUrl: string | null
   title: string
   subtitle: string | null
+  streamType: 'jitsi' | 'youtube'
+  roomName: string | null
 }
 
-export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle }: Props) {
+export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, streamType, roomName }: Props) {
   const router = useRouter()
   const videoId = youtubeUrl ? extractYouTubeId(youtubeUrl) : null
+
+  const isReady = isActive && (streamType === 'jitsi' ? !!roomName : !!videoId)
 
   const refresh = useCallback(() => router.refresh(), [router])
 
   // Quand pas de live, on vérifie toutes les 60s au cas où l'admin l'active
   useEffect(() => {
-    if (isActive && videoId) return
+    if (isReady) return
     const t = setInterval(refresh, 60000)
     return () => clearInterval(t)
-  }, [refresh, isActive, videoId])
+  }, [refresh, isReady])
 
-  if (!isActive || !videoId) {
+  if (!isReady) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 pb-32">
         <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/8 flex items-center justify-center mb-6">
@@ -99,24 +103,34 @@ export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle }: Prop
         </div>
       </div>
 
-      {/* YouTube Player (16:9) */}
+      {/* Player (16:9) */}
       <div
         className="relative w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/8"
         style={{ paddingBottom: '56.25%' }}
       >
-        <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          className="absolute inset-0 w-full h-full"
-          title={title}
-        />
+        {streamType === 'jitsi' ? (
+          <iframe
+            src={`https://meet.jit.si/${roomName}#config.startWithVideoMuted=true&config.startWithAudioMuted=true&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.toolbarButtons=[]`}
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full"
+            title={title}
+          />
+        ) : (
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full"
+            title={title}
+          />
+        )}
       </div>
 
-      {/* Footer info */}
+      {/* Footer */}
       <div className="mt-4 flex items-center justify-between text-xs text-white/20">
         <span>Diffusé sur <span className="text-white/35">WorldSquad</span></span>
-        <span>Le stream est géré par l'équipe WorldSquad</span>
+        <span>Le stream est géré par l&apos;équipe WorldSquad</span>
       </div>
     </div>
   )

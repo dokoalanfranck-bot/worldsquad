@@ -2,21 +2,25 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// ── YouTube helpers ────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function extractYouTubeId(url: string): string | null {
   if (!url) return null
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/,
   ]
-  for (const p of patterns) {
-    const m = url.match(p)
-    if (m) return m[1]
-  }
+  for (const p of patterns) { const m = url.match(p); if (m) return m[1] }
   return null
+}
+
+function generateRoomName(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let s = 'ws-live-'
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)]
+  return s
 }
 
 interface StreamConfig {
@@ -24,10 +28,15 @@ interface StreamConfig {
   title: string
   subtitle: string
   is_active: boolean
+  stream_type: 'jitsi' | 'youtube'
+  room_name: string
 }
 
-function YouTubePanel() {
-  const [config, setConfig] = useState<StreamConfig>({ youtube_url: '', title: 'Match en Direct', subtitle: '', is_active: false })
+function StreamPanel() {
+  const [config, setConfig] = useState<StreamConfig>({
+    youtube_url: '', title: 'Match en Direct', subtitle: '',
+    is_active: false, stream_type: 'jitsi', room_name: generateRoomName(),
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
@@ -42,6 +51,8 @@ function YouTubePanel() {
           title: data.title ?? 'Match en Direct',
           subtitle: data.subtitle ?? '',
           is_active: data.is_active ?? false,
+          stream_type: (data.stream_type as 'jitsi' | 'youtube') ?? 'jitsi',
+          room_name: data.room_name ?? generateRoomName(),
         })
         setLoading(false)
       })
@@ -78,7 +89,7 @@ function YouTubePanel() {
       if (!res.ok) throw new Error()
       toast.success(next.is_active ? '🔴 Stream activé — visible par tous les joueurs' : 'Stream désactivé')
     } catch {
-      setConfig(config) // rollback
+      setConfig(config)
       toast.error('Erreur')
     } finally {
       setToggling(false)
@@ -93,17 +104,19 @@ function YouTubePanel() {
     )
   }
 
+  const jitsiUrl = `https://meet.jit.si/${config.room_name}`
+
   return (
     <div className="glass rounded-2xl border border-white/8 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center">
-            <Video className="w-4 h-4 text-red-400" />
+            <Monitor className="w-4 h-4 text-red-400" />
           </div>
           <div>
-            <p className="text-white font-bold text-sm">Stream YouTube</p>
-            <p className="text-white/30 text-xs">Diffuser un live directement sur la plateforme</p>
+            <p className="text-white font-bold text-sm">Stream en Direct</p>
+            <p className="text-white/30 text-xs">Partage d&apos;écran ou live YouTube</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -113,7 +126,6 @@ function YouTubePanel() {
               <span className="text-red-400 text-[10px] font-bold tracking-widest">ACTIF</span>
             </div>
           )}
-          {/* Toggle switch */}
           <button
             onClick={toggle}
             disabled={toggling}
@@ -129,27 +141,122 @@ function YouTubePanel() {
         </div>
       </div>
 
+      {/* Mode tabs */}
+      <div className="flex border-b border-white/5 px-5">
+        {(['jitsi', 'youtube'] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setConfig((s) => ({ ...s, stream_type: m }))}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-colors ${
+              config.stream_type === m
+                ? 'border-[#F5C518] text-[#F5C518]'
+                : 'border-transparent text-white/30 hover:text-white/55'
+            }`}
+          >
+            {m === 'jitsi'
+              ? <><Monitor className="w-3.5 h-3.5" /> Partage Écran (Jitsi)</>
+              : <><Video className="w-3.5 h-3.5" /> YouTube</>
+            }
+          </button>
+        ))}
+      </div>
+
       {/* Body */}
-      <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Form */}
-        <div className="space-y-3">
-          <div>
-            <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
-              URL YouTube du live
-            </label>
-            <input
-              value={config.youtube_url}
-              onChange={(e) => setConfig((s) => ({ ...s, youtube_url: e.target.value }))}
-              placeholder="https://youtube.com/watch?v=... ou https://youtu.be/..."
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-red-500/40 transition-colors"
-            />
-            {config.youtube_url && (
-              <p className={`text-xs mt-1 ${videoId ? 'text-green-400/70' : 'text-red-400/70'}`}>
-                {videoId ? `✓ ID détecté : ${videoId}` : '✗ URL YouTube non reconnue'}
-              </p>
+      <div className="p-5 space-y-4">
+        {config.stream_type === 'jitsi' ? (
+          <div className="space-y-3">
+            <div>
+              <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+                Nom de la salle Jitsi
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={config.room_name}
+                  onChange={(e) => setConfig((s) => ({ ...s, room_name: e.target.value }))}
+                  placeholder="ws-live-abc12345"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-[#F5C518]/40 transition-colors font-mono"
+                />
+                <button
+                  onClick={() => setConfig((s) => ({ ...s, room_name: generateRoomName() }))}
+                  title="Générer un nouveau nom"
+                  className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <a
+              href={jitsiUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-blue-500/15 border border-blue-500/25 text-blue-300 hover:bg-blue-500/25 font-bold text-sm transition-colors"
+            >
+              <Monitor className="w-4 h-4" />
+              Ouvrir Jitsi et partager mon écran
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            <div className="bg-white/3 border border-white/6 rounded-xl p-3.5 space-y-1.5">
+              <p className="text-white/50 text-xs font-bold mb-2">Comment ça marche :</p>
+              <p className="text-white/30 text-[11px] leading-relaxed">1. Clique &quot;Ouvrir Jitsi&quot; → une salle s&apos;ouvre dans un nouvel onglet</p>
+              <p className="text-white/30 text-[11px] leading-relaxed">2. Dans Jitsi, clique <span className="text-white/50 font-medium">Partager l&apos;écran</span> et sélectionne la fenêtre BeIN Sports</p>
+              <p className="text-white/30 text-[11px] leading-relaxed">3. Sauvegarde puis active le toggle → les joueurs verront ton stream sur /live</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+                URL YouTube du live
+              </label>
+              <input
+                value={config.youtube_url}
+                onChange={(e) => setConfig((s) => ({ ...s, youtube_url: e.target.value }))}
+                placeholder="https://youtube.com/watch?v=... ou https://youtu.be/..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-red-500/40 transition-colors"
+              />
+              {config.youtube_url && (
+                <p className={`text-xs mt-1 ${videoId ? 'text-green-400/70' : 'text-red-400/70'}`}>
+                  {videoId ? `✓ ID détecté : ${videoId}` : '✗ URL YouTube non reconnue'}
+                </p>
+              )}
+            </div>
+            {videoId ? (
+              <div className="relative rounded-xl overflow-hidden bg-black border border-white/8" style={{ paddingBottom: '56.25%' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+                  alt="YouTube thumbnail"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    if (!target.src.includes('hqdefault')) {
+                      target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                    }
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <div className="w-14 h-14 rounded-full bg-red-500/80 backdrop-blur-sm flex items-center justify-center">
+                    <Play className="w-6 h-6 text-white ml-1" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="relative rounded-xl bg-white/3 border border-white/6 flex items-center justify-center" style={{ paddingBottom: '56.25%' }}>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <Video className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                    <p className="text-white/20 text-xs">Colle une URL YouTube valide</p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
+        )}
 
+        {/* Common: Title, Subtitle, Save, View */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1 border-t border-white/5">
           <div>
             <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
               Titre du live
@@ -161,7 +268,6 @@ function YouTubePanel() {
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
             />
           </div>
-
           <div>
             <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
               Sous-titre (optionnel)
@@ -173,82 +279,26 @@ function YouTubePanel() {
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
             />
           </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="flex-1 py-2.5 rounded-xl bg-[#F5C518] text-black font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#FFD700] transition-colors"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              SAUVEGARDER
-            </button>
-            <a
-              href="/live"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 text-sm flex items-center gap-2 transition-colors"
-            >
-              <Eye className="w-4 h-4" />
-              Voir
-            </a>
-          </div>
-
-          <p className="text-white/20 text-[10px] leading-relaxed">
-            Après sauvegarde, active le toggle pour rendre le stream visible aux joueurs.
-            {!videoId && config.youtube_url && ' ⚠️ Vérifie l\'URL avant d\'activer.'}
-          </p>
         </div>
 
-        {/* Preview */}
-        <div>
-          <p className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            {config.is_active ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3" />}
-            Aperçu {config.is_active ? '— visible par les joueurs' : '— non visible'}
-          </p>
-          {videoId ? (
-            <div className="relative rounded-xl overflow-hidden bg-black border border-white/8" style={{ paddingBottom: '56.25%' }}>
-              {/* Thumbnail */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
-                alt="YouTube thumbnail"
-                className="absolute inset-0 w-full h-full object-cover"
-                onError={(e) => {
-                  // fallback to hqdefault if maxresdefault doesn't exist
-                  const target = e.target as HTMLImageElement
-                  if (!target.src.includes('hqdefault')) {
-                    target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-                  }
-                }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <div className="w-14 h-14 rounded-full bg-red-500/80 backdrop-blur-sm flex items-center justify-center">
-                  <Play className="w-6 h-6 text-white ml-1" />
-                </div>
-              </div>
-              {config.is_active && (
-                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  EN DIRECT
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="relative rounded-xl bg-white/3 border border-white/6 flex items-center justify-center" style={{ paddingBottom: '56.25%' }}>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <Video className="w-8 h-8 text-white/10 mx-auto mb-2" />
-                  <p className="text-white/20 text-xs">Colle une URL YouTube valide</p>
-                </div>
-              </div>
-            </div>
-          )}
-          {videoId && (
-            <p className="text-white/20 text-[10px] mt-2 text-center">
-              Miniature · L&apos;embed sera visible après activation
-            </p>
-          )}
+        <div className="flex gap-2">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-[#F5C518] text-black font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#FFD700] transition-colors"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            SAUVEGARDER
+          </button>
+          <a
+            href="/live"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 text-sm flex items-center gap-2 transition-colors"
+          >
+            <Eye className="w-4 h-4" />
+            Voir
+          </a>
         </div>
       </div>
     </div>
@@ -632,8 +682,8 @@ export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled }:
         </div>
       </div>
 
-      {/* YouTube Stream panel */}
-      <YouTubePanel />
+      {/* Stream panel */}
+      <StreamPanel />
 
       {/* Status bar */}
       <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border ${

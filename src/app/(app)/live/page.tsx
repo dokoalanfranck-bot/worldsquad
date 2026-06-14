@@ -7,7 +7,7 @@ export default async function LivePage() {
   const admin = createAdminClient()
   const { data: config } = await admin
     .from('live_config')
-    .select('youtube_url, title, subtitle, is_active, updated_by, updated_at')
+    .select('youtube_url, title, subtitle, is_active, stream_type, room_name')
     .eq('id', 1)
     .single()
 
@@ -17,6 +17,8 @@ export default async function LivePage() {
       youtubeUrl={config?.youtube_url ?? null}
       title={config?.title ?? 'Match en Direct'}
       subtitle={config?.subtitle ?? null}
+      streamType={(config?.stream_type as 'jitsi' | 'youtube') ?? 'jitsi'}
+      roomName={config?.room_name ?? null}
     />
   )
 }

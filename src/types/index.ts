@@ -158,7 +158,7 @@ export const PACK_CONFIGS = {
   common: {
     name: 'Pack Découverte',
     cost: 100,
-    cards: 3,
+    cards: 5,
     odds: { Common: 0.70, Rare: 0.25, Epic: 0.05, Legend: 0.00 },
     color: '#9CA3AF',
     icon: '📦',
@@ -166,7 +166,7 @@ export const PACK_CONFIGS = {
   rare: {
     name: 'Pack Pro',
     cost: 300,
-    cards: 3,
+    cards: 5,
     odds: { Common: 0.05, Rare: 0.45, Epic: 0.40, Legend: 0.10 },
     color: '#00D4FF',
     icon: '💎',
@@ -174,7 +174,7 @@ export const PACK_CONFIGS = {
   elite: {
     name: 'Pack Élite',
     cost: 800,
-    cards: 5,
+    cards: 8,
     odds: { Common: 0.23, Rare: 0.32, Epic: 0.62, Legend: 0.23 },
     color: '#A855F7',
     icon: '👑',
@@ -182,7 +182,7 @@ export const PACK_CONFIGS = {
   legend: {
     name: 'Pack Légendaire',
     cost: 5000,
-    cards: 5,
+    cards: 8,
     odds: { Common: 0.32, Rare: 0.30, Epic: 0.33, Legend: 0.65 },
     color: '#F5C518',
     icon: '⚡',
