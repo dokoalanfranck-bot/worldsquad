@@ -2,8 +2,258 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Play, Square, Plus, Minus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+// ── YouTube helpers ────────────────────────────────────────────────────────────
+function extractYouTubeId(url: string): string | null {
+  if (!url) return null
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
+interface StreamConfig {
+  youtube_url: string
+  title: string
+  subtitle: string
+  is_active: boolean
+}
+
+function YouTubePanel() {
+  const [config, setConfig] = useState<StreamConfig>({ youtube_url: '', title: 'Match en Direct', subtitle: '', is_active: false })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [toggling, setToggling] = useState(false)
+  const videoId = extractYouTubeId(config.youtube_url)
+
+  useEffect(() => {
+    fetch('/api/admin/live-stream')
+      .then((r) => r.json())
+      .then((data: Partial<StreamConfig>) => {
+        setConfig({
+          youtube_url: data.youtube_url ?? '',
+          title: data.title ?? 'Match en Direct',
+          subtitle: data.subtitle ?? '',
+          is_active: data.is_active ?? false,
+        })
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/live-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('✓ Configuration sauvegardée')
+    } catch {
+      toast.error('Erreur de sauvegarde')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggle() {
+    const next = { ...config, is_active: !config.is_active }
+    setConfig(next)
+    setToggling(true)
+    try {
+      const res = await fetch('/api/admin/live-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(next.is_active ? '🔴 Stream activé — visible par tous les joueurs' : 'Stream désactivé')
+    } catch {
+      setConfig(config) // rollback
+      toast.error('Erreur')
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="glass rounded-2xl border border-white/8 p-6 flex items-center justify-center">
+        <Loader2 className="w-5 h-5 text-white/30 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="glass rounded-2xl border border-white/8 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center">
+            <Video className="w-4 h-4 text-red-400" />
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm">Stream YouTube</p>
+            <p className="text-white/30 text-xs">Diffuser un live directement sur la plateforme</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {config.is_active && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/25">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+              <span className="text-red-400 text-[10px] font-bold tracking-widest">ACTIF</span>
+            </div>
+          )}
+          {/* Toggle switch */}
+          <button
+            onClick={toggle}
+            disabled={toggling}
+            title={config.is_active ? 'Désactiver le stream' : 'Activer le stream'}
+            className={`relative w-12 h-6 rounded-full transition-all duration-300 disabled:opacity-50 ${
+              config.is_active ? 'bg-red-500' : 'bg-white/10'
+            }`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 ${
+              config.is_active ? 'left-7' : 'left-1'
+            }`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Form */}
+        <div className="space-y-3">
+          <div>
+            <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+              URL YouTube du live
+            </label>
+            <input
+              value={config.youtube_url}
+              onChange={(e) => setConfig((s) => ({ ...s, youtube_url: e.target.value }))}
+              placeholder="https://youtube.com/watch?v=... ou https://youtu.be/..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-red-500/40 transition-colors"
+            />
+            {config.youtube_url && (
+              <p className={`text-xs mt-1 ${videoId ? 'text-green-400/70' : 'text-red-400/70'}`}>
+                {videoId ? `✓ ID détecté : ${videoId}` : '✗ URL YouTube non reconnue'}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+              Titre du live
+            </label>
+            <input
+              value={config.title}
+              onChange={(e) => setConfig((s) => ({ ...s, title: e.target.value }))}
+              placeholder="Match en Direct"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+              Sous-titre (optionnel)
+            </label>
+            <input
+              value={config.subtitle}
+              onChange={(e) => setConfig((s) => ({ ...s, subtitle: e.target.value }))}
+              placeholder="France 🇫🇷 vs 🇪🇸 Espagne · Demi-finale"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex-1 py-2.5 rounded-xl bg-[#F5C518] text-black font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#FFD700] transition-colors"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              SAUVEGARDER
+            </button>
+            <a
+              href="/live"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 text-sm flex items-center gap-2 transition-colors"
+            >
+              <Eye className="w-4 h-4" />
+              Voir
+            </a>
+          </div>
+
+          <p className="text-white/20 text-[10px] leading-relaxed">
+            Après sauvegarde, active le toggle pour rendre le stream visible aux joueurs.
+            {!videoId && config.youtube_url && ' ⚠️ Vérifie l\'URL avant d\'activer.'}
+          </p>
+        </div>
+
+        {/* Preview */}
+        <div>
+          <p className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
+            {config.is_active ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3" />}
+            Aperçu {config.is_active ? '— visible par les joueurs' : '— non visible'}
+          </p>
+          {videoId ? (
+            <div className="relative rounded-xl overflow-hidden bg-black border border-white/8" style={{ paddingBottom: '56.25%' }}>
+              {/* Thumbnail */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+                alt="YouTube thumbnail"
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => {
+                  // fallback to hqdefault if maxresdefault doesn't exist
+                  const target = e.target as HTMLImageElement
+                  if (!target.src.includes('hqdefault')) {
+                    target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                  }
+                }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <div className="w-14 h-14 rounded-full bg-red-500/80 backdrop-blur-sm flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white ml-1" />
+                </div>
+              </div>
+              {config.is_active && (
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  EN DIRECT
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="relative rounded-xl bg-white/3 border border-white/6 flex items-center justify-center" style={{ paddingBottom: '56.25%' }}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <Video className="w-8 h-8 text-white/10 mx-auto mb-2" />
+                  <p className="text-white/20 text-xs">Colle une URL YouTube valide</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {videoId && (
+            <p className="text-white/20 text-[10px] mt-2 text-center">
+              Miniature · L&apos;embed sera visible après activation
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 interface Match {
   id: string
@@ -381,6 +631,9 @@ export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled }:
           <span>Push automatique activé sur chaque action</span>
         </div>
       </div>
+
+      {/* YouTube Stream panel */}
+      <YouTubePanel />
 
       {/* Status bar */}
       <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border ${

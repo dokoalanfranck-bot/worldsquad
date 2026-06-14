@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Calendar, Layers, Swords, Users,
   Trophy, ShoppingBag, Settings, Crown, Globe, Gift,
-  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard, Repeat2,
+  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard, Repeat2, Radio,
 } from 'lucide-react'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User } from '@/types'
@@ -15,6 +15,7 @@ import type { User } from '@/types'
 const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
   { href: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/matches',     icon: Calendar,        label: 'Matchs & Pronostics' },
+  { href: '/live',        icon: Radio,           label: 'Match en Direct' },
   { href: '/collection',  icon: Layers,          label: 'Ma Collection' },
   { href: '/doublons',    icon: Repeat2,         label: 'Vendre Doublons' },
   { href: '/battles',     icon: Swords,          label: 'Battles' },
@@ -35,6 +36,7 @@ const MOBILE_RIGHT = [
 
 // Items shown inside the burger drawer
 const DRAWER_ITEMS: { href: string; icon: LucideIcon; label: string; color?: string }[] = [
+  { href: '/live',         icon: Radio,        label: 'Match en Direct' },
   { href: '/battles',      icon: Swords,       label: 'Battles' },
   { href: '/doublons',     icon: Repeat2,      label: 'Vendre Doublons' },
   { href: '/group',        icon: Users,        label: 'Mon Groupe' },
