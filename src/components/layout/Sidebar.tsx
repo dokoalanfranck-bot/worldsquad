@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Calendar, Layers, Swords, Users,
   Trophy, ShoppingBag, Settings, Crown, Globe, Gift,
-  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard,
+  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard, Repeat2,
 } from 'lucide-react'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User } from '@/types'
@@ -16,6 +16,7 @@ const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
   { href: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/matches',     icon: Calendar,        label: 'Matchs & Pronostics' },
   { href: '/collection',  icon: Layers,          label: 'Ma Collection' },
+  { href: '/doublons',    icon: Repeat2,         label: 'Vendre Doublons' },
   { href: '/battles',     icon: Swords,          label: 'Battles' },
   { href: '/group',       icon: Users,           label: 'Mon Groupe' },
   { href: '/leaderboard', icon: Trophy,          label: 'Classement' },
@@ -34,12 +35,13 @@ const MOBILE_RIGHT = [
 
 // Items shown inside the burger drawer
 const DRAWER_ITEMS: { href: string; icon: LucideIcon; label: string; color?: string }[] = [
-  { href: '/battles',     icon: Swords,       label: 'Battles' },
-  { href: '/group',       icon: Users,        label: 'Mon Groupe' },
-  { href: '/leaderboard', icon: Trophy,       label: 'Classement' },
-  { href: '/shop',        icon: ShoppingBag,  label: 'Boutique' },
+  { href: '/battles',      icon: Swords,       label: 'Battles' },
+  { href: '/doublons',     icon: Repeat2,      label: 'Vendre Doublons' },
+  { href: '/group',        icon: Users,        label: 'Mon Groupe' },
+  { href: '/leaderboard',  icon: Trophy,       label: 'Classement' },
+  { href: '/shop',         icon: ShoppingBag,  label: 'Boutique' },
   { href: '/supporter-card', icon: CreditCard, label: 'Ma Carte Supporter' },
-  { href: '/settings',    icon: Settings,     label: 'Paramètres' },
+  { href: '/settings',     icon: Settings,     label: 'Paramètres' },
 ]
 
 interface SidebarProps { user: User }
