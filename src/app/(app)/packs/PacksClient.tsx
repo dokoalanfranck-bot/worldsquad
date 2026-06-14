@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Globe, ChevronRight, Sparkles } from 'lucide-react'
 import { GameCard } from '@/components/ui/Card'
@@ -19,7 +19,29 @@ function vibrate(pattern: number | number[]) {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern)
 }
 
+// ── Card back face (fixed 96×136 = sm GameCard dimensions) ──────────────────
+function CardBack() {
+  return (
+    <div
+      className="rounded-xl flex flex-col overflow-hidden border-2 border-[#F5C518]/25 flex-shrink-0"
+      style={{ width: 96, height: 136, background: 'linear-gradient(160deg, #0A1F3D, #060F1A)' }}
+    >
+      <div className="h-1.5 w-full flex-shrink-0" style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518)' }} />
+      <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
+        <div className="w-7 h-7 rounded-full border border-[#F5C518]/40 flex items-center justify-center mb-0.5">
+          <Globe size={12} className="text-[#F5C518]/60" />
+        </div>
+        <div className="text-[#F5C518]/50 font-black text-[10px]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
+        <div className="text-[#F5C518]/50 font-black text-[10px]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
+        <div className="text-white/15 font-bold text-[8px] mt-0.5">2026</div>
+      </div>
+      <div className="h-1.5 w-full flex-shrink-0" style={{ background: 'linear-gradient(90deg, #F5C518, #C8102E)' }} />
+    </div>
+  )
+}
+
 // ── Single card (face-down until tapped) ────────────────────────────────────
+// Uses scaleX flip instead of CSS 3D (backface-visibility unreliable on iOS Safari)
 function TapRevealCard({
   card,
   isActive,
@@ -34,6 +56,23 @@ function TapRevealCard({
   const isSpecial = card.rarity === 'Epic' || card.rarity === 'Legend'
   const particleCount = card.rarity === 'Legend' ? 14 : 10
   const particleRadius = card.rarity === 'Legend' ? 75 : 52
+
+  // Flip state: back → compressing → front
+  // We keep internal showFront so the back is shown initially without any flash
+  const [showFront, setShowFront] = useState(isRevealed)
+  const [compressing, setCompressing] = useState(false)
+
+  useEffect(() => {
+    if (!isRevealed || showFront) return
+    // Phase 1: compress to 0 (150ms)
+    setCompressing(true)
+    const t = setTimeout(() => {
+      // Phase 2: switch content while flat
+      setShowFront(true)
+      setCompressing(false)
+    }, 160)
+    return () => clearTimeout(t)
+  }, [isRevealed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <motion.div
@@ -60,7 +99,7 @@ function TapRevealCard({
 
       {/* Particle burst on reveal */}
       <AnimatePresence>
-        {isRevealed && isSpecial && (
+        {showFront && isSpecial && (
           <>
             {Array.from({ length: particleCount }).map((_, i) => (
               <motion.div
@@ -83,7 +122,7 @@ function TapRevealCard({
 
       {/* Rarity badge pop */}
       <AnimatePresence>
-        {isRevealed && isSpecial && (
+        {showFront && isSpecial && (
           <motion.div
             initial={{ opacity: 0, y: -6, scale: 0.8 }}
             animate={{ opacity: 1, y: -24, scale: 1 }}
@@ -101,40 +140,21 @@ function TapRevealCard({
         )}
       </AnimatePresence>
 
-      {/* 3D flip */}
+      {/* scaleX flip — fiable sur iOS Safari contrairement au CSS 3D */}
       <motion.div
+        animate={{ scaleX: compressing ? 0 : 1 }}
+        transition={{ duration: 0.16, ease: 'easeIn' }}
         style={{
-          transformStyle: 'preserve-3d',
-          boxShadow: isRevealed ? RARITY_GLOW[card.rarity] : 'none',
           borderRadius: '0.75rem',
-          transition: 'box-shadow 0.4s ease',
+          boxShadow: showFront ? RARITY_GLOW[card.rarity] : 'none',
+          transition: 'box-shadow 0.3s ease',
         }}
-        animate={{ rotateY: isRevealed ? 0 : 180 }}
-        transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
       >
-        {/* Front */}
-        <div style={{ backfaceVisibility: 'hidden' }}>
+        {showFront ? (
           <GameCard card={card} owned size="sm" />
-        </div>
-        {/* Back */}
-        <div
-          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', position: 'absolute', inset: 0 }}
-          className="rounded-xl flex flex-col overflow-hidden border-2 border-[#F5C518]/25"
-        >
-          <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #C8102E, #F5C518)' }} />
-          <div
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 p-1.5"
-            style={{ background: 'linear-gradient(160deg, #0A1F3D, #060F1A)' }}
-          >
-            <div className="w-7 h-7 rounded-full border border-[#F5C518]/40 flex items-center justify-center mb-0.5">
-              <Globe size={12} className="text-[#F5C518]/60" />
-            </div>
-            <div className="text-[#F5C518]/50 font-black text-[10px]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>WORLD</div>
-            <div className="text-[#F5C518]/50 font-black text-[10px]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>SQUAD</div>
-            <div className="text-white/15 font-bold text-[8px] mt-0.5">2026</div>
-          </div>
-          <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #F5C518, #C8102E)' }} />
-        </div>
+        ) : (
+          <CardBack />
+        )}
       </motion.div>
 
       {/* "Tap" hint */}
