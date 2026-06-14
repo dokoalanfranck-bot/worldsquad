@@ -21,7 +21,7 @@ async function pickCard(
 ): Promise<Card | null> {
   const buildQuery = (exclude: Set<string>) => {
     let q = supabase.from('cards').select('id').eq('rarity', rarity).eq('type', 'player')
-    if (exclude.size > 0) q = q.not('id', 'in', `(${[...exclude].join(',')})`)
+    if (exclude.size > 0) q = q.not('id', 'in', `(${Array.from(exclude).join(',')})`)
     return q
   }
 
@@ -63,7 +63,7 @@ export async function openPack(
     // Legends locked below 70% global progression
     if (rarity === 'Legend' && globalProgression < 70) rarity = 'Epic'
 
-    const excludeIds = new Set([...ownedIds, ...packCardIds])
+    const excludeIds = new Set(Array.from(ownedIds).concat(Array.from(packCardIds)))
     const card = await pickCard(supabase, rarity, excludeIds)
     if (card) {
       cards.push(card)
