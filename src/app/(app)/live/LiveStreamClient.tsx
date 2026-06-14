@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tv2, RefreshCw } from 'lucide-react'
 
@@ -17,6 +17,70 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    JitsiMeetExternalAPI: new (domain: string, options: Record<string, any>) => { dispose: () => void }
+  }
+}
+
+function JitsiViewer({ roomName }: { roomName: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const apiRef = useRef<{ dispose: () => void } | null>(null)
+
+  useEffect(() => {
+    let script: HTMLScriptElement | null = null
+
+    function initJitsi() {
+      if (!containerRef.current || !window.JitsiMeetExternalAPI) return
+      if (apiRef.current) { apiRef.current.dispose(); apiRef.current = null }
+
+      apiRef.current = new window.JitsiMeetExternalAPI('meet.jit.si', {
+        roomName,
+        width: '100%',
+        height: '100%',
+        parentNode: containerRef.current,
+        configOverwrite: {
+          prejoinPageEnabled: false,
+          startWithAudioMuted: true,
+          startWithVideoMuted: true,
+          disableDeepLinking: true,
+          disableAudioLevels: true,
+          enableNoisyMicDetection: false,
+          toolbarButtons: [],
+        },
+        interfaceConfigOverwrite: {
+          TOOLBAR_BUTTONS: [],
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_BRAND_WATERMARK: false,
+          SHOW_POWERED_BY: false,
+          HIDE_INVITE_MORE_HEADER: true,
+          DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+        },
+        userInfo: { displayName: 'Spectateur' },
+      })
+    }
+
+    if (window.JitsiMeetExternalAPI) {
+      initJitsi()
+    } else {
+      script = document.createElement('script')
+      script.src = 'https://meet.jit.si/external_api.js'
+      script.async = true
+      script.onload = initJitsi
+      document.head.appendChild(script)
+    }
+
+    return () => {
+      if (apiRef.current) { apiRef.current.dispose(); apiRef.current = null }
+      if (script && document.head.contains(script)) document.head.removeChild(script)
+    }
+  }, [roomName])
+
+  return <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+}
+
 interface Props {
   isActive: boolean
   youtubeUrl: string | null
@@ -29,12 +93,10 @@ interface Props {
 export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, streamType, roomName }: Props) {
   const router = useRouter()
   const videoId = youtubeUrl ? extractYouTubeId(youtubeUrl) : null
-
   const isReady = isActive && (streamType === 'jitsi' ? !!roomName : !!videoId)
 
   const refresh = useCallback(() => router.refresh(), [router])
 
-  // Quand pas de live, on vérifie toutes les 60s au cas où l'admin l'active
   useEffect(() => {
     if (isReady) return
     const t = setInterval(refresh, 60000)
@@ -108,14 +170,8 @@ export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, stream
         className="relative w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/8"
         style={{ paddingBottom: '56.25%' }}
       >
-        {streamType === 'jitsi' ? (
-          <iframe
-            src={`https://meet.jit.si/${roomName}#config.startWithVideoMuted=true&config.startWithAudioMuted=true&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.toolbarButtons=[]`}
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
-            allowFullScreen
-            className="absolute inset-0 w-full h-full"
-            title={title}
-          />
+        {streamType === 'jitsi' && roomName ? (
+          <JitsiViewer roomName={roomName} />
         ) : (
           <iframe
             src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
