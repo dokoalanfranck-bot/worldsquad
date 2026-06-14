@@ -26,7 +26,7 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.thesportsdb.com https://fonts.googleapis.com https://fonts.gstatic.com https://meet.jit.si wss://meet.jit.si",
-              "frame-src 'self' https://meet.jit.si https://www.youtube.com https://www.youtube-nocookie.com",
+              "frame-src 'self' https://meet.jit.si https://www.youtube.com https://www.youtube-nocookie.com https://player.twitch.tv",
               "media-src 'self' blob:",
               "worker-src 'self' blob:",
             ].join('; '),

@@ -145,6 +145,22 @@ function CountdownScreen({
   )
 }
 
+// ── Twitch player ─────────────────────────────────────────────────────────────
+function TwitchPlayer({ channel, title }: { channel: string; title: string }) {
+  const [parent, setParent] = useState('')
+  useEffect(() => { setParent(window.location.hostname) }, [])
+  if (!parent) return null
+  return (
+    <iframe
+      src={`https://player.twitch.tv/?channel=${channel}&parent=${parent}&autoplay=true`}
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+      className="absolute inset-0 w-full h-full"
+      title={title}
+    />
+  )
+}
+
 // ── Jitsi viewer ───────────────────────────────────────────────────────────────
 function JitsiViewer({ roomName, title, thumbnailUrl }: { roomName: string; title: string; thumbnailUrl: string | null }) {
   const [joined, setJoined] = useState(false)
@@ -200,16 +216,21 @@ interface Props {
   youtubeUrl: string | null
   title: string
   subtitle: string | null
-  streamType: 'jitsi' | 'youtube'
+  streamType: 'jitsi' | 'youtube' | 'twitch'
   roomName: string | null
   thumbnailUrl: string | null
   startsAt: string | null
+  twitchChannel: string | null
 }
 
-export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, streamType, roomName, thumbnailUrl, startsAt }: Props) {
+export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, streamType, roomName, thumbnailUrl, startsAt, twitchChannel }: Props) {
   const router = useRouter()
   const videoId = youtubeUrl ? extractYouTubeId(youtubeUrl) : null
-  const isReady = isActive && (streamType === 'jitsi' ? !!roomName : !!videoId)
+  const isReady = isActive && (
+    streamType === 'twitch'  ? !!twitchChannel :
+    streamType === 'jitsi'   ? !!roomName :
+    !!videoId
+  )
 
   const refresh = useCallback(() => router.refresh(), [router])
 
@@ -282,7 +303,9 @@ export function LiveStreamClient({ isActive, youtubeUrl, title, subtitle, stream
           className="relative w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/8"
           style={{ paddingBottom: '56.25%' }}
         >
-          {streamType === 'jitsi' && roomName ? (
+          {streamType === 'twitch' && twitchChannel ? (
+            <TwitchPlayer channel={twitchChannel} title={title} />
+          ) : streamType === 'jitsi' && roomName ? (
             <JitsiViewer roomName={roomName} title={title} thumbnailUrl={thumbnailUrl} />
           ) : (
             <iframe

@@ -14,6 +14,7 @@ export async function GET() {
     room_name: null,
     thumbnail_url: null,
     starts_at: null,
+    twitch_channel: null,
   })
 }
 
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
     room_name?: string
     thumbnail_url?: string
     starts_at?: string | null
+    twitch_channel?: string
   }
 
   const admin = createAdminClient()
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
     room_name: body.room_name ?? null,
     thumbnail_url: body.thumbnail_url ?? null,
     starts_at: body.starts_at ?? null,
+    twitch_channel: body.twitch_channel ?? null,
     updated_at: new Date().toISOString(),
     updated_by: profile.pseudo,
   })

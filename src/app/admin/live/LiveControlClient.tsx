@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload, Users } from 'lucide-react'
+import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload, Users, Tv } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -35,17 +35,18 @@ interface StreamConfig {
   title: string
   subtitle: string
   is_active: boolean
-  stream_type: 'jitsi' | 'youtube'
+  stream_type: 'jitsi' | 'youtube' | 'twitch'
   room_name: string
   thumbnail_url: string
   starts_at: string
+  twitch_channel: string
 }
 
 function StreamPanel() {
   const [config, setConfig] = useState<StreamConfig>({
     youtube_url: '', title: 'Match en Direct', subtitle: '',
     is_active: false, stream_type: 'jitsi', room_name: generateRoomName(),
-    thumbnail_url: '', starts_at: '',
+    thumbnail_url: '', starts_at: '', twitch_channel: '',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -94,10 +95,11 @@ function StreamPanel() {
           title: data.title ?? 'Match en Direct',
           subtitle: data.subtitle ?? '',
           is_active: data.is_active ?? false,
-          stream_type: (data.stream_type as 'jitsi' | 'youtube') ?? 'jitsi',
+          stream_type: (data.stream_type as 'jitsi' | 'youtube' | 'twitch') ?? 'jitsi',
           room_name: data.room_name ?? generateRoomName(),
           thumbnail_url: data.thumbnail_url ?? '',
           starts_at: data.starts_at ? toLocalInput(data.starts_at) : '',
+          twitch_channel: data.twitch_channel ?? '',
         })
         setLoading(false)
       })
@@ -204,28 +206,67 @@ function StreamPanel() {
       </div>
 
       {/* Mode tabs */}
-      <div className="flex border-b border-white/5 px-5">
-        {(['jitsi', 'youtube'] as const).map((m) => (
+      <div className="flex border-b border-white/5 px-5 overflow-x-auto">
+        {([
+          { id: 'twitch',  icon: <Tv className="w-3.5 h-3.5" />,      label: 'Twitch (OBS)' },
+          { id: 'jitsi',   icon: <Monitor className="w-3.5 h-3.5" />, label: 'Partage Écran' },
+          { id: 'youtube', icon: <Video className="w-3.5 h-3.5" />,   label: 'YouTube' },
+        ] as const).map(({ id, icon, label }) => (
           <button
-            key={m}
-            onClick={() => setConfig((s) => ({ ...s, stream_type: m }))}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-colors ${
-              config.stream_type === m
+            key={id}
+            onClick={() => setConfig((s) => ({ ...s, stream_type: id }))}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
+              config.stream_type === id
                 ? 'border-[#F5C518] text-[#F5C518]'
                 : 'border-transparent text-white/30 hover:text-white/55'
             }`}
           >
-            {m === 'jitsi'
-              ? <><Monitor className="w-3.5 h-3.5" /> Partage Écran (Jitsi)</>
-              : <><Video className="w-3.5 h-3.5" /> YouTube</>
-            }
+            {icon} {label}
           </button>
         ))}
       </div>
 
       {/* Body */}
       <div className="p-5 space-y-4">
-        {config.stream_type === 'jitsi' ? (
+        {config.stream_type === 'twitch' ? (
+          <div className="space-y-3">
+            <div>
+              <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
+                Nom de la chaîne Twitch
+              </label>
+              <input
+                value={config.twitch_channel}
+                onChange={(e) => setConfig((s) => ({ ...s, twitch_channel: e.target.value.trim() }))}
+                placeholder="nom_de_la_chaine"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-purple-500/40 transition-colors font-mono"
+              />
+              {config.twitch_channel && (
+                <p className="text-green-400/70 text-xs mt-1">
+                  ✓ twitch.tv/{config.twitch_channel}
+                </p>
+              )}
+            </div>
+
+            <a
+              href="https://www.twitch.tv/settings/profile"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-purple-500/15 border border-purple-500/25 text-purple-300 hover:bg-purple-500/25 font-bold text-sm transition-colors"
+            >
+              <Tv className="w-4 h-4" />
+              Aller sur Twitch pour la clé de stream
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            <div className="bg-white/3 border border-white/6 rounded-xl p-3.5 space-y-1.5">
+              <p className="text-white/50 text-xs font-bold mb-2">Setup OBS → Twitch :</p>
+              <p className="text-white/30 text-[11px] leading-relaxed">1. Dans OBS : <span className="text-white/50 font-medium">Paramètres → Stream → Service: Twitch</span></p>
+              <p className="text-white/30 text-[11px] leading-relaxed">2. Colle ta <span className="text-white/50 font-medium">Clé de stream</span> depuis twitch.tv/settings/profile</p>
+              <p className="text-white/30 text-[11px] leading-relaxed">3. Lance le stream OBS → entre le nom de chaîne ci-dessus → Sauvegarde + active</p>
+              <p className="text-white/30 text-[11px] leading-relaxed">4. Les joueurs verront le player Twitch embarqué sur /live — CDN mondial, 0 bande passante côté admin</p>
+            </div>
+          </div>
+        ) : config.stream_type === 'jitsi' ? (
           <div className="space-y-3">
             <div>
               <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
