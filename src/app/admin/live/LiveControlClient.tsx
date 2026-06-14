@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw } from 'lucide-react'
+import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -50,7 +50,26 @@ function StreamPanel() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const videoId = extractYouTubeId(config.youtube_url)
+
+  async function uploadThumbnail(file: File) {
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/upload-thumbnail', { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+      const { url } = await res.json() as { url: string }
+      setConfig((s) => ({ ...s, thumbnail_url: url }))
+      toast.success('✓ Miniature uploadée')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erreur upload')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   useEffect(() => {
     fetch('/api/admin/live-stream')
@@ -303,20 +322,41 @@ function StreamPanel() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div>
             <label className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
-              Miniature (URL image)
+              Miniature
             </label>
-            <input
-              value={config.thumbnail_url}
-              onChange={(e) => setConfig((s) => ({ ...s, thumbnail_url: e.target.value }))}
-              placeholder="https://... .jpg / .png"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
-            />
+            <div className="flex gap-2">
+              <input
+                value={config.thumbnail_url}
+                onChange={(e) => setConfig((s) => ({ ...s, thumbnail_url: e.target.value }))}
+                placeholder="URL ou uploader →"
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white/70 disabled:opacity-50 text-xs font-bold transition-colors whitespace-nowrap"
+              >
+                {uploading
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Upload className="w-3.5 h-3.5" />
+                }
+                {!uploading && 'Upload'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadThumbnail(f) }}
+              />
+            </div>
             {config.thumbnail_url && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={config.thumbnail_url}
                 alt="Miniature"
-                className="mt-2 w-full h-16 object-cover rounded-lg border border-white/8"
+                className="mt-2 w-full h-20 object-cover rounded-xl border border-white/8"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
             )}
