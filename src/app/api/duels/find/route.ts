@@ -38,12 +38,18 @@ export async function POST() {
   if (openDuels && openDuels.length > 0) {
     const duelId = openDuels[0].id
     const deadline = new Date(Date.now() + 30000).toISOString()
-    await admin
+    const { data: updated } = await admin
       .from('duels')
       .update({ opponent_id: user.id, status: 'picking', picks_deadline: deadline })
       .eq('id', duelId)
       .eq('status', 'open') // atomic: prevent double-join
-    return NextResponse.json({ duelId, joined: true })
+      .select('id')
+
+    // Only return success if the row was actually updated (not grabbed by bot or another player)
+    if (updated && updated.length > 0) {
+      return NextResponse.json({ duelId, joined: true })
+    }
+    // Update failed — duel was taken concurrently, fall through to create a new one
   }
 
   // Create a new open duel
