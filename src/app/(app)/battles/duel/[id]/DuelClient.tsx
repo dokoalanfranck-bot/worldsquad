@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, CreditCard, ArrowDownRight } from 'lucide-react'
+import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, ArrowDownRight, Star, Gift } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
 import { computePower } from '@/lib/duel-engine'
+import { RARITY_COLORS } from '@/types'
 import toast from 'react-hot-toast'
 import type { Card } from '@/types'
 
@@ -16,7 +17,10 @@ interface Profile { id: string | null; pseudo: string; nation: string; photo_url
 interface DuelEvent {
   minute: number; timeMs: number
   team: 'challenger' | 'opponent'
-  playerName: string; type: 'goal' | 'chance' | 'save'
+  playerName: string
+  cardImageUrl: string | null
+  cardRarity: string
+  type: 'goal' | 'chance' | 'save'
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Duel = Record<string, any>
@@ -43,18 +47,22 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
 
   const [duel, setDuel] = useState<Duel>(initialDuel)
   const [replaying, setReplaying] = useState(false)
-  const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'result'>(() => {
+  const duelRef = useRef(duel)
+  useEffect(() => { duelRef.current = duel }, [duel])
+
+  const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'stealing' | 'result'>(() => {
     if (initialDuel.status === 'finished') return 'result'
+    if (initialDuel.status === 'stealing') return 'stealing'
     if (initialDuel.status === 'picking') return 'picking'
     return 'waiting'
   })
 
   const isChallenger = duel.challenger_id === currentUserId
-  const me = (isChallenger ? duel.challenger : duel.opponent) as Profile
-  const them = (isChallenger ? duel.opponent : duel.challenger) as Profile
+  const me    = (isChallenger ? duel.challenger : duel.opponent) as Profile
+  const them  = (isChallenger ? duel.opponent  : duel.challenger) as Profile
 
-  const myPicks = (isChallenger ? duel.challenger_picks : duel.opponent_picks) as Card[] | null
-  const theirPicks = (isChallenger ? duel.opponent_picks : duel.challenger_picks) as Card[] | null
+  const myPicks    = (isChallenger ? duel.challenger_picks : duel.opponent_picks) as Card[] | null
+  const theirPicks = (isChallenger ? duel.opponent_picks  : duel.challenger_picks) as Card[] | null
 
   // Realtime subscription
   useEffect(() => {
@@ -65,7 +73,8 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
           setDuel((prev) => ({ ...prev, ...updated }))
           const s = (updated as Duel).status
           if (s === 'picking' && view === 'waiting') setView('picking')
-          if (s === 'finished' && view === 'picking') setView('animation')
+          if ((s === 'stealing' || s === 'finished') && view === 'picking') setView('animation')
+          if (s === 'finished' && view === 'stealing') setView('result')
         })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -79,17 +88,21 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
         if (!r.ok) return
         const data = await r.json() as Duel
         setDuel((prev) => ({ ...prev, ...data }))
-        if (data.status === 'picking' && view === 'waiting') setView('picking')
-        if (data.status === 'finished' && view === 'picking') setView('animation')
+        if (data.status === 'picking'  && view === 'waiting')  setView('picking')
+        if ((data.status === 'stealing' || data.status === 'finished') && view === 'picking') setView('animation')
+        if (data.status === 'finished' && view === 'stealing') setView('result')
       } catch { /* réseau */ }
     }, 3000)
     return () => clearInterval(poll)
   }, [duel.id, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Transition: animation → result after 26s (22s match + 4s final whistle)
+  // animation → stealing/result after 32s (30s match + 2s buffer)
   useEffect(() => {
     if (view !== 'animation') return
-    const t = setTimeout(() => setView('result'), 26000)
+    const t = setTimeout(() => {
+      if (duelRef.current.status === 'stealing') setView('stealing')
+      else setView('result')
+    }, 32000)
     return () => clearTimeout(t)
   }, [view])
 
@@ -106,6 +119,9 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
         )}
         {view === 'animation' && (
           <AnimationView key="animation" duel={duel} isChallenger={isChallenger} me={me} them={them} />
+        )}
+        {view === 'stealing' && (
+          <StealingView key="stealing" duel={duel} currentUserId={currentUserId} onDone={() => setView('result')} />
         )}
         {view === 'result' && (
           <ResultView key="result" duel={duel} currentUserId={currentUserId} me={me} them={them}
@@ -147,7 +163,7 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
     return () => clearInterval(t)
   }, [])
 
-  // Bot fallback after 50s (only challenger triggers it)
+  // Bot fallback after 50s
   useEffect(() => {
     if (!isChallenger || botFiredRef.current) return
     if (elapsed < 50) return
@@ -158,9 +174,7 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
       .catch(() => { botFiredRef.current = false })
   }, [elapsed, isChallenger, duel.id, onReady])
 
-  // Re-poll matchmaking every 4s while waiting as challenger.
-  // Fixes race condition where two players simultaneously create their own duels:
-  // the server-side find route will cross-match them and redirect to the shared duel.
+  // Re-poll matchmaking every 4s while waiting as challenger (race condition fix)
   useEffect(() => {
     if (!isChallenger) return
     const poll = setInterval(async () => {
@@ -169,10 +183,10 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
         if (!res.ok) return
         const data = await res.json() as { duelId?: string; joined?: boolean }
         if (data.joined && data.duelId && data.duelId !== duel.id) {
-          botFiredRef.current = true // prevent bot from firing for the abandoned duel
+          botFiredRef.current = true
           router.replace(`/battles/duel/${data.duelId}`)
         }
-      } catch { /* ignore network errors */ }
+      } catch { /* ignore */ }
     }, 4000)
     return () => clearInterval(poll)
   }, [duel.id, isChallenger, router])
@@ -184,7 +198,6 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
       exit={{ opacity: 0, scale: 0.95 }}
       className="min-h-screen flex flex-col items-center justify-center px-4 gap-6"
     >
-      {/* Pulse animation */}
       <div className="relative w-32 h-32">
         {[1, 2, 3].map((i) => (
           <motion.div
@@ -220,10 +233,7 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
         </div>
       </div>
 
-      <button
-        onClick={() => router.push('/battles')}
-        className="text-gray-600 hover:text-gray-400 text-sm transition-colors mt-4"
-      >
+      <button onClick={() => router.push('/battles')} className="text-gray-600 hover:text-gray-400 text-sm transition-colors mt-4">
         Annuler
       </button>
     </motion.div>
@@ -240,13 +250,14 @@ function PickingView({
   me: Profile; them: Profile
   onSubmitted: () => void
 }) {
-  const [selectedPlayers, setSelectedPlayers] = useState<Card[]>([])
+  const [selectedField, setSelectedField] = useState<Card[]>([])
+  const [selectedGK, setSelectedGK] = useState<Card | null>(null)
   const [selectedCoach, setSelectedCoach] = useState<Card | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(!!myPicks)
   const [timeLeft, setTimeLeft] = useState<number>(45)
+  const [tab, setTab] = useState<'field' | 'gk' | 'coach'>('field')
 
-  // Countdown from picks_deadline
   useEffect(() => {
     if (!duel.picks_deadline) return
     const update = () => {
@@ -258,50 +269,47 @@ function PickingView({
     return () => clearInterval(t)
   }, [duel.picks_deadline])
 
+  const isCoachCard = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
+  const isGKCard    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'GK'
+
+  const sorted      = useMemo(() => [...myCards].sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0)), [myCards])
+  const fieldCards  = useMemo(() => sorted.filter((c) => !isGKCard(c) && !isCoachCard(c)), [sorted])
+  const gkCards     = useMemo(() => sorted.filter(isGKCard), [sorted])
+  const coachCards  = useMemo(() => sorted.filter(isCoachCard), [sorted])
+
   // Auto-pick when timer hits 0
   useEffect(() => {
     if (timeLeft > 0 || submitted || myPicks) return
-    const sorted = [...myCards].sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0))
-    const isCoach = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
-    const players = sorted.filter((c) => !isCoach(c)).slice(0, 3)
-    const coach = sorted.find(isCoach) ?? sorted[3]
-    if (players.length === 3 && coach) {
-      submitPicks(players, coach)
+    const autoCoach = coachCards[0] ?? sorted[sorted.length - 1]
+    const autoGK    = gkCards[0] ?? sorted.find((c) => c.id !== autoCoach?.id) ?? sorted[1]
+    const autoField = fieldCards.filter((c) => c.id !== autoGK?.id && c.id !== autoCoach?.id).slice(0, 4)
+    if (autoField.length === 4 && autoGK && autoCoach) {
+      submitPicks(autoField, autoGK, autoCoach)
     }
   }, [timeLeft]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isCoachCard = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
-  const playerCards = useMemo(
-    () => myCards.filter((c) => !isCoachCard(c)).sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0)),
-    [myCards]
-  )
-  const coachCards = useMemo(
-    () => myCards.filter(isCoachCard).sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0)),
-    [myCards]
-  )
-
   const cohesion = useMemo(() => {
-    if (selectedPlayers.length === 3 && selectedCoach) {
-      return computePower([...selectedPlayers, selectedCoach])
+    if (selectedField.length === 4 && selectedGK && selectedCoach) {
+      return computePower([...selectedField, selectedGK, selectedCoach])
     }
     return null
-  }, [selectedPlayers, selectedCoach])
+  }, [selectedField, selectedGK, selectedCoach])
 
-  function togglePlayer(card: Card) {
-    if (selectedPlayers.find((c) => c.id === card.id)) {
-      setSelectedPlayers((p) => p.filter((c) => c.id !== card.id))
-    } else if (selectedPlayers.length < 3) {
-      setSelectedPlayers((p) => [...p, card])
+  function toggleField(card: Card) {
+    if (selectedField.find((c) => c.id === card.id)) {
+      setSelectedField((p) => p.filter((c) => c.id !== card.id))
+    } else if (selectedField.length < 4) {
+      setSelectedField((p) => [...p, card])
     }
   }
 
-  async function submitPicks(players: Card[], coach: Card) {
+  async function submitPicks(field: Card[], gk: Card, coach: Card) {
     setLoading(true)
     try {
       const res = await fetch(`/api/duels/${duel.id}/pick`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerIds: players.map((c) => c.id), coachId: coach.id }),
+        body: JSON.stringify({ playerIds: field.map((c) => c.id), gkId: gk.id, coachId: coach.id }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Erreur'); return }
@@ -314,9 +322,7 @@ function PickingView({
     }
   }
 
-  const canSubmit = selectedPlayers.length === 3 && selectedCoach !== null
-
-  // Color for timer
+  const canSubmit = selectedField.length === 4 && selectedGK !== null && selectedCoach !== null
   const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#f59e0b' : '#F5C518'
 
   return (
@@ -329,15 +335,11 @@ function PickingView({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-gray-600 text-xs uppercase tracking-wider">
-            {me?.pseudo} vs {them?.pseudo ?? '…'}
-          </p>
+          <p className="text-gray-600 text-xs uppercase tracking-wider">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
           <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             CHOISIS TON ÉQUIPE
           </h1>
         </div>
-
-        {/* Timer */}
         <motion.div
           animate={{ scale: timeLeft <= 10 ? [1, 1.05, 1] : 1 }}
           transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
@@ -354,9 +356,7 @@ function PickingView({
       <div className="glass rounded-xl p-3 mb-4 flex items-center gap-3">
         <div className={`w-2 h-2 rounded-full ${theirPicks ? 'bg-green-400' : 'bg-amber-400 animate-pulse'}`} />
         <span className="text-sm text-gray-400">
-          {theirPicks
-            ? `${them?.pseudo ?? 'Adversaire'} a confirmé son équipe ✓`
-            : `${them?.pseudo ?? 'Adversaire'} sélectionne…`}
+          {theirPicks ? `${them?.pseudo ?? 'Adversaire'} a confirmé son équipe ✓` : `${them?.pseudo ?? 'Adversaire'} sélectionne…`}
         </span>
         {cohesion !== null && (
           <span className="ml-auto text-xs font-black text-[#F5C518]">COHÉSION {cohesion}</span>
@@ -364,11 +364,7 @@ function PickingView({
       </div>
 
       {submitted || myPicks ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass rounded-2xl p-8 text-center"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-8 text-center">
           <Check className="w-10 h-10 text-green-400 mx-auto mb-3" />
           <p className="text-white font-bold text-lg">Équipe confirmée !</p>
           <p className="text-gray-500 text-sm mt-1">
@@ -377,93 +373,92 @@ function PickingView({
         </motion.div>
       ) : (
         <>
-          {/* Selected slots */}
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className={`aspect-[2/3] rounded-xl border-2 border-dashed flex items-center justify-center transition-all ${selectedPlayers[i] ? 'border-[#F5C518]/50' : 'border-white/10'}`}>
-                {selectedPlayers[i]
-                  ? <GameCard card={selectedPlayers[i]} owned size="sm" />
-                  : <span className="text-gray-700 text-xs">J{i + 1}</span>}
+          {/* 6 selected slots: row 4 field + row GK+Coach */}
+          <div className="mb-4">
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className={`aspect-[2/3] rounded-xl border-2 border-dashed flex items-center justify-center transition-all ${selectedField[i] ? 'border-[#F5C518]/50' : 'border-white/10'}`}>
+                  {selectedField[i]
+                    ? <GameCard card={selectedField[i]} owned size="sm" />
+                    : <span className="text-gray-700 text-[10px]">J{i + 1}</span>}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className={`aspect-[2/3] rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all relative ${selectedGK ? 'border-blue-400/50' : 'border-white/10'}`}>
+                {selectedGK ? (
+                  <>
+                    <GameCard card={selectedGK} owned size="sm" />
+                    <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-black px-1 rounded">GK</div>
+                  </>
+                ) : <span className="text-gray-700 text-xs">Gardien</span>}
               </div>
-            ))}
-            <div className={`aspect-[2/3] rounded-xl border-2 border-dashed flex items-center justify-center transition-all relative ${selectedCoach ? 'border-[#F5C518]/50' : 'border-white/10'}`}>
-              {selectedCoach ? (
-                <>
-                  <GameCard card={selectedCoach} owned size="sm" />
-                  <div className="absolute -top-1 -right-1 bg-[#F5C518] text-black text-[7px] font-black px-1 rounded">C</div>
-                </>
-              ) : (
-                <span className="text-gray-700 text-xs">Coach</span>
-              )}
+              <div className={`aspect-[2/3] rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all relative ${selectedCoach ? 'border-purple-400/50' : 'border-white/10'}`}>
+                {selectedCoach ? (
+                  <>
+                    <GameCard card={selectedCoach} owned size="sm" />
+                    <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-[7px] font-black px-1 rounded">C</div>
+                  </>
+                ) : <span className="text-gray-700 text-xs">Coach</span>}
+              </div>
             </div>
           </div>
 
-          {/* Players */}
-          <p className="text-white font-bold text-sm mb-2">
-            Joueurs <span className="text-gray-600">({selectedPlayers.length}/3)</span>
-          </p>
-          <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1 mb-4">
-            {playerCards.map((card) => {
-              const sel = !!selectedPlayers.find((c) => c.id === card.id)
-              const disabled = !sel && selectedPlayers.length >= 3
+          {/* Tabs */}
+          <div className="flex gap-1 mb-3 glass rounded-xl p-1">
+            {([['field', `Joueurs (${selectedField.length}/4)`], ['gk', `Gardien${selectedGK ? ' ✓' : ''}`], ['coach', `Coach${selectedCoach ? ' ✓' : ''}`]] as const).map(([t, label]) => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${tab === t ? 'bg-[#F5C518] text-black' : 'text-gray-400'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Card grid */}
+          <div className="grid grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1">
+            {tab === 'field' && fieldCards.map((card) => {
+              const sel = !!selectedField.find((c) => c.id === card.id)
+              const disabled = !sel && selectedField.length >= 4
               return (
                 <motion.div key={card.id} whileTap={disabled ? {} : { scale: 0.92 }}
                   className={`rounded-xl ${disabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer'} ${sel ? 'ring-2 ring-[#F5C518]' : ''}`}
-                  onClick={() => !disabled && togglePlayer(card)}>
+                  onClick={() => !disabled && toggleField(card)}>
+                  <GameCard card={card} owned size="sm" selected={sel} onClick={() => {}} />
+                </motion.div>
+              )
+            })}
+
+            {tab === 'gk' && (gkCards.length > 0 ? gkCards : sorted).map((card) => {
+              const sel = selectedGK?.id === card.id
+              return (
+                <motion.div key={card.id} whileTap={{ scale: 0.92 }}
+                  className={`rounded-xl cursor-pointer ${sel ? 'ring-2 ring-blue-400' : ''}`}
+                  onClick={() => setSelectedGK(sel ? null : card)}>
+                  <GameCard card={card} owned size="sm" selected={sel} onClick={() => {}} />
+                </motion.div>
+              )
+            })}
+
+            {tab === 'coach' && (coachCards.length > 0 ? coachCards : sorted).map((card) => {
+              const sel = selectedCoach?.id === card.id
+              return (
+                <motion.div key={card.id} whileTap={{ scale: 0.92 }}
+                  className={`rounded-xl cursor-pointer ${sel ? 'ring-2 ring-purple-400' : ''}`}
+                  onClick={() => setSelectedCoach(sel ? null : card)}>
                   <GameCard card={card} owned size="sm" selected={sel} onClick={() => {}} />
                 </motion.div>
               )
             })}
           </div>
-
-          {/* Coach */}
-          {coachCards.length > 0 ? (
-            <>
-              <p className="text-white font-bold text-sm mb-2">Coach</p>
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                {coachCards.map((card) => {
-                  const sel = selectedCoach?.id === card.id
-                  return (
-                    <motion.div key={card.id} whileTap={{ scale: 0.92 }}
-                      className={`rounded-xl cursor-pointer ${sel ? 'ring-2 ring-[#F5C518]' : ''}`}
-                      onClick={() => setSelectedCoach(sel ? null : card)}>
-                      <GameCard card={card} owned size="sm" selected={sel} onClick={() => {}} />
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-white font-bold text-sm mb-2">
-                Coach <span className="text-gray-500 text-xs">(n'importe quelle carte)</span>
-              </p>
-              <div className="grid grid-cols-4 gap-2 max-h-32 overflow-y-auto pr-1 mb-4">
-                {myCards.filter((c) => !selectedPlayers.find((p) => p.id === c.id))
-                  .sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0))
-                  .map((card) => {
-                    const sel = selectedCoach?.id === card.id
-                    return (
-                      <motion.div key={card.id} whileTap={{ scale: 0.92 }}
-                        className={`rounded-xl cursor-pointer ${sel ? 'ring-2 ring-[#F5C518]' : ''}`}
-                        onClick={() => setSelectedCoach(sel ? null : card)}>
-                        <GameCard card={card} owned size="sm" selected={sel} onClick={() => {}} />
-                      </motion.div>
-                    )
-                  })}
-              </div>
-            </>
-          )}
         </>
       )}
 
-      {/* Confirm button */}
       {!submitted && !myPicks && (
         <div className="fixed bottom-20 left-0 right-0 px-4 max-w-2xl mx-auto">
           <motion.button
             whileTap={{ scale: 0.98 }}
             disabled={!canSubmit || loading}
-            onClick={() => canSubmit && selectedCoach && submitPicks(selectedPlayers, selectedCoach)}
+            onClick={() => canSubmit && selectedGK && selectedCoach && submitPicks(selectedField, selectedGK, selectedCoach)}
             className="w-full bg-[#F5C518] disabled:opacity-30 text-black font-black py-4 rounded-xl text-lg flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20"
             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
           >
@@ -477,7 +472,7 @@ function PickingView({
 
 // ── AnimationView ─────────────────────────────────────────────────────────────
 
-const MATCH_MS = 22000
+const MATCH_MS = 30000
 
 function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallenger: boolean; me: Profile; them: Profile }) {
   const [elapsed, setElapsed] = useState(0)
@@ -485,14 +480,13 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
   const [myGoals, setMyGoals] = useState(0)
   const [theirGoals, setTheirGoals] = useState(0)
   const [ballPos, setBallPos] = useState({ x: 50, y: 50 })
-  const [goalFlash, setGoalFlash] = useState<{ name: string; isMine: boolean } | null>(null)
+  const [cardFlash, setCardFlash] = useState<{ name: string; isMine: boolean; cardImageUrl: string | null; cardRarity: string; type: 'goal' | 'save' } | null>(null)
   const startRef = useRef(Date.now())
   const lastCountRef = useRef(0)
 
-  // Remap event timeMs (0–60000) to fit within MATCH_MS
   const events = useMemo(() => {
     const raw = (duel.match_events ?? []) as DuelEvent[]
-    const maxMs = raw.length > 0 ? Math.max(...raw.map((e) => e.timeMs)) : 60000
+    const maxMs = raw.length > 0 ? Math.max(...raw.map((e) => e.timeMs)) : 30000
     return raw.map((e) => ({ ...e, timeMs: Math.round((e.timeMs / maxMs) * MATCH_MS) }))
   }, [duel.match_events])
 
@@ -513,15 +507,15 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
         const newEvs = vis.slice(lastCountRef.current)
         for (const ev of newEvs) {
           const isMine = (isChallenger && ev.team === 'challenger') || (!isChallenger && ev.team === 'opponent')
-          // Ball rushes toward attacking goal (challenger attacks right, opponent attacks left)
           const tx = ev.team === 'challenger'
             ? (ev.type === 'goal' ? 88 : 72)
             : (ev.type === 'goal' ? 12 : 28)
           const ty = 35 + Math.random() * 30
           setBallPos({ x: tx, y: ty })
-          if (ev.type === 'goal') {
-            setGoalFlash({ name: ev.playerName, isMine })
-            setTimeout(() => setGoalFlash(null), 2500)
+
+          if (ev.type === 'goal' || ev.type === 'save') {
+            setCardFlash({ name: ev.playerName, isMine, cardImageUrl: ev.cardImageUrl ?? null, cardRarity: ev.cardRarity ?? 'Common', type: ev.type })
+            setTimeout(() => setCardFlash(null), 2500)
             setTimeout(() => setBallPos({ x: 50, y: 50 }), 2700)
           } else {
             setTimeout(() => setBallPos({ x: 50, y: 50 }), 1600)
@@ -566,9 +560,7 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
             </motion.div>
             <div className="flex items-center gap-1.5 justify-center mt-1">
               {!isFinished && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
-              <span className="text-gray-500 text-xs font-mono">
-                {isFinished ? 'FT' : `${displayMinute}'`}
-              </span>
+              <span className="text-gray-500 text-xs font-mono">{isFinished ? 'FT' : `${displayMinute}'`}</span>
             </div>
           </div>
           <div className="flex-1 text-center">
@@ -581,12 +573,8 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
         </div>
       </div>
 
-      {/* Animated pitch */}
-      <MatchPitch
-        ballPos={ballPos}
-        challengerPseudo={isChallenger ? me?.pseudo : them?.pseudo}
-        opponentPseudo={isChallenger ? them?.pseudo : me?.pseudo}
-      />
+      {/* Pitch */}
+      <MatchPitch ballPos={ballPos} challengerPseudo={isChallenger ? me?.pseudo : them?.pseudo} opponentPseudo={isChallenger ? them?.pseudo : me?.pseudo} />
 
       {/* Events feed */}
       <div className="flex-1 mt-4 space-y-1.5 overflow-hidden">
@@ -609,9 +597,7 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
                 <span className="text-base flex-shrink-0">
                   {ev.type === 'goal' ? '⚽' : ev.type === 'chance' ? '🎯' : '🧤'}
                 </span>
-                <p className={`text-sm font-bold flex-1 truncate ${
-                  ev.type === 'goal' ? (isMine ? 'text-green-400' : 'text-red-400') : 'text-gray-500'
-                }`}>
+                <p className={`text-sm font-bold flex-1 truncate ${ev.type === 'goal' ? (isMine ? 'text-green-400' : 'text-red-400') : 'text-gray-500'}`}>
                   {ev.type === 'goal' ? 'BUT !' : ev.type === 'chance' ? 'Occasion' : 'Arrêt !'}{' '}
                   <span className="font-normal">{ev.playerName}</span>
                 </p>
@@ -622,14 +608,9 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
         </AnimatePresence>
       </div>
 
-      {/* Final whistle */}
       <AnimatePresence>
         {isFinished && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-5"
-          >
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center py-5">
             <p className="text-[#F5C518] font-black text-3xl tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
               COUP DE SIFFLET FINAL !
             </p>
@@ -638,37 +619,55 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
         )}
       </AnimatePresence>
 
-      {/* Goal flash overlay */}
+      {/* Card flash overlay (goal/save) */}
       <AnimatePresence>
-        {goalFlash && (
+        {cardFlash && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
           >
-            <div className={`absolute inset-0 ${goalFlash.isMine ? 'bg-green-500/10' : 'bg-red-500/10'}`} />
+            <div className={`absolute inset-0 ${cardFlash.type === 'goal' ? (cardFlash.isMine ? 'bg-green-500/10' : 'bg-red-500/10') : 'bg-blue-500/10'}`} />
             <motion.div
               initial={{ scale: 0.4, y: 60 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 1.1, opacity: 0, y: -30 }}
               transition={{ type: 'spring', stiffness: 280, damping: 20 }}
-              className="relative text-center z-10"
+              className="relative text-center z-10 flex flex-col items-center gap-3"
             >
+              {/* Card image with glow */}
+              {cardFlash.cardImageUrl && (
+                <motion.div
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  className="w-28 h-40 rounded-xl overflow-hidden border-2"
+                  style={{
+                    borderColor: RARITY_COLORS[cardFlash.cardRarity as keyof typeof RARITY_COLORS] ?? '#fff',
+                    boxShadow: `0 0 40px ${rarityGlow(cardFlash.cardRarity)}, 0 0 80px ${rarityGlow(cardFlash.cardRarity)}`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={cardFlash.cardImageUrl} alt={cardFlash.name} className="w-full h-full object-cover" />
+                </motion.div>
+              )}
               <p
                 className="font-black leading-none"
                 style={{
                   fontFamily: 'Bebas Neue, sans-serif',
-                  fontSize: 'clamp(72px, 20vw, 120px)',
-                  color: goalFlash.isMine ? '#22c55e' : '#ef4444',
-                  textShadow: goalFlash.isMine
-                    ? '0 0 60px rgba(34,197,94,0.6)'
-                    : '0 0 60px rgba(239,68,68,0.6)',
+                  fontSize: 'clamp(60px, 18vw, 100px)',
+                  color: cardFlash.type === 'goal' ? (cardFlash.isMine ? '#22c55e' : '#ef4444') : '#60a5fa',
+                  textShadow: cardFlash.type === 'goal'
+                    ? (cardFlash.isMine ? '0 0 60px rgba(34,197,94,0.6)' : '0 0 60px rgba(239,68,68,0.6)')
+                    : '0 0 60px rgba(96,165,250,0.6)',
                 }}
               >
-                BUT !
+                {cardFlash.type === 'goal' ? 'BUT !' : 'ARRÊT !'}
               </p>
-              <p className="text-white text-xl font-bold mt-1">⚽ {goalFlash.name}</p>
+              <p className="text-white text-lg font-bold drop-shadow-lg">
+                {cardFlash.type === 'goal' ? '⚽' : '🧤'} {cardFlash.name}
+              </p>
             </motion.div>
           </motion.div>
         )}
@@ -677,83 +676,177 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
   )
 }
 
+function rarityGlow(rarity: string): string {
+  const map: Record<string, string> = { Legend: 'rgba(245,197,24,0.7)', Epic: 'rgba(168,85,247,0.7)', Rare: 'rgba(0,212,255,0.6)', Common: 'rgba(255,255,255,0.3)' }
+  return map[rarity] ?? map.Common
+}
+
 // ── MatchPitch ────────────────────────────────────────────────────────────────
 
 function MatchPitch({ ballPos, challengerPseudo, opponentPseudo }: {
-  ballPos: { x: number; y: number }
-  challengerPseudo: string
-  opponentPseudo: string
+  ballPos: { x: number; y: number }; challengerPseudo: string; opponentPseudo: string
 }) {
   return (
-    <div
-      className="relative rounded-2xl overflow-hidden flex-shrink-0"
-      style={{
-        height: 152,
-        background: 'linear-gradient(180deg, #1a4a1a 0%, #1e5c1e 50%, #1a4a1a 100%)',
-      }}
-    >
-      {/* Grass stripes */}
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 12px, rgba(0,0,0,0.2) 12px, rgba(0,0,0,0.2) 24px)',
-        }}
-      />
-
-      {/* Player labels */}
-      <p className="absolute top-2 left-3 text-white/35 text-[9px] font-black uppercase tracking-wide truncate max-w-[70px] z-10">
-        {challengerPseudo}
-      </p>
-      <p className="absolute top-2 right-3 text-white/35 text-[9px] font-black uppercase tracking-wide truncate max-w-[70px] text-right z-10">
-        {opponentPseudo}
-      </p>
-
-      {/* Center line */}
+    <div className="relative rounded-2xl overflow-hidden flex-shrink-0" style={{ height: 152, background: 'linear-gradient(180deg, #1a4a1a 0%, #1e5c1e 50%, #1a4a1a 100%)' }}>
+      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 12px, rgba(0,0,0,0.2) 12px, rgba(0,0,0,0.2) 24px)' }} />
+      <p className="absolute top-2 left-3 text-white/35 text-[9px] font-black uppercase tracking-wide truncate max-w-[70px] z-10">{challengerPseudo}</p>
+      <p className="absolute top-2 right-3 text-white/35 text-[9px] font-black uppercase tracking-wide truncate max-w-[70px] text-right z-10">{opponentPseudo}</p>
       <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white/20" />
-      {/* Center circle */}
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20"
-        style={{ width: 60, height: 60 }}
-      />
-      {/* Center dot */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" style={{ width: 60, height: 60 }} />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white/25" />
-
-      {/* Left penalty box */}
-      <div
-        className="absolute top-1/2 -translate-y-1/2 left-0 border-r border-t border-b border-white/15 rounded-r"
-        style={{ width: 28, height: 76 }}
-      />
-      {/* Right penalty box */}
-      <div
-        className="absolute top-1/2 -translate-y-1/2 right-0 border-l border-t border-b border-white/15 rounded-l"
-        style={{ width: 28, height: 76 }}
-      />
-
-      {/* Left goal */}
-      <div
-        className="absolute top-1/2 -translate-y-1/2 left-0 rounded-r"
-        style={{ width: 7, height: 32, background: 'rgba(255,255,255,0.12)', borderRight: '1px solid rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.3)' }}
-      />
-      {/* Right goal */}
-      <div
-        className="absolute top-1/2 -translate-y-1/2 right-0 rounded-l"
-        style={{ width: 7, height: 32, background: 'rgba(255,255,255,0.12)', borderLeft: '1px solid rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.3)' }}
-      />
-
-      {/* Ball */}
+      <div className="absolute top-1/2 -translate-y-1/2 left-0 border-r border-t border-b border-white/15 rounded-r" style={{ width: 28, height: 76 }} />
+      <div className="absolute top-1/2 -translate-y-1/2 right-0 border-l border-t border-b border-white/15 rounded-l" style={{ width: 28, height: 76 }} />
+      <div className="absolute top-1/2 -translate-y-1/2 left-0 rounded-r" style={{ width: 7, height: 32, background: 'rgba(255,255,255,0.12)', borderRight: '1px solid rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.3)' }} />
+      <div className="absolute top-1/2 -translate-y-1/2 right-0 rounded-l" style={{ width: 7, height: 32, background: 'rgba(255,255,255,0.12)', borderLeft: '1px solid rgba(255,255,255,0.3)', borderTop: '1px solid rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.3)' }} />
       <motion.div
         animate={{ left: `${ballPos.x}%`, top: `${ballPos.y}%` }}
         transition={{ type: 'spring', stiffness: 55, damping: 11 }}
         className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          width: 14,
-          height: 14,
-          background: 'radial-gradient(circle at 35% 35%, #ffffff, #cccccc)',
-          boxShadow: '0 0 10px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.5)',
-          zIndex: 20,
-        }}
+        style={{ width: 14, height: 14, background: 'radial-gradient(circle at 35% 35%, #ffffff, #cccccc)', boxShadow: '0 0 10px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.5)', zIndex: 20 }}
       />
     </div>
+  )
+}
+
+// ── StealingView ──────────────────────────────────────────────────────────────
+
+function StealingView({ duel, currentUserId, onDone }: { duel: Duel; currentUserId: string; onDone: () => void }) {
+  const supabase = createClient()
+  const isWinner = duel.winner_id === currentUserId
+  const stakeCount: number = duel.stake_count ?? 1
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [countdown, setCountdown] = useState(60)
+
+  // Derive loser's cards from their picks stored in the duel
+  const loserPicks = useMemo(() => {
+    const picks = (duel.winner_id === duel.challenger_id ? duel.opponent_picks : duel.challenger_picks) as Card[] | null
+    const available = new Set<string>(duel.stolen_card_ids ?? [])
+    return (picks ?? []).filter((c: Card) => available.has(c.id))
+  }, [duel])
+
+  // Realtime: when finished → onDone
+  useEffect(() => {
+    const ch = supabase
+      .channel(`steal-${duel.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${duel.id}` },
+        ({ new: updated }) => {
+          if ((updated as Duel).status === 'finished') onDone()
+        })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [duel.id, onDone]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Countdown (winner only)
+  useEffect(() => {
+    if (!isWinner) return
+    const t = setInterval(() => setCountdown((c) => {
+      if (c <= 1) {
+        clearInterval(t)
+        // Auto-select best by rarity
+        const sorted = [...loserPicks].sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0))
+        const ids = sorted.slice(0, stakeCount).map((c) => c.id)
+        handleSteal(ids)
+        return 0
+      }
+      return c - 1
+    }), 1000)
+    return () => clearInterval(t)
+  }, [isWinner, loserPicks, stakeCount]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggle(id: string) {
+    if (selectedIds.includes(id)) {
+      setSelectedIds((s) => s.filter((x) => x !== id))
+    } else if (selectedIds.length < stakeCount) {
+      setSelectedIds((s) => [...s, id])
+    }
+  }
+
+  async function handleSteal(ids: string[]) {
+    if (loading) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/duels/${duel.id}/steal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardIds: ids }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Erreur'); return }
+      onDone()
+    } catch {
+      toast.error('Erreur réseau')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isWinner) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="min-h-screen flex flex-col items-center justify-center px-4 gap-6">
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
+          className="w-16 h-16 rounded-full border-2 border-[#F5C518]/30 border-t-[#F5C518]" />
+        <div className="text-center">
+          <h2 className="text-3xl font-black text-white mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>MATCH TERMINÉ</h2>
+          <p className="text-gray-400">Le gagnant choisit ses récompenses…</p>
+        </div>
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+      className="min-h-screen px-4 py-6 max-w-md mx-auto pb-28">
+      <div className="text-center mb-6">
+        <h2 className="text-4xl font-black text-[#F5C518] mb-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          CHOISIS TES BUTINS ⚡
+        </h2>
+        <p className="text-gray-400 text-sm">
+          Sélectionne <span className="text-[#F5C518] font-bold">{stakeCount}</span> carte{stakeCount > 1 ? 's' : ''} à voler
+          {' '}· <span className="font-mono text-[#F5C518]">{countdown}s</span>
+        </p>
+      </div>
+
+      {loserPicks.length === 0 ? (
+        <p className="text-center text-gray-500">Aucune carte disponible</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          {loserPicks.map((card: Card) => {
+            const sel = selectedIds.includes(card.id)
+            return (
+              <motion.div key={card.id} whileTap={{ scale: 0.93 }}
+                className={`rounded-2xl cursor-pointer transition-all ${sel ? 'ring-2 ring-[#F5C518] scale-105' : 'opacity-70 hover:opacity-100'}`}
+                onClick={() => toggle(card.id)}>
+                <GameCard card={card} owned size="sm" selected={sel} onClick={() => {}} />
+                {sel && (
+                  <div className="mt-1 flex items-center justify-center gap-1">
+                    <Star size={12} className="text-[#F5C518] fill-[#F5C518]" />
+                    <span className="text-[#F5C518] text-[10px] font-black">SÉLECTIONNÉ</span>
+                  </div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="fixed bottom-20 left-0 right-0 px-4 max-w-md mx-auto">
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          disabled={selectedIds.length !== stakeCount || loading}
+          onClick={() => handleSteal(selectedIds)}
+          className="w-full bg-[#F5C518] disabled:opacity-30 text-black font-black py-4 rounded-xl text-lg flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20"
+          style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+        >
+          {loading ? (
+            <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> TRANSFERT…</>
+          ) : (
+            <><Gift size={18} /> PRENDRE {selectedIds.length}/{stakeCount}</>
+          )}
+        </motion.button>
+      </div>
+    </motion.div>
   )
 }
 
@@ -767,9 +860,15 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
   const iWon = winnerId === currentUserId
   const myScore = isChallenger ? duel.challenger_score : duel.opponent_score
   const theirScore = isChallenger ? duel.opponent_score : duel.challenger_score
-  // Draw only if truly equal scores AND no winner (bot-won with different score = défaite)
   const isDraw = !winnerId && (myScore ?? 0) === (theirScore ?? 0)
-  const rewardCard = duel.reward_card as Card | null
+  const stolenCards = useMemo(() => {
+    if (!duel.stolen_card_ids?.length) return []
+    const loserPicks = (iWon
+      ? (isChallenger ? duel.opponent_picks : duel.challenger_picks)
+      : (isChallenger ? duel.opponent_picks : duel.challenger_picks)) as Card[] | null
+    const ids = new Set<string>(duel.stolen_card_ids)
+    return (loserPicks ?? []).filter((c: Card) => ids.has(c.id))
+  }, [duel, iWon, isChallenger])
 
   const flag = (nation: string) => NATION_FLAGS[nation] ?? '🌍'
 
@@ -780,7 +879,6 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
       transition={{ type: 'spring', stiffness: 200, damping: 22 }}
       className="min-h-screen flex flex-col items-center justify-center px-4 gap-5 max-w-sm mx-auto"
     >
-      {/* Result icon */}
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
@@ -788,15 +886,9 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
         className={`w-24 h-24 rounded-3xl flex items-center justify-center ${isDraw ? 'bg-white/5' : iWon ? 'bg-[#F5C518]/10' : 'bg-red-500/10'}`}
         style={{ boxShadow: isDraw ? 'none' : iWon ? '0 0 40px rgba(245,197,24,0.25)' : '0 0 40px rgba(239,68,68,0.2)' }}
       >
-        {isDraw
-          ? <Minus size={48} className="text-white/40" />
-          : iWon
-            ? <Trophy size={48} className="text-[#F5C518]" />
-            : <TrendingDown size={48} className="text-red-400" />
-        }
+        {isDraw ? <Minus size={48} className="text-white/40" /> : iWon ? <Trophy size={48} className="text-[#F5C518]" /> : <TrendingDown size={48} className="text-red-400" />}
       </motion.div>
 
-      {/* Title */}
       <motion.h2
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -807,13 +899,8 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
         {isDraw ? 'MATCH NUL' : iWon ? 'VICTOIRE !' : 'DÉFAITE'}
       </motion.h2>
 
-      {/* Score */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="glass rounded-2xl px-8 py-4 flex items-center gap-6"
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+        className="glass rounded-2xl px-8 py-4 flex items-center gap-6">
         <div className="text-center">
           <p className="text-2xl">{flag(me?.nation)}</p>
           <p className="text-white font-black text-xs mt-1">{me?.pseudo}</p>
@@ -827,34 +914,29 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
         </div>
       </motion.div>
 
-      {/* Reward card */}
-      {rewardCard && (
+      {/* Stolen cards display */}
+      {stolenCards.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, type: 'spring' }}
-          className={`w-full glass rounded-2xl p-4 flex flex-col items-center gap-3 border ${
-            iWon ? 'border-[#F5C518]/30' : 'border-red-500/20'
-          }`}
+          className={`w-full glass rounded-2xl p-4 flex flex-col items-center gap-3 border ${iWon ? 'border-[#F5C518]/30' : 'border-red-500/20'}`}
         >
           <p className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${iWon ? 'text-[#F5C518]' : 'text-red-400'}`}>
-            {iWon ? <><CreditCard size={12} /> Carte volée</> : <><ArrowDownRight size={12} /> Carte perdue</>}
+            {iWon ? <><Gift size={12} /> Cartes volées</> : <><ArrowDownRight size={12} /> Cartes perdues</>}
           </p>
-          <GameCard card={rewardCard} owned size="md" />
-          <div className="text-center">
-            <p className="text-white font-bold text-sm">{rewardCard.name}</p>
-            <p className="text-gray-500 text-xs capitalize">{rewardCard.rarity}</p>
+          <div className="flex gap-2 justify-center flex-wrap">
+            {stolenCards.map((card: Card) => (
+              <div key={card.id} className="text-center">
+                <GameCard card={card} owned size="sm" />
+                <p className="text-white/60 text-[9px] mt-1 truncate max-w-16">{card.name}</p>
+              </div>
+            ))}
           </div>
         </motion.div>
       )}
 
-      {/* Actions */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="flex gap-3 w-full"
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="flex gap-3 w-full">
         <button
           onClick={onReplay}
           disabled={replayLoading}
@@ -869,10 +951,7 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
         <button
           onClick={() => {
             if (navigator.share) {
-              navigator.share({
-                title: iWon ? `Victoire ${myScore}-${theirScore} sur WorldSquad !` : `Défaite ${myScore}-${theirScore} sur WorldSquad`,
-                text: `Je viens de jouer un duel sur WorldSquad !`,
-              }).catch(() => {})
+              navigator.share({ title: iWon ? `Victoire ${myScore}-${theirScore} !` : `Défaite ${myScore}-${theirScore}`, text: 'Je viens de jouer un duel sur WorldSquad !' }).catch(() => {})
             }
           }}
           className="px-4 py-3.5 rounded-xl border border-white/10 text-gray-400 hover:text-white transition-colors"
@@ -881,14 +960,9 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
         </button>
       </motion.div>
 
-      {/* Stats hint */}
       <div className="flex gap-4 text-center text-xs text-gray-700">
-        <div className="flex items-center gap-1">
-          <Zap size={10} /> Puissance moi : {isChallenger ? duel.challenger_score : duel.opponent_score}
-        </div>
-        <div className="flex items-center gap-1">
-          <Shield size={10} /> Puissance eux : {isChallenger ? duel.opponent_score : duel.challenger_score}
-        </div>
+        <div className="flex items-center gap-1"><Zap size={10} /> Moi : {myScore ?? 0}</div>
+        <div className="flex items-center gap-1"><Shield size={10} /> Eux : {theirScore ?? 0}</div>
       </div>
     </motion.div>
   )

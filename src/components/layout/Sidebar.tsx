@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Calendar, Layers, Swords, Users,
   Trophy, ShoppingBag, Settings, Crown, Globe, Gift,
-  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard, Repeat2, Radio,
+  Menu, X, Shield, ChevronRight, type LucideIcon, CreditCard, Repeat2, Radio, UserPlus,
 } from 'lucide-react'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User } from '@/types'
@@ -19,6 +19,7 @@ const NAV_ITEMS: { href: string; icon: LucideIcon; label: string }[] = [
   { href: '/collection',  icon: Layers,          label: 'Ma Collection' },
   { href: '/doublons',    icon: Repeat2,         label: 'Vendre Doublons' },
   { href: '/battles',     icon: Swords,          label: 'Battles' },
+  { href: '/social',      icon: UserPlus,        label: 'Amis' },
   { href: '/group',       icon: Users,           label: 'Mon Groupe' },
   { href: '/leaderboard', icon: Trophy,          label: 'Classement' },
   { href: '/shop',        icon: ShoppingBag,     label: 'Boutique' },
@@ -38,6 +39,7 @@ const MOBILE_RIGHT = [
 const DRAWER_ITEMS: { href: string; icon: LucideIcon; label: string; color?: string }[] = [
   { href: '/live',         icon: Radio,        label: 'Match en Direct' },
   { href: '/battles',      icon: Swords,       label: 'Battles' },
+  { href: '/social',       icon: UserPlus,     label: 'Amis' },
   { href: '/doublons',     icon: Repeat2,      label: 'Vendre Doublons' },
   { href: '/group',        icon: Users,        label: 'Mon Groupe' },
   { href: '/leaderboard',  icon: Trophy,       label: 'Classement' },

@@ -21,15 +21,10 @@ export async function POST() {
   if (active && active.length > 0) {
     const myDuel = active[0]
 
-    // Already matched — stay in this duel
-    if (myDuel.status === 'picking') {
-      return NextResponse.json({ duelId: myDuel.id, joined: false })
-    }
-
     // I'm the challenger of an unmatched open duel — check if another player is also waiting.
     // This resolves the race condition where both players click simultaneously and each
     // creates their own duel before seeing the other's.
-    if (myDuel.challenger_id === user.id) {
+    if (myDuel.status === 'open' && myDuel.challenger_id === user.id) {
       const cutoff = new Date(Date.now() - 80000).toISOString()
       const { data: otherDuels } = await admin
         .from('duels')
@@ -61,7 +56,10 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ duelId: myDuel.id, joined: false })
+    // Only return existing open duel if no cross-match was found
+    if (myDuel.status === 'open') {
+      return NextResponse.json({ duelId: myDuel.id, joined: false })
+    }
   }
 
   // Join an open duel from another player (created in last 80s — matches the 50s bot timer + buffer)

@@ -4,6 +4,7 @@ export type MatchStatus = 'upcoming' | 'live' | 'finished'
 export type MatchPhase = 'group' | 'round16' | 'quarter' | 'semi' | 'final'
 export type PredictionStatus = 'pending' | 'correct_score' | 'correct_winner' | 'wrong'
 export type BattleStatus = 'pending' | 'accepted' | 'finished' | 'declined'
+export type DuelStatus = 'invited' | 'open' | 'picking' | 'stealing' | 'finished' | 'cancelled'
 export type PurchaseStatus = 'pending' | 'completed' | 'failed'
 
 export interface User {
@@ -23,6 +24,7 @@ export interface User {
   battles_played: number
   battle_streak: number
   best_streak: number
+  last_seen_at: string | null
   daily_reward_claimed_at: string | null
   daily_streak: number
   install_reward_claimed: boolean
@@ -122,6 +124,48 @@ export interface Battle {
   opponent?: User
   challenger_card?: Card
   opponent_card?: Card
+}
+
+export interface Friendship {
+  id: string
+  requester_id: string
+  addressee_id: string
+  status: 'pending' | 'accepted' | 'declined'
+  created_at: string
+  requester?: Pick<User, 'id' | 'pseudo' | 'nation' | 'photo_url'>
+  addressee?: Pick<User, 'id' | 'pseudo' | 'nation' | 'photo_url'>
+}
+
+export interface FriendMessage {
+  id: string
+  sender_id: string
+  receiver_id: string
+  text: string
+  read_at: string | null
+  created_at: string
+}
+
+export interface Duel {
+  id: string
+  challenger_id: string
+  opponent_id: string | null
+  winner_id: string | null
+  status: DuelStatus
+  coins_stake: number
+  stake_count: number
+  is_bot: boolean
+  is_friend_battle: boolean
+  challenger_picks: Card[] | null
+  opponent_picks: Card[] | null
+  match_events: Record<string, unknown>[] | null
+  challenger_score: number | null
+  opponent_score: number | null
+  stolen_card_ids: string[]
+  picks_deadline: string | null
+  invite_expires_at: string | null
+  created_at: string
+  challenger?: User
+  opponent?: User
 }
 
 export interface CoinTransaction {
