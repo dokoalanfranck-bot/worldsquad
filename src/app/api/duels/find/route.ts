@@ -21,6 +21,11 @@ export async function POST() {
   if (active && active.length > 0) {
     const myDuel = active[0]
 
+    // Already in an active picking duel — redirect there, don't create an orphaned open duel
+    if (myDuel.status === 'picking') {
+      return NextResponse.json({ duelId: myDuel.id, joined: false })
+    }
+
     // I'm the challenger of an unmatched open duel — check if another player is also waiting.
     // This resolves the race condition where both players click simultaneously and each
     // creates their own duel before seeing the other's.
