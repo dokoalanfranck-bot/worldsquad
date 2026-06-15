@@ -5,6 +5,7 @@ import { MusicProvider } from '@/components/MusicProvider'
 import { OnboardingGuide } from '@/components/OnboardingGuide'
 import { PingProvider } from '@/components/PingProvider'
 import { InstallPrompt } from '@/components/InstallPrompt'
+import { ChallengeListener } from '@/components/ChallengeListener'
 import type { User } from '@/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar user={profile as User} />
       <main className="dashboard-content min-h-screen">
         <PingProvider />
+        <ChallengeListener userId={authUser.id} />
         <MusicProvider>
           {children}
           <OnboardingGuide />

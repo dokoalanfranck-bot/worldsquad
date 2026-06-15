@@ -14,12 +14,15 @@ import {
   Globe,
   UserPlus,
   TrendingUp,
+  Radio,
 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboardPage() {
   const supabase = createAdminClient()
+
+  const onlineCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString()
 
   const [
     { count: usersCount },
@@ -30,6 +33,7 @@ export default async function AdminDashboardPage() {
     { data: usersCoins },
     { data: recentUsers },
     { data: recentMatches },
+    { data: onlineUsers },
   ] = await Promise.all([
     supabase.from('users').select('*', { count: 'exact', head: true }),
     supabase.from('matches').select('*', { count: 'exact', head: true }),
@@ -48,17 +52,32 @@ export default async function AdminDashboardPage() {
       .eq('status', 'finished')
       .order('match_date', { ascending: false })
       .limit(5),
+    supabase
+      .from('users')
+      .select('id, pseudo, nation, photo_url, last_seen_at')
+      .gte('last_seen_at', onlineCutoff)
+      .order('last_seen_at', { ascending: false })
+      .limit(50),
   ])
 
   const totalCoins = usersCoins?.reduce((sum, u) => sum + (u.coins ?? 0), 0) ?? 0
 
+  const onlineCount = onlineUsers?.length ?? 0
+
   const stats = [
     { label: 'Utilisateurs', value: usersCount ?? 0, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Matchs', value: matchesCount ?? 0, icon: Calendar, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { label: 'Pronostics', value: predictionsCount ?? 0, icon: Target, color: 'text-green-400', bg: 'bg-green-500/10' },
+    { label: 'En ligne', value: onlineCount, icon: Radio, color: 'text-green-400', bg: 'bg-green-500/10', pulse: true },
+    { label: 'Pronostics', value: predictionsCount ?? 0, icon: Target, color: 'text-purple-400', bg: 'bg-purple-500/10' },
     { label: 'Battles', value: battlesCount ?? 0, icon: Swords, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
     { label: 'Cartes', value: cardsCount ?? 0, icon: Layers, color: 'text-pink-400', bg: 'bg-pink-500/10' },
   ]
+
+  const NATION_FLAGS: Record<string, string> = {
+    France: '🇫🇷', Brazil: '🇧🇷', Argentina: '🇦🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    Spain: '🇪🇸', Germany: '🇩🇪', Portugal: '🇵🇹', Netherlands: '🇳🇱',
+    Morocco: '🇲🇦', USA: '🇺🇸', Mexico: '🇲🇽', Belgium: '🇧🇪',
+    Japan: '🇯🇵', Senegal: '🇸🇳', Croatia: '🇭🇷', Uruguay: '🇺🇾',
+  }
 
   const quickActions = [
     { label: 'Gérer les équipes', href: '/admin/teams', icon: Globe, desc: 'Import JSON, groupes' },
@@ -87,9 +106,12 @@ export default async function AdminDashboardPage() {
         {stats.map((stat) => {
           const Icon = stat.icon
           return (
-            <div key={stat.label} className="glass rounded-xl p-4">
-              <div className={`w-9 h-9 rounded-lg ${stat.bg} flex items-center justify-center mb-3`}>
+            <div key={stat.label} className={`glass rounded-xl p-4 ${stat.pulse && onlineCount > 0 ? 'border border-green-500/20' : ''}`}>
+              <div className={`w-9 h-9 rounded-lg ${stat.bg} flex items-center justify-center mb-3 relative`}>
                 <Icon className={`w-4 h-4 ${stat.color}`} />
+                {stat.pulse && onlineCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
+                )}
               </div>
               <p className="text-2xl font-bold text-white">{stat.value.toLocaleString()}</p>
               <p className="text-white/50 text-xs mt-0.5">{stat.label}</p>
@@ -97,6 +119,27 @@ export default async function AdminDashboardPage() {
           )
         })}
       </div>
+
+      {/* Joueurs en ligne */}
+      {onlineCount > 0 && (
+        <div className="glass rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <h2 className="font-bebas text-lg text-white">JOUEURS EN LIGNE</h2>
+            <span className="ml-auto text-xs text-green-400 font-bold">{onlineCount} actif{onlineCount > 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(onlineUsers ?? []).map((u) => (
+              <div key={u.id} className="flex items-center gap-2 bg-green-500/5 border border-green-500/15 rounded-xl px-3 py-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                <span className="text-white text-sm font-medium">
+                  {NATION_FLAGS[u.nation as string] ?? '🌍'} {u.pseudo}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Coins en circulation */}
       <div className="glass rounded-xl p-6 flex items-center gap-4">
