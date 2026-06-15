@@ -14,17 +14,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const admin = createAdminClient()
 
-  // Verify friendship
-  const { data: friendship } = await admin
-    .from('friendships')
-    .select('id')
-    .or(
-      `and(requester_id.eq.${user.id},addressee_id.eq.${friendId}),` +
-      `and(requester_id.eq.${friendId},addressee_id.eq.${user.id})`
-    )
-    .eq('status', 'accepted')
-    .limit(1)
-    .single()
+  // Check friendship in both directions (two separate queries — avoids nested or/and)
+  const [{ data: fs1 }, { data: fs2 }] = await Promise.all([
+    admin.from('friendships').select('id').eq('requester_id', user.id).eq('addressee_id', friendId).eq('status', 'accepted').maybeSingle(),
+    admin.from('friendships').select('id').eq('requester_id', friendId).eq('addressee_id', user.id).eq('status', 'accepted').maybeSingle(),
+  ])
+  const friendship = fs1 ?? fs2
 
   if (!friendship) {
     return NextResponse.json({ error: 'Pas amis' }, { status: 403 })
@@ -36,32 +31,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq('id', user.id)
     .single()
 
+  // Build insert payload — invite_expires_at is optional (requires migration 013)
   const inviteExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertPayload: Record<string, any> = {
+    challenger_id:    user.id,
+    opponent_id:      friendId,
+    stake_count:      stake,
+    is_friend_battle: true,
+    status:           'invited',
+    coins_stake:      50 * stake,
+  }
 
-  const { data: duel, error } = await admin
-    .from('duels')
-    .insert({
-      challenger_id:    user.id,
-      opponent_id:      friendId,
-      stake_count:      stake,
-      is_friend_battle: true,
-      status:           'invited',
-      coins_stake:      50 * stake,
-      invite_expires_at: inviteExpires,
-    })
-    .select('id')
-    .single()
-
-  if (error || !duel) {
-    return NextResponse.json({ error: error?.message ?? 'Erreur' }, { status: 500 })
+  // Try with invite_expires_at first, fall back without it if the column doesn't exist yet
+  let duel: { id: string } | null = null
+  const { data: d1, error: e1 } = await admin.from('duels').insert({ ...insertPayload, invite_expires_at: inviteExpires }).select('id').single()
+  if (e1) {
+    // Column might not exist yet (migration 013 pending) — retry without it
+    const { data: d2, error: e2 } = await admin.from('duels').insert(insertPayload).select('id').single()
+    if (e2 || !d2) return NextResponse.json({ error: e2?.message ?? 'Erreur création duel' }, { status: 500 })
+    duel = d2
+  } else {
+    duel = d1
   }
 
   // Push notification to friend
   await sendPushToUser(friendId, {
     title: `⚔️ Défi de ${challenger?.pseudo ?? 'Quelqu\'un'}`,
     body:  `Mise : ${stake} carte${stake > 1 ? 's' : ''} — Accepte le défi !`,
-    url:   `/battles/duel/${duel.id}`,
+    url:   `/battles/duel/${duel!.id}`,
   }).catch(() => { /* ignore push errors */ })
 
-  return NextResponse.json({ duelId: duel.id })
+  return NextResponse.json({ duelId: duel!.id })
 }
