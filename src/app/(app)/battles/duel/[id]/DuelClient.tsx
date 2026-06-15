@@ -158,6 +158,25 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
       .catch(() => { botFiredRef.current = false })
   }, [elapsed, isChallenger, duel.id, onReady])
 
+  // Re-poll matchmaking every 4s while waiting as challenger.
+  // Fixes race condition where two players simultaneously create their own duels:
+  // the server-side find route will cross-match them and redirect to the shared duel.
+  useEffect(() => {
+    if (!isChallenger) return
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch('/api/duels/find', { method: 'POST' })
+        if (!res.ok) return
+        const data = await res.json() as { duelId?: string; joined?: boolean }
+        if (data.joined && data.duelId && data.duelId !== duel.id) {
+          botFiredRef.current = true // prevent bot from firing for the abandoned duel
+          router.replace(`/battles/duel/${data.duelId}`)
+        }
+      } catch { /* ignore network errors */ }
+    }, 4000)
+    return () => clearInterval(poll)
+  }, [duel.id, isChallenger, router])
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -214,7 +233,7 @@ function WaitingView({ duel, currentUserId, onReady }: { duel: Duel; currentUser
 // ── PickingView ───────────────────────────────────────────────────────────────
 
 function PickingView({
-  duel, currentUserId, myCards, myPicks, theirPicks, me, them, onSubmitted,
+  duel, currentUserId: _currentUserId, myCards, myPicks, theirPicks, me, them, onSubmitted,
 }: {
   duel: Duel; currentUserId: string; myCards: Card[]
   myPicks: Card[] | null; theirPicks: Card[] | null
