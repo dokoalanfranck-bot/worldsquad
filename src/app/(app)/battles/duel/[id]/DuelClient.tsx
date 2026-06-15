@@ -50,7 +50,8 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
   const duelRef = useRef(duel)
   useEffect(() => { duelRef.current = duel }, [duel])
 
-  const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'stealing' | 'result'>(() => {
+  const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'stealing' | 'result' | 'cancelled'>(() => {
+    if (initialDuel.status === 'cancelled') return 'cancelled'
     if (initialDuel.status === 'finished') return 'result'
     if (initialDuel.status === 'stealing') return 'stealing'
     if (initialDuel.status === 'picking') return 'picking'
@@ -75,6 +76,11 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
           setDuel((prev) => ({ ...prev, ...updated }))
           const s = (updated as Duel).status
           const v = viewRef.current
+          if (s === 'cancelled') {
+            toast('Match annulé par l\'adversaire', { icon: '❌' })
+            setTimeout(() => router.push('/battles'), 1800)
+            return
+          }
           if (s === 'picking' && v === 'waiting') setView('picking')
           if ((s === 'stealing' || s === 'finished') && v === 'picking') setView('animation')
           if (s === 'finished' && v === 'stealing') setView('result')
@@ -91,6 +97,12 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
         if (!r.ok) return
         const data = await r.json() as Duel
         setDuel((prev) => ({ ...prev, ...data }))
+        if (data.status === 'cancelled') {
+          clearInterval(poll)
+          toast('Match annulé', { icon: '❌' })
+          setTimeout(() => router.push('/battles'), 1800)
+          return
+        }
         if (data.status === 'picking'  && view === 'waiting')  setView('picking')
         if ((data.status === 'stealing' || data.status === 'finished') && view === 'picking') setView('animation')
         if (data.status === 'finished' && view === 'stealing') setView('result')
@@ -109,9 +121,30 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
     return () => clearTimeout(t)
   }, [view])
 
+  // Auto-redirect if landing on a cancelled duel
+  useEffect(() => {
+    if (view === 'cancelled') {
+      toast('Ce match a été annulé', { icon: '❌' })
+      const t = setTimeout(() => router.push('/battles'), 1800)
+      return () => clearTimeout(t)
+    }
+  }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="min-h-screen bg-[#07070f]">
       <AnimatePresence mode="wait">
+        {view === 'cancelled' && (
+          <motion.div key="cancelled" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">
+            <div className="w-20 h-20 rounded-3xl bg-red-500/10 flex items-center justify-center">
+              <span className="text-4xl">❌</span>
+            </div>
+            <h2 className="text-3xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              MATCH ANNULÉ
+            </h2>
+            <p className="text-gray-400 text-sm">Redirection vers les duels…</p>
+          </motion.div>
+        )}
         {view === 'waiting' && (
           <WaitingView key="waiting" duel={duel} currentUserId={currentUserId} onReady={() => setView('picking')} />
         )}
