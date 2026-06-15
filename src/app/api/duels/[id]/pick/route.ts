@@ -91,8 +91,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         : null
 
     // Cards the winner can steal = loser's played cards
-    const loserPicks  = winnerId === challId ? opponentPicks  : challengerPicks
-    const stolenCardIds = winnerId ? loserPicks.map((c) => c.id) : []
+    const loserPicks = winnerId === challId ? opponentPicks : challengerPicks
+    let stolenCardIds: string[] = winnerId ? loserPicks.map((c) => c.id) : []
 
     // Update stats
     if (winnerId === challId) {
@@ -129,6 +129,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ])
       await admin.from('users').update({ battles_played: (cp?.battles_played ?? 0) + 1 }).eq('id', challId)
       if (oppId && oq) await admin.from('users').update({ battles_played: (oq?.battles_played ?? 0) + 1 }).eq('id', oppId)
+    }
+
+    // If bot won → auto-steal stake_count best cards (by rarity) from user's collection
+    if (botWon) {
+      const rarityOrder: Record<string, number> = { Legend: 4, Epic: 3, Rare: 2, Common: 1 }
+      const sortedUserPicks = [...challengerPicks].sort(
+        (a, b) => (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0)
+      )
+      const count = Math.min(duel.stake_count ?? 1, sortedUserPicks.length)
+      const toSteal = sortedUserPicks.slice(0, count)
+
+      await Promise.all(
+        toSteal.map((card) =>
+          admin.from('user_cards').delete().eq('user_id', challId).eq('card_id', card.id)
+        )
+      )
+      stolenCardIds = toSteal.map((c) => c.id)
     }
 
     // If bot won → skip stealing, finish immediately
