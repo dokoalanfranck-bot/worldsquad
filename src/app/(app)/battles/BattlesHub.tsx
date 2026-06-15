@@ -37,6 +37,7 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
   const router = useRouter()
   const [searching, setSearching] = useState(false)
   const [accepting, setAccepting] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<string | null>(null)
 
   async function findDuel() {
     setSearching(true)
@@ -62,6 +63,16 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
   async function declineInvite(duelId: string) {
     await fetch(`/api/duels/${duelId}/decline-invite`, { method: 'POST' })
     router.refresh()
+  }
+
+  async function cancelDuel(duelId: string) {
+    setCancelling(duelId)
+    try {
+      const res = await fetch(`/api/duels/${duelId}/cancel`, { method: 'POST' })
+      if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Impossible d\'annuler'); return }
+      router.refresh()
+    } catch { toast.error('Erreur réseau') }
+    finally { setCancelling(null) }
   }
 
   const invitedDuels  = duels.filter((d) => d.status === 'invited' && d.opponent_id === currentUserId)
@@ -131,18 +142,32 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
                   const isChallenger = d.challenger_id === currentUserId
                   const them = isChallenger ? d.opponent : d.challenger
                   const statusLabel = d.status === 'open' ? 'Recherche…' : d.status === 'picking' ? 'Sélection' : 'Vol en cours'
+                  const canCancel = d.status === 'open' || d.status === 'picking'
                   return (
                     <motion.div key={d.id} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                      onClick={() => router.push(`/battles/duel/${d.id}`)}
-                      className="glass rounded-2xl p-4 border border-[#F5C518]/25 cursor-pointer flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="w-2 h-2 rounded-full bg-[#F5C518] animate-pulse" />
-                        <div>
+                      className="glass rounded-2xl p-4 border border-[#F5C518]/25 flex items-center gap-3">
+                      <div
+                        className="flex items-center gap-3 flex-1 cursor-pointer"
+                        onClick={() => router.push(`/battles/duel/${d.id}`)}>
+                        <span className="w-2 h-2 rounded-full bg-[#F5C518] animate-pulse flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
                           <p className="text-[#F5C518] text-xs font-black uppercase tracking-wider">{statusLabel}</p>
-                          <p className="text-white font-bold text-sm mt-0.5">vs {them?.pseudo ?? '…'}</p>
+                          <p className="text-white font-bold text-sm mt-0.5 truncate">vs {them?.pseudo ?? '…'}</p>
                         </div>
+                        <ChevronRight size={16} className="text-[#F5C518] flex-shrink-0" />
                       </div>
-                      <ChevronRight size={16} className="text-[#F5C518]" />
+                      {canCancel && (
+                        <button
+                          onClick={() => cancelDuel(d.id)}
+                          disabled={cancelling === d.id}
+                          className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors flex-shrink-0 disabled:opacity-40"
+                        >
+                          {cancelling === d.id
+                            ? <div className="w-3 h-3 border border-red-400/40 border-t-red-400 rounded-full animate-spin" />
+                            : <X size={14} />
+                          }
+                        </button>
+                      )}
                     </motion.div>
                   )
                 })}

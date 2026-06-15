@@ -2,20 +2,26 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Swords, CircleDollarSign, Target, Flame, Trophy } from 'lucide-react'
+import { Swords, Target, Flame, Trophy, Layers, Check, X } from 'lucide-react'
 
-interface PlayerRow {
-  id: string; pseudo: string; photo_url: string | null; nation: string
-  coins: number; predictions_correct: number; battles_won: number
-}
 interface BattleRow {
   id: string; pseudo: string; photo_url: string | null; nation: string
   battles_won: number; battles_played: number; battle_streak: number
-  best_streak: number; win_rate: number; losses: number
+  best_streak: number; losses: number
+}
+interface PredRow {
+  id: string; pseudo: string; photo_url: string | null; nation: string
+  predictions_correct: number; predictions_wrong: number; predictions_total: number
+}
+interface CardRow {
+  id: string; pseudo: string; photo_url: string | null; nation: string
+  unique_cards: number
 }
 interface Props {
-  topCoins: PlayerRow[]; topPredictions: PlayerRow[]
-  topBattles: BattleRow[]; currentUserId: string
+  topPredictions: PredRow[]
+  topBattles: BattleRow[]
+  topCards: CardRow[]
+  currentUserId: string
 }
 
 const NATION_FLAGS: Record<string, string> = {
@@ -79,38 +85,8 @@ function Podium({ players }: { players: { id: string; pseudo: string; photo_url:
   )
 }
 
-function PlayerRowCoins({ player, rank, isCurrentUser }: { player: PlayerRow; rank: number; isCurrentUser: boolean }) {
-  const flag = NATION_FLAGS[player.nation] ?? '🌍'
-  return (
-    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(rank * 0.03, 0.5) }}
-      className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-colors ${isCurrentUser ? 'bg-[#F5C518]/10 border border-[#F5C518]/30' : rank <= 3 ? 'bg-white/5 border border-white/5' : 'hover:bg-white/3'}`}>
-      <RankBadge rank={rank} />
-      <Avatar photo_url={player.photo_url} pseudo={player.pseudo} size="sm" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-white font-bold text-sm truncate">{player.pseudo}</span>
-          {isCurrentUser && <span className="text-[#F5C518] text-xs font-bold">(toi)</span>}
-        </div>
-        <div className="text-white/30 text-xs flex items-center gap-1">
-          <span>{flag}</span><span>{player.nation}</span>
-        </div>
-      </div>
-      <div className="text-right">
-        <div className="text-[#F5C518] font-black text-base tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-          {player.coins.toLocaleString()}
-        </div>
-        <div className="text-white/20 text-[10px] flex items-center justify-end gap-1">
-          <Target size={9} className="text-violet-400" />{player.predictions_correct}
-          <Swords size={9} className="text-orange-400 ml-1" />{player.battles_won}
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
 function BattlePlayerRow({ player, rank, isCurrentUser }: { player: BattleRow; rank: number; isCurrentUser: boolean }) {
   const flag = NATION_FLAGS[player.nation] ?? '🌍'
-  const rateColor = player.win_rate >= 70 ? '#22c55e' : player.win_rate >= 50 ? '#F5C518' : '#ef4444'
   return (
     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(rank * 0.03, 0.5) }}
       className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-colors ${isCurrentUser ? 'bg-[#F5C518]/10 border border-[#F5C518]/30' : rank <= 3 ? 'bg-white/5 border border-white/5' : 'hover:bg-white/3'}`}>
@@ -121,25 +97,93 @@ function BattlePlayerRow({ player, rank, isCurrentUser }: { player: BattleRow; r
           <span className="text-white font-bold text-sm truncate">{player.pseudo}</span>
           {isCurrentUser && <span className="text-[#F5C518] text-xs font-bold">(toi)</span>}
         </div>
-        <div className="text-white/30 text-xs flex items-center gap-1">
+        <div className="text-white/30 text-xs flex items-center gap-1.5 mt-0.5">
           <span>{flag}</span>
-          <span className="text-green-500">{player.battles_won}V</span>
-          <span className="text-white/20">—</span>
-          <span className="text-red-500">{player.losses}D</span>
+          <span className="text-white/20">{player.battles_played} joués</span>
           {player.battle_streak >= 3 && (
-            <span className="flex items-center gap-0.5 text-orange-400 font-bold ml-1">
+            <span className="flex items-center gap-0.5 text-orange-400 font-bold">
               <Flame size={9} />{player.battle_streak}
             </span>
           )}
         </div>
       </div>
       <div className="text-right">
-        <div className="font-black text-base tabular-nums" style={{ color: rateColor, fontFamily: 'Bebas Neue, sans-serif' }}>
-          {player.win_rate}%
+        <div className="font-black text-lg tabular-nums text-[#F5C518]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          {player.battles_won} <span className="text-xs text-white/30 font-normal">victoires</span>
         </div>
-        <div className="text-white/20 text-[10px] flex items-center justify-end gap-0.5">
-          best <Flame size={9} className="text-orange-400/60" />{player.best_streak}
+        <div className="text-white/30 text-[10px] flex items-center justify-end gap-1 mt-0.5">
+          <span className="text-green-500">{player.battles_won}V</span>
+          <span className="text-white/20">·</span>
+          <span className="text-red-500">{player.losses}D</span>
+          {player.best_streak > 0 && (
+            <span className="ml-1 flex items-center gap-0.5 text-orange-400/60">
+              best <Flame size={8} />{player.best_streak}
+            </span>
+          )}
         </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function PredPlayerRow({ player, rank, isCurrentUser }: { player: PredRow; rank: number; isCurrentUser: boolean }) {
+  const flag = NATION_FLAGS[player.nation] ?? '🌍'
+  const total = player.predictions_total
+  const correctPct = total > 0 ? Math.round((player.predictions_correct / total) * 100) : 0
+  return (
+    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(rank * 0.03, 0.5) }}
+      className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-colors ${isCurrentUser ? 'bg-[#F5C518]/10 border border-[#F5C518]/30' : rank <= 3 ? 'bg-white/5 border border-white/5' : 'hover:bg-white/3'}`}>
+      <RankBadge rank={rank} />
+      <Avatar photo_url={player.photo_url} pseudo={player.pseudo} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-white font-bold text-sm truncate">{player.pseudo}</span>
+          {isCurrentUser && <span className="text-[#F5C518] text-xs font-bold">(toi)</span>}
+        </div>
+        <div className="text-white/30 text-xs flex items-center gap-1.5 mt-0.5">
+          <span>{flag}</span>
+          <span className="flex items-center gap-0.5 text-green-500">
+            <Check size={9} />{player.predictions_correct}
+          </span>
+          <span className="text-white/20">·</span>
+          <span className="flex items-center gap-0.5 text-red-400">
+            <X size={9} />{player.predictions_wrong}
+          </span>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="font-black text-lg tabular-nums text-[#F5C518]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          {player.predictions_correct} <span className="text-xs text-white/30 font-normal">corrects</span>
+        </div>
+        <div className="text-white/30 text-[10px] mt-0.5">
+          {total > 0 ? `${correctPct}% sur ${total} pronos` : 'aucun prono'}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function CardPlayerRow({ player, rank, isCurrentUser }: { player: CardRow; rank: number; isCurrentUser: boolean }) {
+  const flag = NATION_FLAGS[player.nation] ?? '🌍'
+  return (
+    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(rank * 0.03, 0.5) }}
+      className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-colors ${isCurrentUser ? 'bg-[#F5C518]/10 border border-[#F5C518]/30' : rank <= 3 ? 'bg-white/5 border border-white/5' : 'hover:bg-white/3'}`}>
+      <RankBadge rank={rank} />
+      <Avatar photo_url={player.photo_url} pseudo={player.pseudo} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-white font-bold text-sm truncate">{player.pseudo}</span>
+          {isCurrentUser && <span className="text-[#F5C518] text-xs font-bold">(toi)</span>}
+        </div>
+        <div className="text-white/30 text-xs flex items-center gap-1 mt-0.5">
+          <span>{flag}</span><span>{player.nation}</span>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="font-black text-lg tabular-nums text-[#F5C518]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          {player.unique_cards} <span className="text-xs text-white/30 font-normal">cartes</span>
+        </div>
+        <div className="text-white/20 text-[10px] mt-0.5">uniques</div>
       </div>
     </motion.div>
   )
@@ -147,14 +191,17 @@ function BattlePlayerRow({ player, rank, isCurrentUser }: { player: BattleRow; r
 
 const TABS = [
   { key: 'battles', label: 'Battles', icon: Swords },
-  { key: 'coins', label: 'Coins', icon: CircleDollarSign },
+  { key: 'cards', label: 'Cartes', icon: Layers },
   { key: 'predictions', label: 'Pronos', icon: Target },
 ] as const
 
-export function LeaderboardClient({ topCoins, topPredictions, topBattles, currentUserId }: Props) {
-  const [tab, setTab] = useState<'battles' | 'coins' | 'predictions'>('battles')
-  const list = tab === 'coins' ? topCoins : tab === 'predictions' ? topPredictions : null
-  const battleList = tab === 'battles' ? topBattles : null
+export function LeaderboardClient({ topPredictions, topBattles, topCards, currentUserId }: Props) {
+  const [tab, setTab] = useState<'battles' | 'cards' | 'predictions'>('battles')
+
+  const podiumList =
+    tab === 'battles' ? topBattles :
+    tab === 'cards' ? topCards :
+    topPredictions
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-3xl mx-auto pb-28">
@@ -180,20 +227,22 @@ export function LeaderboardClient({ topCoins, topPredictions, topBattles, curren
       </div>
 
       {/* Podium */}
-      {battleList && battleList.length >= 3 && <Podium players={battleList.slice(0, 3)} />}
-      {list && list.length >= 3 && <Podium players={list.slice(0, 3)} />}
+      {podiumList.length >= 3 && <Podium players={podiumList.slice(0, 3)} />}
 
       {/* List */}
       <div className="space-y-1">
-        {battleList?.map((player, i) => (
+        {tab === 'battles' && topBattles.map((player, i) => (
           <BattlePlayerRow key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} />
         ))}
-        {list?.map((player, i) => (
-          <PlayerRowCoins key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} />
+        {tab === 'predictions' && topPredictions.map((player, i) => (
+          <PredPlayerRow key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} />
+        ))}
+        {tab === 'cards' && topCards.map((player, i) => (
+          <CardPlayerRow key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} />
         ))}
       </div>
 
-      {((battleList ?? list ?? []).length === 0) && (
+      {podiumList.length === 0 && (
         <div className="text-center py-16">
           <div className="w-16 h-16 rounded-3xl bg-[#F5C518]/10 flex items-center justify-center mx-auto mb-4">
             <Trophy size={30} className="text-[#F5C518]/40" />
