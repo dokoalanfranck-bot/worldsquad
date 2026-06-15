@@ -56,6 +56,8 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
     if (initialDuel.status === 'picking') return 'picking'
     return 'waiting'
   })
+  const viewRef = useRef(view)
+  useEffect(() => { viewRef.current = view }, [view])
 
   const isChallenger = duel.challenger_id === currentUserId
   const me    = (isChallenger ? duel.challenger : duel.opponent) as Profile
@@ -64,7 +66,7 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
   const myPicks    = (isChallenger ? duel.challenger_picks : duel.opponent_picks) as Card[] | null
   const theirPicks = (isChallenger ? duel.opponent_picks  : duel.challenger_picks) as Card[] | null
 
-  // Realtime subscription
+  // Realtime subscription — uses viewRef to avoid stale closure
   useEffect(() => {
     const ch = supabase
       .channel(`duel-${duel.id}`)
@@ -72,9 +74,10 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
         ({ new: updated }) => {
           setDuel((prev) => ({ ...prev, ...updated }))
           const s = (updated as Duel).status
-          if (s === 'picking' && view === 'waiting') setView('picking')
-          if ((s === 'stealing' || s === 'finished') && view === 'picking') setView('animation')
-          if (s === 'finished' && view === 'stealing') setView('result')
+          const v = viewRef.current
+          if (s === 'picking' && v === 'waiting') setView('picking')
+          if ((s === 'stealing' || s === 'finished') && v === 'picking') setView('animation')
+          if (s === 'finished' && v === 'stealing') setView('result')
         })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -418,7 +421,8 @@ function PickingView({
           <div className="grid grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1">
             {tab === 'field' && fieldCards.map((card) => {
               const sel = !!selectedField.find((c) => c.id === card.id)
-              const disabled = !sel && selectedField.length >= 4
+              const usedElsewhere = card.id === selectedGK?.id || card.id === selectedCoach?.id
+              const disabled = usedElsewhere || (!sel && selectedField.length >= 4)
               return (
                 <motion.div key={card.id} whileTap={disabled ? {} : { scale: 0.92 }}
                   className={`rounded-xl ${disabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer'} ${sel ? 'ring-2 ring-[#F5C518]' : ''}`}
@@ -428,7 +432,9 @@ function PickingView({
               )
             })}
 
-            {tab === 'gk' && (gkCards.length > 0 ? gkCards : sorted).map((card) => {
+            {tab === 'gk' && (gkCards.length > 0 ? gkCards : sorted.filter(
+              (c) => !selectedField.find((f) => f.id === c.id) && c.id !== selectedCoach?.id
+            )).map((card) => {
               const sel = selectedGK?.id === card.id
               return (
                 <motion.div key={card.id} whileTap={{ scale: 0.92 }}
@@ -439,7 +445,9 @@ function PickingView({
               )
             })}
 
-            {tab === 'coach' && (coachCards.length > 0 ? coachCards : sorted).map((card) => {
+            {tab === 'coach' && (coachCards.length > 0 ? coachCards : sorted.filter(
+              (c) => !selectedField.find((f) => f.id === c.id) && c.id !== selectedGK?.id
+            )).map((card) => {
               const sel = selectedCoach?.id === card.id
               return (
                 <motion.div key={card.id} whileTap={{ scale: 0.92 }}

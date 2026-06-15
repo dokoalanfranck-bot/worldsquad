@@ -21,6 +21,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: '4 joueurs + 1 GK + 1 coach requis' }, { status: 400 })
   }
 
+  // Ensure all 6 card IDs are distinct
+  const allIdSet = new Set([...playerIds, gkId, coachId])
+  if (allIdSet.size !== 6) {
+    return NextResponse.json({ error: 'Cartes en double détectées' }, { status: 400 })
+  }
+
   const admin = createAdminClient()
 
   const { data: duel } = await admin
@@ -61,7 +67,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const myPicks = allIds.map((id) => cardsRaw.find((c) => c.id === id)).filter(Boolean) as Card[]
   const pickField = isChallenger ? 'challenger_picks' : 'opponent_picks'
 
-  await admin.from('duels').update({ [pickField]: myPicks }).eq('id', duelId)
+  const { error: saveErr } = await admin.from('duels').update({ [pickField]: myPicks }).eq('id', duelId)
+  if (saveErr) return NextResponse.json({ error: saveErr.message }, { status: 500 })
 
   // Re-fetch to see if both picks are ready
   const { data: fresh } = await admin.from('duels').select('*').eq('id', duelId).single()
@@ -127,7 +134,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // If bot won → skip stealing, finish immediately
     const nextStatus = (!winnerId || botWon) ? 'finished' : 'stealing'
 
-    await admin.from('duels').update({
+    const { error: finishErr } = await admin.from('duels').update({
       match_events:     events,
       challenger_score: challengerScore,
       opponent_score:   opponentScore,
@@ -135,6 +142,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       stolen_card_ids:  stolenCardIds,
       status:           nextStatus,
     }).eq('id', duelId)
+
+    if (finishErr) {
+      console.error('[pick] status update failed:', finishErr)
+      return NextResponse.json({ error: finishErr.message }, { status: 500 })
+    }
 
     if (winnerId) await completeMission(winnerId, 'battle')
   }
