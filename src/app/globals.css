@@ -180,9 +180,16 @@ body {
 }
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
-.dashboard-content { padding-left: 0; }
+.dashboard-content {
+  padding-left: 0;
+  /* Safe-area-aware bottom padding so content clears the bottom nav + home indicator */
+  padding-bottom: max(5.5rem, calc(4rem + env(safe-area-inset-bottom)));
+}
 @media (min-width: 1024px) {
-  .dashboard-content { padding-left: 256px; }
+  .dashboard-content {
+    padding-left: 256px;
+    padding-bottom: 0;
+  }
   /* On large screens, Bebas Neue headings can scale up */
   .font-bebas, [style*="Bebas Neue"] { letter-spacing: 0.03em; }
 }

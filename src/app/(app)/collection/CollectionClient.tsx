@@ -85,7 +85,7 @@ export function CollectionClient({
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(['all', 'player', 'nation', 'trophy'] as const).map((t) => (
             <button key={t} onClick={() => navigate({ type: t, page: 1 })}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize ${
@@ -97,7 +97,7 @@ export function CollectionClient({
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(['all', 'Common', 'Rare', 'Epic', 'Legend'] as const).map((r) => (
             <button key={r} onClick={() => navigate({ rarity: r, page: 1 })}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -118,7 +118,7 @@ export function CollectionClient({
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
             Possédées ({ownedIds.length})
           </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3">
             {ownedCards.map((card) => (
               <GameCard key={card.id} card={card} owned size="sm" onClick={() => setSelectedCard(card)} />
             ))}
@@ -132,7 +132,7 @@ export function CollectionClient({
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">
             Non possédées ({notOwnedCount})
           </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3">
             {notOwnedCards.map((card) => (
               <GameCard key={card.id} card={card} owned={false} size="sm" onClick={() => setSelectedCard(card)} />
             ))}

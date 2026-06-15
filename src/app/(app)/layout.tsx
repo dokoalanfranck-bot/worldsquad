@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <Sidebar user={profile as User} />
-      <main className="dashboard-content min-h-screen pb-20 lg:pb-0">
+      <main className="dashboard-content min-h-screen">
         <PingProvider />
         <MusicProvider>
           {children}
