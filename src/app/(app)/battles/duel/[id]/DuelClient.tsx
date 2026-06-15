@@ -871,9 +871,11 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
   const isDraw = !winnerId && (myScore ?? 0) === (theirScore ?? 0)
   const stolenCards = useMemo(() => {
     if (!duel.stolen_card_ids?.length) return []
+    // Winner → show loser's picks (cards stolen from opponent)
+    // Loser  → show own picks (cards stolen from me)
     const loserPicks = (iWon
-      ? (isChallenger ? duel.opponent_picks : duel.challenger_picks)
-      : (isChallenger ? duel.opponent_picks : duel.challenger_picks)) as Card[] | null
+      ? (isChallenger ? duel.opponent_picks   : duel.challenger_picks)
+      : (isChallenger ? duel.challenger_picks : duel.opponent_picks)) as Card[] | null
     const ids = new Set<string>(duel.stolen_card_ids)
     return (loserPicks ?? []).filter((c: Card) => ids.has(c.id))
   }, [duel, iWon, isChallenger])
