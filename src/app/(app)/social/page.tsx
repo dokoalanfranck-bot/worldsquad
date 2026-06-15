@@ -25,7 +25,7 @@ export default async function SocialPage() {
   }
 
   const { data: users } = userIds.size > 0
-    ? await admin.from('users').select('id, pseudo, nation, photo_url').in('id', Array.from(userIds))
+    ? await admin.from('users').select('id, pseudo, nation, photo_url, last_seen_at').in('id', Array.from(userIds))
     : { data: [] }
 
   const usersMap = new Map((users ?? []).map((u) => [u.id, u]))

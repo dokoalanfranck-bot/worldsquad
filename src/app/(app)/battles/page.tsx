@@ -13,12 +13,7 @@ export default async function BattlesPage() {
 
   const { data: duels } = await admin
     .from('duels')
-    .select(`
-      id, status, is_bot, bot_name, is_friend_battle,
-      challenger_score, opponent_score, winner_id,
-      stake_count, stolen_card_ids, coins_stake, created_at,
-      challenger_id, opponent_id
-    `)
+    .select('*')
     .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
     .not('status', 'eq', 'cancelled')
     .order('created_at', { ascending: false })
