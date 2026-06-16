@@ -201,7 +201,7 @@ export interface GroupActivity {
 export const PACK_CONFIGS = {
   common: {
     name: 'Pack Découverte',
-    cost: 100,
+    cost: 200,
     cards: 5,
     odds: { Common: 0.70, Rare: 0.25, Epic: 0.05, Legend: 0.00 },
     color: '#9CA3AF',
@@ -209,7 +209,7 @@ export const PACK_CONFIGS = {
   },
   rare: {
     name: 'Pack Pro',
-    cost: 300,
+    cost: 500,
     cards: 5,
     odds: { Common: 0.05, Rare: 0.45, Epic: 0.40, Legend: 0.10 },
     color: '#00D4FF',
@@ -217,7 +217,7 @@ export const PACK_CONFIGS = {
   },
   elite: {
     name: 'Pack Élite',
-    cost: 800,
+    cost: 2000,
     cards: 8,
     odds: { Common: 0.23, Rare: 0.32, Epic: 0.62, Legend: 0.23 },
     color: '#A855F7',
