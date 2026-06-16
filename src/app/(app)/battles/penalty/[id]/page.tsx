@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { PenaltyClient } from './PenaltyClient'
+import type { Card } from '@/types'
 
 export default async function PenaltyBattlePage({
   params,
@@ -32,25 +33,29 @@ export default async function PenaltyBattlePage({
 
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-  async function loadCard(userCardId: string | null) {
-    if (!userCardId) return null
-    const { data } = await admin
-      .from('user_cards')
-      .select('id, card_id, card:cards(id, name, rarity, image_url, stats, type)')
-      .eq('id', userCardId)
-      .maybeSingle()
-    if (!data) return null
-    const raw = data as { id: string; card_id: string; card: unknown }
-    const cardArr = Array.isArray(raw.card) ? raw.card[0] : raw.card
-    return { id: raw.id, card_id: raw.card_id, card: cardArr }
-  }
+  // Load user's cards for the picking phase
+  const { data: userCardsRaw } = await admin
+    .from('user_cards')
+    .select('card:cards(id, name, rarity, image_url, stats, type, nation, description, created_at)')
+    .eq('user_id', user.id)
+    .order('obtained_at', { ascending: false })
+    .limit(80)
 
-  const [challengerCard, opponentCard] = await Promise.all([
-    loadCard(battle.challenger_wager),
-    loadCard(battle.opponent_wager),
-  ])
+  const myCards = (userCardsRaw ?? [])
+    .map((uc) => {
+      const raw = uc as { card: unknown }
+      return Array.isArray(raw.card) ? raw.card[0] : raw.card
+    })
+    .filter(Boolean) as Card[]
 
-  const { data: myChoice } = await admin
+  // Check if current user already submitted picks
+  const isChallenger = user.id === battle.challenger_id
+  const initialMyPicksSubmitted = isChallenger
+    ? battle.challenger_picks !== null
+    : battle.opponent_picks !== null
+
+  // Check current round choice
+  const { data: myChoiceRow } = await admin
     .from('penalty_choices')
     .select('choice')
     .eq('battle_id', id)
@@ -64,9 +69,9 @@ export default async function PenaltyBattlePage({
       currentUserId={user.id}
       challenger={profileMap.get(battle.challenger_id) ?? null}
       opponent={battle.opponent_id ? (profileMap.get(battle.opponent_id) ?? null) : null}
-      challengerCard={challengerCard}
-      opponentCard={opponentCard}
-      initialMyChoice={myChoice?.choice ?? null}
+      myCards={myCards}
+      initialMyPicksSubmitted={initialMyPicksSubmitted}
+      initialMyChoice={myChoiceRow?.choice ?? null}
     />
   )
 }

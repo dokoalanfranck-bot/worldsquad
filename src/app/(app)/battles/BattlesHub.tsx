@@ -1,15 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   Swords, ChevronRight, Search, Layers, Radio, Gift,
   TrendingUp, TrendingDown, Minus, Check, X, Clock, Users,
-  Star,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import Image from 'next/image'
 import toast from 'react-hot-toast'
 
 interface Profile { id: string | null; pseudo: string; nation: string; photo_url: string | null }
@@ -20,9 +17,6 @@ interface PenaltyBattle {
   winner_id: string | null; challenger_id: string; opponent_id: string | null
   challenger: Profile; opponent: Profile | null; created_at: string
 }
-
-interface CardDef { id: string; name: string; rarity: string; image_url: string | null }
-interface UserCard { id: string; card_id: string; card: CardDef }
 
 interface Duel {
   id: string; status: string; is_bot: boolean; is_friend_battle: boolean; bot_name: string | null
@@ -47,112 +41,7 @@ const HOW_IT_WORKS = [
   { icon: Gift, label: 'Vol de carte', desc: 'Choisis les cartes à voler parmi les picks adverses', accent: 'bg-amber-500/10 text-amber-400' },
 ]
 
-const RARITY_BORDER: Record<string, string> = {
-  Legend: 'border-yellow-500/50',
-  Epic: 'border-purple-500/50',
-  Rare: 'border-blue-500/50',
-  Common: 'border-white/20',
-}
 
-function CardPickModal({
-  onPick,
-  onClose,
-}: {
-  onPick: (cardId: string) => void
-  onClose: () => void
-}) {
-  const supabase = useMemo(() => createClient(), [])
-  const [cards, setCards] = useState<UserCard[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('user_cards')
-        .select('id, card_id, card:cards(id, name, rarity, image_url)')
-        .eq('user_id', user.id)
-        .order('obtained_at', { ascending: false })
-        .limit(50)
-      setCards((data ?? []) as unknown as UserCard[])
-      setLoading(false)
-    }
-    load()
-  }, [supabase])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className="glass rounded-3xl border border-white/10 w-full max-w-md p-5 space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-white font-black text-lg">Choisir votre mise</h3>
-            <p className="text-white/40 text-xs">La carte perdante revient au gagnant</p>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl bg-white/5 text-white/40 hover:text-white">
-            <X size={16} />
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="py-8 text-center text-white/30 text-sm">Chargement…</div>
-        ) : cards.length === 0 ? (
-          <div className="py-8 text-center text-white/30 text-sm">Aucune carte disponible</div>
-        ) : (
-          <div className="grid grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
-            {cards.map((uc) => (
-              <button
-                key={uc.id}
-                onClick={() => setSelected(uc.id)}
-                className={`rounded-xl overflow-hidden border-2 transition-all ${
-                  selected === uc.id
-                    ? 'border-green-400 scale-105'
-                    : RARITY_BORDER[uc.card.rarity] ?? 'border-white/10'
-                }`}
-              >
-                <div className="aspect-[3/4] relative">
-                  {uc.card.image_url
-                    ? <Image src={uc.card.image_url} alt={uc.card.name} fill className="object-cover" />
-                    : <div className="w-full h-full bg-white/5 flex items-center justify-center">
-                        <Star size={16} className="text-white/20" />
-                      </div>
-                  }
-                  {selected === uc.id && (
-                    <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                      <Check size={20} className="text-green-400" />
-                    </div>
-                  )}
-                </div>
-                <p className="text-[9px] text-white/50 text-center px-1 py-0.5 truncate">{uc.card.name}</p>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={() => selected && onPick(selected)}
-          disabled={!selected}
-          className="w-full py-3 rounded-xl bg-green-500 text-black font-black text-sm disabled:opacity-40 hover:bg-green-400 transition-colors"
-        >
-          CONFIRMER LA MISE
-        </button>
-      </motion.div>
-    </motion.div>
-  )
-}
 
 export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   duels: Duel[]
@@ -163,7 +52,6 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   const [searching, setSearching] = useState(false)
   const [accepting, setAccepting] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<string | null>(null)
-  const [showCardPicker, setShowCardPicker] = useState(false)
   const [searchingPenalty, setSearchingPenalty] = useState(false)
 
   async function findDuel() {
@@ -202,15 +90,10 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
     finally { setCancelling(null) }
   }
 
-  async function startPenalty(wagerUserCardId: string) {
+  async function startPenalty() {
     setSearchingPenalty(true)
-    setShowCardPicker(false)
     try {
-      const res = await fetch('/api/penalty/find', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wagerUserCardId }),
-      })
+      const res = await fetch('/api/penalty/find', { method: 'POST' })
       const data = await res.json() as { battleId?: string; error?: string }
       if (!res.ok || !data.battleId) { toast.error(data.error ?? 'Erreur'); return }
       router.push(`/battles/penalty/${data.battleId}`)
@@ -222,7 +105,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   const activeDuels   = duels.filter((d) => ['open', 'picking', 'stealing'].includes(d.status))
   const finished      = duels.filter((d) => d.status === 'finished')
 
-  const activePenalty  = penaltyBattles.filter((p) => ['waiting', 'active'].includes(p.status))
+  const activePenalty  = penaltyBattles.filter((p) => ['waiting', 'picking', 'active', 'stealing'].includes(p.status))
   const finishedPenalty = penaltyBattles.filter((p) => p.status === 'finished')
 
   return (
@@ -346,7 +229,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
                 {activePenalty.map((pb) => {
                   const isChallenger = pb.challenger_id === currentUserId
                   const them = isChallenger ? pb.opponent : pb.challenger
-                  const statusLabel = pb.status === 'waiting' ? 'En attente…' : `Tour ${pb.current_round}`
+                  const statusLabel = pb.status === 'waiting' ? 'En attente…' : pb.status === 'picking' ? 'Sélection équipe…' : pb.status === 'stealing' ? 'Vol de carte…' : `Tour ${pb.current_round}`
                   return (
                     <motion.div key={pb.id} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
                       onClick={() => router.push(`/battles/penalty/${pb.id}`)}
@@ -372,7 +255,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
           {/* Penalty CTA */}
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setShowCardPicker(true)}
+            onClick={startPenalty}
             disabled={searchingPenalty}
             className="w-full relative overflow-hidden bg-green-500 text-black font-black py-4 rounded-2xl text-xl flex items-center justify-center gap-3 shadow-2xl shadow-green-500/25 disabled:opacity-70 mb-4"
             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
@@ -514,15 +397,6 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
 
       </div>
 
-      {/* Card picker modal */}
-      <AnimatePresence>
-        {showCardPicker && (
-          <CardPickModal
-            onPick={startPenalty}
-            onClose={() => setShowCardPicker(false)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   )
 }

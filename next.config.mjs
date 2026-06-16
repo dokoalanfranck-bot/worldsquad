@@ -10,6 +10,10 @@ const nextConfig = {
         hostname: 'www.thesportsdb.com',
         pathname: '/images/**',
       },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
     ],
   },
   async headers() {

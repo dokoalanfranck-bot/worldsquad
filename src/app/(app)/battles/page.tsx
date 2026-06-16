@@ -41,7 +41,7 @@ export default async function BattlesPage() {
     .from('penalty_battles')
     .select('*')
     .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
-    .not('status', 'eq', 'cancelled')
+    .in('status', ['waiting', 'picking', 'active', 'stealing', 'finished'])
     .order('created_at', { ascending: false })
     .limit(20)
 
