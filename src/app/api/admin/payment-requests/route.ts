@@ -2,6 +2,34 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const BUCKET = 'payment-screenshots'
+
+// Extrait le chemin relatif depuis l'URL Supabase Storage
+function extractStoragePath(url: string): string | null {
+  const marker = `/object/public/${BUCKET}/`
+  const idx = url.indexOf(marker)
+  if (idx !== -1) return url.slice(idx + marker.length)
+  // URL déjà relative ou autre format
+  const markerSign = `/object/sign/${BUCKET}/`
+  const idx2 = url.indexOf(markerSign)
+  if (idx2 !== -1) return url.slice(idx2 + markerSign.length).split('?')[0]
+  return null
+}
+
+async function withSignedUrls<T extends { screenshot_url: string }>(
+  items: T[],
+  admin: ReturnType<typeof createAdminClient>
+): Promise<T[]> {
+  return Promise.all(
+    items.map(async (item) => {
+      const path = extractStoragePath(item.screenshot_url)
+      if (!path) return item
+      const { data } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600)
+      return { ...item, screenshot_url: data?.signedUrl ?? item.screenshot_url }
+    })
+  )
+}
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,8 +59,13 @@ export async function GET() {
   if (pendingErr) console.error('[admin/payment-requests] pending:', pendingErr.message)
   if (historyErr) console.error('[admin/payment-requests] history:', historyErr.message)
 
+  const [pendingWithUrls, historyWithUrls] = await Promise.all([
+    withSignedUrls(pending ?? [], admin),
+    withSignedUrls(history ?? [], admin),
+  ])
+
   return NextResponse.json(
-    { pending: pending ?? [], history: history ?? [] },
+    { pending: pendingWithUrls, history: historyWithUrls },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }
