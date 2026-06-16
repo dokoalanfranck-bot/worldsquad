@@ -39,7 +39,10 @@ export default async function PenaltyBattlePage({
       .select('id, card_id, card:cards(id, name, rarity, image_url, stats, type)')
       .eq('id', userCardId)
       .maybeSingle()
-    return data
+    if (!data) return null
+    const raw = data as { id: string; card_id: string; card: unknown }
+    const cardArr = Array.isArray(raw.card) ? raw.card[0] : raw.card
+    return { id: raw.id, card_id: raw.card_id, card: cardArr }
   }
 
   const [challengerCard, opponentCard] = await Promise.all([
