@@ -90,7 +90,7 @@ export async function POST(
   if (fresh?.challenger_picks && fresh?.opponent_picks) {
     await admin.from('penalty_battles').update({
       status: 'active',
-      round_deadline: new Date(Date.now() + 5000).toISOString(),
+      round_deadline: new Date(Date.now() + 15000).toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', battleId).eq('status', 'picking')
   }

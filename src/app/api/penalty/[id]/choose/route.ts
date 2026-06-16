@@ -178,7 +178,7 @@ export async function POST(
   }
 
   const nextRound = battle.current_round + 1
-  const nextDeadline = over ? null : new Date(Date.now() + 5000).toISOString()
+  const nextDeadline = over ? null : new Date(Date.now() + 15000).toISOString()
 
   const { data: updated } = await admin
     .from('penalty_battles')

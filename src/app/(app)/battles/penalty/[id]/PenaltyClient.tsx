@@ -304,6 +304,159 @@ function PickingView({
   )
 }
 
+// ── GoalAnimation ─────────────────────────────────────────────────────────────
+
+// Ball: starts at center-bottom, flies to corner.
+// Offsets relative to center-bottom of the 280×170px goal frame:
+const BALL_ANIM: Record<string, { x: number; y: number; scale: number }> = {
+  left:    { x: -84, y: -94,  scale: 0.55 },
+  center:  { x: 0,   y: -120, scale: 0.5  },
+  right:   { x: 84,  y: -94,  scale: 0.55 },
+  panenka: { x: 0,   y: -140, scale: 0.4  },
+}
+
+// GK silhouette: starts centered at bottom, dives on their side
+const GK_ANIM: Record<string, { x: number; rotate: number }> = {
+  left:    { x: -72, rotate: -58 },
+  center:  { x: 0,   rotate: 0   },
+  right:   { x: 72,  rotate: 58  },
+  panenka: { x: 0,   rotate: 8   },
+}
+
+function GoalAnimation({
+  result, onDone,
+}: {
+  result: RoundResult
+  onDone: () => void
+}) {
+  const isGoal = result.is_goal
+  const ballAnim = BALL_ANIM[result.shooter_choice] ?? BALL_ANIM.center
+  const gkAnim = GK_ANIM[result.gk_choice] ?? GK_ANIM.center
+  const [showText, setShowText] = useState(false)
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setShowText(true), 850)
+    const t2 = setTimeout(() => onDone(), 2800)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [onDone])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 overflow-hidden"
+      style={{ background: 'rgba(0,0,0,0.93)' }}
+    >
+      {/* Stadium glow */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: showText ? 0.18 : 0 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          background: isGoal
+            ? 'radial-gradient(ellipse at 50% 60%, #22c55e 0%, transparent 65%)'
+            : 'radial-gradient(ellipse at 50% 60%, #3b82f6 0%, transparent 65%)',
+        }}
+      />
+
+      {/* Goal frame */}
+      <div className="relative" style={{ width: 280, height: 170 }}>
+        <svg className="absolute inset-0" width="280" height="170" viewBox="0 0 280 170">
+          {/* Net grid */}
+          {[0,1,2,3,4].map((i) => (
+            <line key={`h${i}`} x1="12" y1={14 + i * 28} x2="268" y2={14 + i * 28}
+              stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+          ))}
+          {[0,1,2,3,4,5,6,7,8,9].map((i) => (
+            <line key={`v${i}`} x1={12 + i * 28} y1="14" x2={12 + i * 28} y2="154"
+              stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+          ))}
+          {/* Posts */}
+          <line x1="12" y1="14" x2="12" y2="158" stroke="white" strokeWidth="5" strokeLinecap="round" />
+          <line x1="268" y1="14" x2="268" y2="158" stroke="white" strokeWidth="5" strokeLinecap="round" />
+          <line x1="12" y1="14" x2="268" y2="14" stroke="white" strokeWidth="5" strokeLinecap="round" />
+          {/* Goal-line flash when scored */}
+          {isGoal && showText && (
+            <rect x="12" y="14" width="256" height="144" fill="rgba(34,197,94,0.08)" rx="2" />
+          )}
+          {/* Ground */}
+          <line x1="0" y1="158" x2="280" y2="158" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
+          {/* Penalty spot */}
+          <circle cx="140" cy="165" r="3" fill="rgba(255,255,255,0.25)" />
+        </svg>
+
+        {/* GK silhouette */}
+        <motion.div
+          className="absolute"
+          style={{ bottom: 8, left: '50%', marginLeft: -13 }}
+          initial={{ x: 0, rotate: 0 }}
+          animate={{ x: gkAnim.x, rotate: gkAnim.rotate }}
+          transition={{ delay: 0.15, duration: 0.48, ease: [0.2, 0, 0.4, 1] }}
+        >
+          <div className="flex flex-col items-center">
+            <div className="w-6 h-6 rounded-full bg-white/75" />
+            <div className="relative w-5 h-7 bg-white/75 rounded-full mt-0.5">
+              <div className="absolute top-1.5 -left-4 w-4 h-2 bg-white/75 rounded-full" />
+              <div className="absolute top-1.5 -right-4 w-4 h-2 bg-white/75 rounded-full" />
+            </div>
+            <div className="flex gap-0.5 mt-0.5">
+              <div className="w-2 h-4 bg-white/75 rounded-full" />
+              <div className="w-2 h-4 bg-white/75 rounded-full" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Ball */}
+        <motion.div
+          className="absolute text-3xl select-none"
+          style={{ bottom: 4, left: '50%', marginLeft: -18 }}
+          initial={{ x: 0, y: 0, scale: 1, rotate: 0 }}
+          animate={{
+            x: ballAnim.x,
+            y: ballAnim.y,
+            scale: ballAnim.scale,
+            rotate: result.shooter_choice === 'panenka' ? 0 : (result.shooter_choice === 'left' ? -180 : 180),
+          }}
+          transition={{ duration: 0.65, ease: [0.15, 0.0, 0.25, 1.0] }}
+        >
+          ⚽
+        </motion.div>
+      </div>
+
+      {/* Result text */}
+      <AnimatePresence>
+        {showText && (
+          <motion.div
+            key="result-text"
+            initial={{ opacity: 0, scale: 0.4, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 18 }}
+            className="text-center"
+          >
+            <p className="text-7xl font-black tracking-tight" style={{
+              fontFamily: 'Bebas Neue, sans-serif',
+              color: isGoal ? '#22c55e' : '#60a5fa',
+              textShadow: isGoal ? '0 0 50px #22c55e88' : '0 0 50px #60a5fa88',
+            }}>
+              {isGoal ? 'BUT !' : 'ARRÊT !'}
+            </p>
+            <p className="text-white/30 text-xs mt-2 uppercase tracking-widest">
+              {result.shooter_choice === 'panenka' ? '⭐ Panenka'
+                : result.shooter_choice === 'left' ? '← Gauche'
+                : result.shooter_choice === 'center' ? '↑ Centre'
+                : 'Droite →'}
+              {' · GK → '}
+              {result.gk_choice === 'left' ? '←' : result.gk_choice === 'center' ? '↑' : '→'}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 // ── ActiveView ────────────────────────────────────────────────────────────────
 
 function ActiveView({
@@ -331,29 +484,40 @@ function ActiveView({
 
   const timeLeft = useDeadlineCountdown(battle.round_deadline)
   const [myChoice, setMyChoice] = useState<string | null>(initialMyChoice)
-  const [roundPhase, setRoundPhase] = useState<'choosing' | 'waiting'>(() => initialMyChoice ? 'waiting' : 'choosing')
-  const [lastResult, setLastResult] = useState<RoundResult | null>(null)
+  const [roundPhase, setRoundPhase] = useState<'choosing' | 'waiting' | 'animating'>(() =>
+    initialMyChoice ? 'waiting' : 'choosing'
+  )
+  const [animatingResult, setAnimatingResult] = useState<RoundResult | null>(null)
   const [loading, setLoading] = useState(false)
 
   const usedPanenka = isChallenger ? battle.challenger_used_panenka : battle.opponent_used_panenka
-  const flashShownRef = useRef(new Set<number>())
+  const shownRef = useRef(new Set<number>())
 
+  function startAnimation(r: RoundResult) {
+    if (shownRef.current.has(r.round)) return
+    shownRef.current.add(r.round)
+    setAnimatingResult(r)
+    setRoundPhase('animating')
+  }
+
+  function onAnimationDone() {
+    setAnimatingResult(null)
+    setRoundPhase('choosing')
+    setMyChoice(null)
+  }
+
+  // Realtime rounds: start animation for the round we haven't seen yet
   useEffect(() => {
     const rounds = (battle.rounds ?? []) as RoundResult[]
     for (const r of rounds) {
-      if (!flashShownRef.current.has(r.round)) {
-        flashShownRef.current.add(r.round)
-        setLastResult(r)
-        setTimeout(() => {
-          setLastResult(null)
-          setMyChoice(null)
-          setRoundPhase('choosing')
-        }, 2500)
+      if (!shownRef.current.has(r.round)) {
+        startAnimation(r)
         break
       }
     }
   }, [battle.rounds]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-submit at deadline
   useEffect(() => {
     if (timeLeft === 0 && roundPhase === 'choosing' && !myChoice) {
       const choices = ['left', 'center', 'right'] as const
@@ -371,24 +535,15 @@ function ActiveView({
         body: JSON.stringify({ choice }),
       })
       const data = await res.json() as {
-        submitted: boolean; resolved: boolean; isGoal?: boolean
+        submitted: boolean; resolved: boolean
         roundResult?: RoundResult; alreadySubmitted?: boolean; error?: string
       }
       if (!res.ok) { toast.error(data.error ?? 'Erreur'); return }
       setMyChoice(choice)
       setRoundPhase('waiting')
-
+      // If we resolved the round → animate immediately
       if (data.resolved && data.roundResult) {
-        const rn = data.roundResult.round
-        if (!flashShownRef.current.has(rn)) {
-          flashShownRef.current.add(rn)
-          setLastResult(data.roundResult)
-          setTimeout(() => {
-            setLastResult(null)
-            setMyChoice(null)
-            setRoundPhase('choosing')
-          }, 2500)
-        }
+        startAnimation(data.roundResult)
       }
     } catch { toast.error('Erreur réseau') }
     finally { setLoading(false) }
@@ -396,139 +551,203 @@ function ActiveView({
 
   const myScore = isChallenger ? battle.challenger_score : battle.opponent_score
   const theirScore = isChallenger ? battle.opponent_score : battle.challenger_score
+  const timerPct = battle.round_deadline
+    ? Math.max(0, (new Date(battle.round_deadline).getTime() - Date.now()) / 15000)
+    : 0
+  const timerColor = timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : '#22c55e'
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen px-4 py-4 max-w-2xl mx-auto">
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Stadium atmosphere pulse */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        animate={{
+          opacity: roundPhase === 'choosing' ? [0.04, 0.09, 0.04] : 0,
+        }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          background: 'radial-gradient(ellipse at 50% 100%, #22c55e 0%, transparent 60%)',
+        }}
+      />
 
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <p className="text-white/30 text-xs">Round {round} · {iAmShooter ? 'Vous tirez' : 'Vous êtes gardien'}</p>
-          <div className="text-4xl font-black text-white tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            {myScore} <span className="text-white/30">—</span> {theirScore}
-          </div>
-          <p className="text-white/30 text-xs mt-0.5">
-            {flag(me?.nation ?? '')} {me?.pseudo} vs {flag(them?.nation ?? '')} {them?.pseudo}
-          </p>
-        </div>
-        <div className="flex flex-col items-center glass rounded-xl px-4 py-2">
-          <Clock size={12} className="text-green-400" />
-          <span className="text-2xl font-black font-mono text-green-400" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            {timeLeft}
-          </span>
-        </div>
-      </div>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative px-4 py-4 max-w-2xl mx-auto">
 
-      {/* Active cards */}
-      <div className="flex items-end gap-3 mb-6 justify-center">
-        <div className="text-center">
-          <p className="text-white/30 text-[9px] uppercase mb-1">
-            {iAmShooter ? 'Tireur (vous)' : `Tireur (${them?.pseudo ?? '?'})`}
-          </p>
-          <div className="w-20">
-            {(iAmShooter ? myActiveCard : theirActiveCard)
-              ? <GameCard card={(iAmShooter ? myActiveCard : theirActiveCard)!} owned size="sm" />
-              : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-white/20 text-xl">⚽</div>}
-          </div>
-        </div>
-        <div className="text-2xl pb-4">⚡</div>
-        <div className="text-center">
-          <p className="text-white/30 text-[9px] uppercase mb-1">
-            {iAmShooter ? `Gardien (${them?.pseudo ?? '?'})` : 'Gardien (vous)'}
-          </p>
-          <div className="w-20">
-            {(iAmShooter ? theirActiveCard : myActiveCard)
-              ? <GameCard card={(iAmShooter ? theirActiveCard : myActiveCard)!} owned size="sm" />
-              : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-white/20 text-xl">🧤</div>}
-          </div>
-        </div>
-      </div>
-
-      {/* Result flash */}
-      <AnimatePresence>
-        {lastResult && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.2 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
-          >
-            <div className={`text-center px-10 py-8 rounded-3xl border backdrop-blur-xl ${
-              lastResult.is_goal ? 'bg-green-500/20 border-green-500/30' : 'bg-blue-500/20 border-blue-500/30'
-            }`}>
-              <div className="text-7xl mb-2">{lastResult.is_goal ? '⚽' : '🧤'}</div>
-              <div className="text-5xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                {lastResult.is_goal ? 'BUT !' : 'ARRÊT !'}
-              </div>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="text-white/30 text-xs">
+              Round {round} · {iAmShooter ? '⚽ Vous tirez' : '🧤 Vous êtes gardien'}
+            </p>
+            <div className="text-4xl font-black text-white tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              {myScore} <span className="text-white/30">—</span> {theirScore}
             </div>
+            <p className="text-white/30 text-xs mt-0.5">
+              {flag(me?.nation ?? '')} {me?.pseudo} vs {flag(them?.nation ?? '')} {them?.pseudo}
+            </p>
+          </div>
+
+          {/* Timer ring */}
+          <div className="relative flex items-center justify-center" style={{ width: 56, height: 56 }}>
+            <svg className="absolute inset-0 -rotate-90" width="56" height="56">
+              <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+              <motion.circle
+                cx="28" cy="28" r="22" fill="none"
+                stroke={timerColor} strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 22}`}
+                animate={{ strokeDashoffset: (1 - timerPct) * 2 * Math.PI * 22 }}
+                transition={{ duration: 0.5 }}
+              />
+            </svg>
+            <span className="text-xl font-black font-mono tabular-nums z-10" style={{ color: timerColor, fontFamily: 'Bebas Neue, sans-serif' }}>
+              {timeLeft}
+            </span>
+          </div>
+        </div>
+
+        {/* Shooter card & GK card */}
+        <div className="flex items-end gap-4 mb-7 justify-center">
+          <div className="text-center">
+            <p className="text-white/25 text-[9px] uppercase tracking-wider mb-1.5">
+              {iAmShooter ? 'Tireur (vous)' : `Tireur (${them?.pseudo ?? '?'})`}
+            </p>
+            <motion.div
+              className="w-[72px]"
+              animate={roundPhase === 'choosing' && iAmShooter ? {
+                y: [0, -3, 0], filter: ['drop-shadow(0 0 0px #22c55e00)', 'drop-shadow(0 0 12px #22c55e88)', 'drop-shadow(0 0 0px #22c55e00)'],
+              } : {}}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {(iAmShooter ? myActiveCard : theirActiveCard)
+                ? <GameCard card={(iAmShooter ? myActiveCard : theirActiveCard)!} owned size="sm" />
+                : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-2xl">⚽</div>}
+            </motion.div>
+          </div>
+
+          <div className="text-white/20 text-xl pb-5">VS</div>
+
+          <div className="text-center">
+            <p className="text-white/25 text-[9px] uppercase tracking-wider mb-1.5">
+              {iAmShooter ? `Gardien (${them?.pseudo ?? '?'})` : 'Gardien (vous)'}
+            </p>
+            <motion.div
+              className="w-[72px]"
+              animate={roundPhase === 'choosing' && !iAmShooter ? {
+                y: [0, -3, 0], filter: ['drop-shadow(0 0 0px #3b82f600)', 'drop-shadow(0 0 12px #3b82f688)', 'drop-shadow(0 0 0px #3b82f600)'],
+              } : {}}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {(iAmShooter ? theirActiveCard : myActiveCard)
+                ? <GameCard card={(iAmShooter ? theirActiveCard : myActiveCard)!} owned size="sm" />
+                : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-2xl">🧤</div>}
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Chosen indicator */}
+        {myChoice && roundPhase === 'waiting' && (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-xl p-2.5 mb-4 flex items-center justify-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-xs text-white/50">
+              {iAmShooter ? 'Tir confirmé' : 'Plongeon confirmé'} · En attente de l'adversaire…
+            </span>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      {/* Direction buttons */}
-      <div className="space-y-3">
-        <p className="text-white/40 text-sm text-center font-bold">
-          {iAmShooter ? '⚽ Où viser ?' : '🧤 Où plonger ?'}
-        </p>
-        <div className="grid grid-cols-3 gap-3">
-          {(['left', 'center', 'right'] as const).map((dir) => {
-            const chosen = myChoice === dir
-            const labels: Record<string, string> = { left: '← Gauche', center: '↑ Centre', right: 'Droite →' }
-            return (
-              <motion.button key={dir} whileTap={{ scale: 0.93 }}
-                disabled={roundPhase !== 'choosing' || loading}
-                onClick={() => submitChoice(dir)}
-                className={`py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all ${
-                  chosen ? 'bg-green-500 text-black shadow-lg shadow-green-500/30'
-                    : roundPhase !== 'choosing' ? 'bg-white/5 text-white/20'
-                    : 'bg-white/10 text-white hover:bg-white/15'
-                }`}
-                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                {labels[dir]}
-              </motion.button>
-            )
-          })}
-        </div>
-
-        {iAmShooter && !usedPanenka && (
-          <motion.button whileTap={{ scale: 0.96 }}
-            disabled={roundPhase !== 'choosing' || loading}
-            onClick={() => submitChoice('panenka')}
-            className={`w-full py-3 rounded-2xl font-black text-sm transition-all ${
-              myChoice === 'panenka' ? 'bg-yellow-400 text-black'
-                : roundPhase !== 'choosing' ? 'bg-white/5 text-white/20'
-                : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/15'
-            }`}
-            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            ⭐ PANENKA (usage unique)
-          </motion.button>
-        )}
-
-        {roundPhase === 'waiting' && !lastResult && (
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-center py-3 text-white/40 text-sm">
-            En attente de l'adversaire…
-          </motion.p>
-        )}
-      </div>
-
-      {/* Round history */}
-      {((battle.rounds?.length ?? 0) > 0) && (
-        <div className="mt-6">
-          <p className="text-white/20 text-[9px] uppercase tracking-widest mb-2">Historique</p>
-          <div className="flex gap-2 flex-wrap">
-            {((battle.rounds ?? []) as RoundResult[]).map((r, i) => {
-              const iShot = r.shooter_id === currentUserId
-              const positive = iShot ? r.is_goal : !r.is_goal
+        {/* Direction buttons */}
+        <div className="space-y-3">
+          <p className="text-white/50 text-xs text-center font-bold uppercase tracking-widest">
+            {iAmShooter ? '⚽ Choisir la direction du tir' : '🧤 Choisir la direction du plongeon'}
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {(['left', 'center', 'right'] as const).map((dir) => {
+              const chosen = myChoice === dir
+              const disabled = roundPhase !== 'choosing' || loading
+              const labels: Record<string, string> = { left: '← Gauche', center: '↑ Centre', right: 'Droite →' }
               return (
-                <div key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${positive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                  {r.is_goal ? '⚽' : '🧤'}
-                </div>
+                <motion.button key={dir}
+                  whileTap={disabled ? {} : { scale: 0.91 }}
+                  whileHover={disabled ? {} : { scale: 1.03 }}
+                  disabled={disabled}
+                  onClick={() => submitChoice(dir)}
+                  className={`py-5 rounded-2xl font-black text-sm uppercase tracking-wider transition-colors relative overflow-hidden ${
+                    chosen
+                      ? 'bg-green-500 text-black shadow-lg shadow-green-500/40'
+                      : disabled
+                        ? 'bg-white/4 text-white/15'
+                        : 'bg-white/8 text-white hover:bg-white/12 border border-white/8'
+                  }`}
+                  style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                  {chosen && (
+                    <motion.div
+                      className="absolute inset-0 bg-white/20"
+                      initial={{ scale: 0, opacity: 1, borderRadius: '100%' }}
+                      animate={{ scale: 3, opacity: 0 }}
+                      transition={{ duration: 0.5 }}
+                    />
+                  )}
+                  {labels[dir]}
+                </motion.button>
               )
             })}
           </div>
+
+          {iAmShooter && !usedPanenka && (
+            <motion.button
+              whileTap={roundPhase !== 'choosing' ? {} : { scale: 0.96 }}
+              disabled={roundPhase !== 'choosing' || loading}
+              onClick={() => submitChoice('panenka')}
+              className={`w-full py-3 rounded-2xl font-black text-sm transition-all relative overflow-hidden ${
+                myChoice === 'panenka'
+                  ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/40'
+                  : roundPhase !== 'choosing'
+                    ? 'bg-white/4 text-white/15'
+                    : 'bg-yellow-500/8 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/14'
+              }`}
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              ⭐ PANENKA — usage unique
+            </motion.button>
+          )}
         </div>
-      )}
-    </motion.div>
+
+        {/* Round history */}
+        {((battle.rounds?.length ?? 0) > 0) && (
+          <div className="mt-7">
+            <p className="text-white/20 text-[9px] uppercase tracking-widest mb-2">Historique</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {((battle.rounds ?? []) as RoundResult[]).map((r, i) => {
+                const iShot = r.shooter_id === currentUserId
+                const positive = iShot ? r.is_goal : !r.is_goal
+                return (
+                  <motion.div key={i}
+                    initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    transition={{ type: 'spring', delay: i * 0.05 }}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-sm border ${
+                      positive
+                        ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                        : 'bg-red-500/10 border-red-500/20 text-red-400'
+                    }`}>
+                    {r.is_goal ? '⚽' : '🧤'}
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Goal animation overlay */}
+      <AnimatePresence>
+        {animatingResult && (
+          <GoalAnimation
+            key={`anim-${animatingResult.round}`}
+            result={animatingResult}
+            onDone={onAnimationDone}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
