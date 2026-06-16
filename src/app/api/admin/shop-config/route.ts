@@ -18,12 +18,24 @@ export async function PUT(req: NextRequest) {
     is_active?: boolean
   }
 
-  const { data: existing } = await admin.from('shop_config').select('id').limit(1).single()
+  const { data: existing } = await admin.from('shop_config').select('id').limit(1).maybeSingle()
 
   if (existing) {
-    await admin.from('shop_config').update({ ...body, updated_at: new Date().toISOString() }).eq('id', existing.id)
+    const { error } = await admin
+      .from('shop_config')
+      .update({ ...body, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+
+    if (error) {
+      console.error('[shop-config] update error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
   } else {
-    await admin.from('shop_config').insert({ ...body })
+    const { error } = await admin.from('shop_config').insert({ ...body })
+    if (error) {
+      console.error('[shop-config] insert error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ success: true })

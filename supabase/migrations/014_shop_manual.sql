@@ -39,8 +39,20 @@ CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON public.payment_request
 
 ALTER TABLE public.payment_requests ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users read own requests"   ON public.payment_requests;
+DROP POLICY IF EXISTS "Users insert own requests" ON public.payment_requests;
+DROP POLICY IF EXISTS "Service role all"          ON public.payment_requests;
+
 CREATE POLICY "Users read own requests"   ON public.payment_requests FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own requests" ON public.payment_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Service role all"          ON public.payment_requests FOR ALL USING (auth.role() = 'service_role');
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.payment_requests;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'payment_requests'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.payment_requests;
+  END IF;
+END $$;

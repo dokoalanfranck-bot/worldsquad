@@ -75,7 +75,7 @@ export default function ShopPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetch('/api/shop/config').then((r) => r.json()).then(setConfig).catch(() => {})
+    fetch('/api/shop/config', { cache: 'no-store' }).then((r) => r.json()).then(setConfig).catch(() => {})
 
     const loadRequests = async () => {
       const { data: { user } } = await supabase.auth.getUser()

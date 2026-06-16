@@ -62,7 +62,7 @@ export default function AdminShopPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    const cfgRes = await fetch('/api/shop/config')
+    const cfgRes = await fetch('/api/shop/config', { cache: 'no-store' })
     const cfg = await cfgRes.json() as ShopConfig
     setConfig(cfg)
     setConfigDraft({
