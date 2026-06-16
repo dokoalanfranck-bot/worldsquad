@@ -88,14 +88,20 @@ export default function AdminShopPage() {
     loadConfig()
     loadRequests()
 
-    // PaymentNotifier (layout) dispatche cet event quand il reçoit un INSERT/UPDATE
-    const handleNewPayment = () => {
-      if (refreshingRef.current) return
-      refreshingRef.current = true
-      loadRequests().finally(() => { refreshingRef.current = false })
+    // Polling toutes les 20s — contourne le problème RLS Realtime
+    const interval = setInterval(loadRequests, 20000)
+
+    // Rechargement quand l'admin revient sur la fenêtre (ex: après avoir reçu une notif push)
+    const handleFocus = () => loadRequests()
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) loadRequests()
+    })
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
     }
-    window.addEventListener('payment-request-received', handleNewPayment)
-    return () => { window.removeEventListener('payment-request-received', handleNewPayment) }
   }, [loadConfig, loadRequests])
 
   async function saveConfig() {
