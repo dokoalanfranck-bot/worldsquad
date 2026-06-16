@@ -65,6 +65,7 @@ export default function ShopPage() {
   const supabase = createClient()
   const [config, setConfig] = useState<ShopConfig | null>(null)
   const [myRequests, setMyRequests] = useState<PaymentRequest[]>([])
+  const hasPending = myRequests.some((r) => r.status === 'pending')
   const [selected, setSelected] = useState<typeof PACKS[0] | null>(null)
   const [step, setStep] = useState<'method' | 'form'>('method')
   const [payMethod, setPayMethod] = useState<'orange_money' | 'mtn'>('orange_money')
@@ -166,17 +167,29 @@ export default function ShopPage() {
         <p className="text-white/30 text-sm mt-2">Recharge via Orange Money ou MTN Mobile Money</p>
       </div>
 
+      {/* Bandeau demande en attente */}
+      {hasPending && (
+        <div className="glass rounded-2xl p-4 mb-6 border border-amber-500/30 flex items-start gap-3">
+          <Clock size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-400 font-bold text-sm">Demande en cours de traitement</p>
+            <p className="text-white/40 text-xs mt-0.5">Tu as déjà une demande en attente. Tu pourras en soumettre une nouvelle une fois qu'elle sera traitée par l'admin.</p>
+          </div>
+        </div>
+      )}
+
       {/* Pack cards */}
       <div className="space-y-3 mb-8">
         {PACKS.map((pack) => {
           const Icon = pack.icon
           const priceFcfa = config?.prices_fcfa[pack.key]
+          const blocked = hasPending || !config?.is_active
           return (
-            <motion.div key={pack.key} whileTap={{ scale: 0.98 }}
-              onClick={() => config?.is_active && openModal(pack)}
-              className={`relative glass rounded-2xl p-5 border cursor-pointer flex items-center gap-4 transition-all
+            <motion.div key={pack.key} whileTap={!blocked ? { scale: 0.98 } : undefined}
+              onClick={() => !blocked && openModal(pack)}
+              className={`relative glass rounded-2xl p-5 border flex items-center gap-4 transition-all
                 ${pack.key === 'fan' ? 'border-[#00D4FF]/30' : pack.key === 'ultra' ? 'border-[#F5C518]/30' : 'border-white/5'}
-                ${!config?.is_active ? 'opacity-50 cursor-not-allowed' : 'hover:border-white/20'}`}
+                ${blocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:border-white/20'}`}
             >
               {pack.badge && (
                 <div className="absolute -top-2.5 left-5 text-[9px] font-black px-2.5 py-0.5 rounded-full text-black"

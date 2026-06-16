@@ -35,8 +35,24 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient()
 
+  // Vérifie qu'il n'y a pas déjà une demande en attente
+  const { data: existing } = await admin
+    .from('payment_requests')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) {
+    return NextResponse.json(
+      { error: 'Tu as déjà une demande en attente. Attends que l\'admin la traite avant d\'en soumettre une nouvelle.' },
+      { status: 409 }
+    )
+  }
+
   // Get pack price
-  const { data: config } = await admin.from('shop_config').select('prices_fcfa, is_active').limit(1).single()
+  const { data: config } = await admin.from('shop_config').select('prices_fcfa, is_active').limit(1).maybeSingle()
   if (!config?.is_active) {
     return NextResponse.json({ error: 'Boutique temporairement fermée' }, { status: 503 })
   }
