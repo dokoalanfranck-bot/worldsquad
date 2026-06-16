@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
-import { getTodayMissions } from '@/lib/missions'
+import { getTodayMissions, getMissionConfig } from '@/lib/missions'
 import { getActiveFlashChallenges } from '@/lib/flash-challenges'
 import type { FlashChallenge } from '@/lib/flash-challenges'
 
@@ -13,7 +13,7 @@ export default async function DashboardPage() {
 
   if (!authUser) redirect('/login')
 
-  const [{ data: profile }, { data: nextMatch }, { data: recentPredictions }, { data: groupData }, { data: liveMatches }, { data: recentFinished }, todayMissions, flashChallenges] =
+  const [{ data: profile }, { data: nextMatch }, { data: recentPredictions }, { data: groupData }, { data: liveMatches }, { data: recentFinished }, todayMissions, flashChallenges, missionConfig] =
     await Promise.all([
       supabase.from('users').select('*').eq('id', authUser.id).single(),
       supabase
@@ -48,6 +48,7 @@ export default async function DashboardPage() {
         .limit(4),
       getTodayMissions(authUser.id),
       getActiveFlashChallenges(),
+      getMissionConfig(),
     ])
 
   if (!profile) redirect('/signup')
@@ -91,6 +92,7 @@ export default async function DashboardPage() {
       groupActivity={groupActivity ?? []}
       dailyReward={{ canClaim, nextClaim, streak, todayReward }}
       missions={todayMissions}
+      missionConfig={missionConfig}
       flashChallenges={flashChallenges as FlashChallenge[]}
       liveMatches={liveMatches ?? []}
       recentFinished={recentFinished ?? []}

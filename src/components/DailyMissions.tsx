@@ -6,48 +6,55 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Target, Gift, Swords, CheckCircle2, Circle, Flame, Zap, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { DailyMissionsRow } from '@/lib/missions'
-import { MISSION_REWARDS } from '@/lib/missions'
+import type { DailyMissionsRow, MissionConfig } from '@/lib/missions'
+import { DEFAULT_MISSION_REWARDS } from '@/lib/missions'
 
 interface Props {
   initial: DailyMissionsRow | null
   streak: number
+  rewards?: MissionConfig
 }
 
-const MISSIONS = [
-  {
-    key: 'prediction_done' as const,
-    icon: Target,
-    label: 'Faire 1 pronostic',
-    sub: '/matches',
-    coins: MISSION_REWARDS.prediction,
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10',
-    border: 'border-violet-500/20',
-  },
-  {
-    key: 'pack_done' as const,
-    icon: Gift,
-    label: 'Ouvrir 1 pack',
-    sub: '/packs',
-    coins: MISSION_REWARDS.pack,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
-  },
-  {
-    key: 'battle_won' as const,
-    icon: Swords,
-    label: 'Gagner 1 battle',
-    sub: '/battles',
-    coins: MISSION_REWARDS.battle,
-    color: 'text-orange-400',
-    bg: 'bg-orange-500/10',
-    border: 'border-orange-500/20',
-  },
-]
+export function DailyMissions({ initial, streak, rewards }: Props) {
+  const r = rewards ?? {
+    prediction_coins: DEFAULT_MISSION_REWARDS.prediction,
+    pack_coins: DEFAULT_MISSION_REWARDS.pack,
+    battle_coins: DEFAULT_MISSION_REWARDS.battle,
+    bonus_coins: DEFAULT_r.bonus_coins,
+  }
 
-export function DailyMissions({ initial, streak }: Props) {
+  const MISSIONS = [
+    {
+      key: 'prediction_done' as const,
+      icon: Target,
+      label: 'Faire 1 pronostic',
+      sub: '/matches',
+      coins: r.prediction_coins,
+      color: 'text-violet-400',
+      bg: 'bg-violet-500/10',
+      border: 'border-violet-500/20',
+    },
+    {
+      key: 'pack_done' as const,
+      icon: Gift,
+      label: 'Ouvrir 1 pack',
+      sub: '/packs',
+      coins: r.pack_coins,
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10',
+      border: 'border-amber-500/20',
+    },
+    {
+      key: 'battle_won' as const,
+      icon: Swords,
+      label: 'Gagner 1 battle',
+      sub: '/battles',
+      coins: r.battle_coins,
+      color: 'text-orange-400',
+      bg: 'bg-orange-500/10',
+      border: 'border-orange-500/20',
+    },
+  ]
   const router = useRouter()
   const [missions, setMissions] = useState<DailyMissionsRow | null>(initial)
   const [claiming, setClaiming] = useState(false)
@@ -166,7 +173,7 @@ export function DailyMissions({ initial, streak }: Props) {
               className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/3 border border-white/5"
             >
               <CheckCircle2 size={14} className="text-green-400" />
-              <span className="text-green-400 text-xs font-bold">Bonus +{MISSION_REWARDS.bonus} coins réclamé !</span>
+              <span className="text-green-400 text-xs font-bold">Bonus +{r.bonus_coins} coins réclamé !</span>
             </motion.div>
           ) : bonusReady ? (
             <motion.button
@@ -183,7 +190,7 @@ export function DailyMissions({ initial, streak }: Props) {
               }}
             >
               <Zap size={15} />
-              {claiming ? 'Réclamation…' : `BONUS : +${MISSION_REWARDS.bonus} COINS`}
+              {claiming ? 'Réclamation…' : `BONUS : +${r.bonus_coins} COINS`}
             </motion.button>
           ) : (
             <motion.div
@@ -194,7 +201,7 @@ export function DailyMissions({ initial, streak }: Props) {
                 <Zap size={13} className="text-white/20" />
                 <span className="text-white/30 text-xs font-semibold">Bonus débloqué si tout complété</span>
               </div>
-              <span className="text-[#F5C518] text-xs font-black">+{MISSION_REWARDS.bonus}</span>
+              <span className="text-[#F5C518] text-xs font-black">+{r.bonus_coins}</span>
             </motion.div>
           )}
         </AnimatePresence>

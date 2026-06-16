@@ -13,7 +13,7 @@ import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { DailyMissions } from '@/components/DailyMissions'
 import { FlashChallengeBanner } from '@/components/FlashChallengeBanner'
 import type { User, Match, Prediction, GroupActivity } from '@/types'
-import type { DailyMissionsRow } from '@/lib/missions'
+import type { DailyMissionsRow, MissionConfig } from '@/lib/missions'
 import type { FlashChallenge } from '@/lib/flash-challenges'
 import toast from 'react-hot-toast'
 
@@ -32,6 +32,7 @@ interface Props {
   groupActivity: (GroupActivity & { user: { pseudo: string; photo_url: string | null } | null })[]
   dailyReward: DailyRewardState
   missions: DailyMissionsRow | null
+  missionConfig: MissionConfig
   liveMatches: Match[]
   recentFinished: Match[]
   flashChallenges: FlashChallenge[]
@@ -258,7 +259,7 @@ function QuickAction({ href, icon: Icon, label, sub, accent }: { href: string; i
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, missions, liveMatches, recentFinished, flashChallenges }: Props) {
+export function DashboardClient({ profile, nextMatch, recentPredictions, group, groupActivity, dailyReward, missions, missionConfig, liveMatches, recentFinished, flashChallenges }: Props) {
   const [activities, setActivities] = useState(groupActivity)
   const supabase = createClient()
 
@@ -332,7 +333,7 @@ export function DashboardClient({ profile, nextMatch, recentPredictions, group, 
             </div>
 
             {/* Daily missions */}
-            <DailyMissions initial={missions} streak={dailyReward.streak} />
+            <DailyMissions initial={missions} streak={dailyReward.streak} rewards={missionConfig} />
 
             {/* Quick actions */}
             <div className="mb-5">
