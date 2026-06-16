@@ -8,6 +8,9 @@ export const DEFAULT_MISSION_REWARDS = {
   bonus: 200,
 } as const
 
+// Alias pour la compatibilité avec les composants client
+export const MISSION_REWARDS = DEFAULT_MISSION_REWARDS
+
 export type MissionType = 'prediction' | 'pack' | 'battle'
 
 const DONE_FIELD: Record<MissionType, 'prediction_done' | 'pack_done' | 'battle_won'> = {
