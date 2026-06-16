@@ -40,9 +40,13 @@ export default async function TrackingPage() {
     { count: totalUserCards },
     { count: cardsFromPacksToday },
     { count: cardsFromBattleToday },
-    // Purchases
+    // Purchases (ancien système Stripe)
     { count: purchasesToday },
     { count: purchasesTotal },
+    // Payment requests (nouveau système OM/MTN)
+    { count: payReqPending },
+    { count: payReqApprovedToday },
+    { count: payReqApprovedTotal },
     // Missions today
     { count: missionsPredictionDone },
     { count: missionsPackDone },
@@ -55,6 +59,9 @@ export default async function TrackingPage() {
     { data: recentDuelsRaw },
     { data: recentPredictions },
     { data: recentPurchases },
+    { data: recentPaymentRequests },
+    { data: payReqRevenueToday },
+    { data: payReqRevenueTotal },
     { data: topUsers },
     { data: coinStatsToday },
     { data: recentTransactions },
@@ -91,9 +98,13 @@ export default async function TrackingPage() {
     admin.from('user_cards').select('*', { count: 'exact', head: true }),
     admin.from('user_cards').select('*', { count: 'exact', head: true }).gte('obtained_at', todayStr).eq('obtained_via', 'pack'),
     admin.from('user_cards').select('*', { count: 'exact', head: true }).gte('obtained_at', todayStr).eq('obtained_via', 'battle'),
-    // Purchases
+    // Purchases (ancien système Stripe)
     admin.from('purchases').select('*', { count: 'exact', head: true }).gte('created_at', todayStr).eq('status', 'completed'),
     admin.from('purchases').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+    // Payment requests (nouveau système OM/MTN)
+    admin.from('payment_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    admin.from('payment_requests').select('*', { count: 'exact', head: true }).eq('status', 'approved').gte('reviewed_at', todayStr),
+    admin.from('payment_requests').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
     // Missions today
     admin.from('daily_missions').select('*', { count: 'exact', head: true }).eq('date', todayDate).eq('prediction_done', true),
     admin.from('daily_missions').select('*', { count: 'exact', head: true }).eq('date', todayDate).eq('pack_done', true),
@@ -106,6 +117,9 @@ export default async function TrackingPage() {
     admin.from('duels').select('id, created_at, is_bot, bot_name, challenger_score, opponent_score, winner_id, coins_stake, challenger_id, opponent_id, status').eq('status', 'finished').order('created_at', { ascending: false }).limit(30),
     admin.from('predictions').select('id, user_id, created_at, status, coins_won').order('created_at', { ascending: false }).limit(20),
     admin.from('purchases').select('id, user_id, pack_type, coins_granted, amount_paid, status, created_at').order('created_at', { ascending: false }).limit(15),
+    admin.from('payment_requests').select('id, user_id, pack_name, pack_type, amount_fcfa, coins_to_credit, payment_method, status, reviewed_at, created_at').order('created_at', { ascending: false }).limit(20),
+    admin.from('payment_requests').select('amount_fcfa').eq('status', 'approved').gte('reviewed_at', todayStr),
+    admin.from('payment_requests').select('amount_fcfa').eq('status', 'approved'),
     admin.from('users').select('id, pseudo, nation, photo_url, is_vip, coins, battles_won, battles_played, predictions_correct, battle_streak, best_streak, created_at, last_seen_at, daily_streak').order('battles_played', { ascending: false }).limit(100),
     admin.from('coin_transactions').select('amount, reason').gte('created_at', todayStr),
     admin.from('coin_transactions').select('id, user_id, amount, reason, created_at').order('created_at', { ascending: false }).limit(60),
@@ -225,6 +239,9 @@ export default async function TrackingPage() {
     .filter((p) => p.status === 'completed' && new Date(p.created_at) >= todayStart)
     .reduce((s, p) => s + p.amount_paid / 100, 0)
 
+  const revenueFcfaToday = (payReqRevenueToday ?? []).reduce((s, r) => s + (r.amount_fcfa ?? 0), 0)
+  const revenueFcfaTotal = (payReqRevenueTotal ?? []).reduce((s, r) => s + (r.amount_fcfa ?? 0), 0)
+
   return (
     <TrackingClient
       stats={{
@@ -250,6 +267,11 @@ export default async function TrackingPage() {
         purchasesToday: purchasesToday ?? 0,
         purchasesTotal: purchasesTotal ?? 0,
         revenueToday,
+        payReqPending: payReqPending ?? 0,
+        payReqApprovedToday: payReqApprovedToday ?? 0,
+        payReqApprovedTotal: payReqApprovedTotal ?? 0,
+        revenueFcfaToday,
+        revenueFcfaTotal,
         coinsIn,
         coinsOut,
         missionsPredictionDone: missionsPredictionDone ?? 0,
@@ -267,6 +289,7 @@ export default async function TrackingPage() {
       recentDuels={recentDuels}
       recentPredictions={recentPredictions ?? []}
       recentPurchases={recentPurchases ?? []}
+      recentPaymentRequests={recentPaymentRequests ?? []}
       recentTransactions={recentTransactions ?? []}
       topUsers={(topUsers ?? []).map((u) => ({
         ...u,

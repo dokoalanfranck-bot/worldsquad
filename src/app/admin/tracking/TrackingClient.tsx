@@ -21,6 +21,8 @@ interface Stats {
   correctScoreToday: number; correctWinnerToday: number; wrongToday: number; pendingPredictions: number
   totalUserCards: number; cardsFromPacksToday: number; cardsFromBattleToday: number
   purchasesToday: number; purchasesTotal: number; revenueToday: number
+  payReqPending: number; payReqApprovedToday: number; payReqApprovedTotal: number
+  revenueFcfaToday: number; revenueFcfaTotal: number
   coinsIn: number; coinsOut: number
   missionsPredictionDone: number; missionsPackDone: number; missionsBattleWon: number; missionsBonusClaimed: number
   flashClaimsToday: number
@@ -34,6 +36,7 @@ interface SignupRow { id: string; pseudo: string; nation: string; photo_url: str
 interface DuelRow { id: string; created_at: string; is_bot: boolean; challenger_pseudo: string; opponent_pseudo: string; challenger_score: number | null; opponent_score: number | null; winner_id: string | null; coins_stake: number; challenger_id: string }
 interface PredictionRow { id: string; user_id: string; created_at: string; status: string; coins_won: number }
 interface PurchaseRow { id: string; user_id: string; pack_type: string; coins_granted: number; amount_paid: number; status: string; created_at: string }
+interface PaymentRequestRow { id: string; user_id: string; pack_name: string; pack_type: string; amount_fcfa: number; coins_to_credit: number; payment_method: string; status: string; reviewed_at: string | null; created_at: string }
 interface TransactionRow { id: string; user_id: string; amount: number; reason: string; created_at: string }
 interface UserRow { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; coins: number; battles_won: number; battles_played: number; predictions_correct: number; battle_streak: number; best_streak: number; created_at: string; last_seen_at?: string | null; daily_streak?: number; win_rate: number; losses: number }
 interface ChartPoint { hour: number; count: number }
@@ -45,6 +48,7 @@ interface Props {
   recentDuels: DuelRow[]
   recentPredictions: PredictionRow[]
   recentPurchases: PurchaseRow[]
+  recentPaymentRequests: PaymentRequestRow[]
   recentTransactions: TransactionRow[]
   topUsers: UserRow[]
   onlineUsers: OnlineUser[]
@@ -351,7 +355,7 @@ const TABS: { key: Tab; label: string; emoji: string }[] = [
 export function TrackingClient(props: Props) {
   const {
     stats, recentSignups, recentDuels, recentPredictions,
-    recentPurchases, recentTransactions, topUsers,
+    recentPurchases, recentPaymentRequests, recentTransactions, topUsers,
     onlineUsers, activeDuelsList, duelChart, packChart, signupChart, fetchedAt,
   } = props
 
@@ -819,6 +823,59 @@ export function TrackingClient(props: Props) {
               <StatCard label="Coins dépensés auj." value={stats.coinsOut.toLocaleString()} icon={TrendingDown} accent="text-red-400" iconBg="bg-red-500/10" />
               <StatCard label="Achats aujourd'hui" value={stats.purchasesToday} sub={`${stats.revenueToday.toFixed(2)}€`} icon={ShoppingBag} accent="text-violet-400" iconBg="bg-violet-500/10" />
               <StatCard label="Total achats" value={stats.purchasesTotal} icon={TrendingUp} accent="text-indigo-400" iconBg="bg-indigo-500/10" />
+            </div>
+
+            {/* OM/MTN payment stats */}
+            <div className="rounded-xl border border-orange-500/20 overflow-hidden" style={cardStyle}>
+              <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
+                <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
+                <span className="text-white font-bold text-sm">Paiements Orange Money / MTN</span>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/5">
+                {[
+                  { label: 'En attente', value: stats.payReqPending, color: 'text-amber-400' },
+                  { label: 'Approuvés auj.', value: stats.payReqApprovedToday, color: 'text-green-400' },
+                  { label: 'Total approuvés', value: stats.payReqApprovedTotal, color: 'text-blue-400' },
+                  { label: 'Revenu total', value: stats.revenueFcfaTotal.toLocaleString('fr-FR') + ' FCFA', color: 'text-[#F5C518]', isStr: true },
+                ].map((s) => (
+                  <div key={s.label} className="px-4 py-3" style={{ background: 'rgba(10,10,15,0.8)' }}>
+                    <p className="text-white/30 text-xs mb-1">{s.label}</p>
+                    <p className={`font-black text-lg ${s.color}`} style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                      {s.isStr ? s.value : s.value}
+                    </p>
+                    {s.label === 'Approuvés auj.' && (
+                      <p className="text-white/20 text-xs">{stats.revenueFcfaToday.toLocaleString('fr-FR')} FCFA</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="divide-y divide-white/4 max-h-64 overflow-y-auto">
+                {recentPaymentRequests.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0
+                      ${p.status === 'approved' ? 'bg-green-500/15' : p.status === 'rejected' ? 'bg-red-500/15' : 'bg-amber-500/15'}`}>
+                      {p.status === 'approved'
+                        ? <CheckCircle className="w-3 h-3 text-green-400" />
+                        : p.status === 'rejected'
+                          ? <XCircle className="w-3 h-3 text-red-400" />
+                          : <Clock className="w-3 h-3 text-amber-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-white font-semibold capitalize">{p.pack_name}</span>
+                      <span className="text-white/30 text-xs ml-2">
+                        {p.payment_method === 'orange_money' ? '🟠 Orange' : '🟡 MTN'}
+                      </span>
+                    </div>
+                    <span className={`font-bold text-xs tabular-nums ${p.status === 'approved' ? 'text-green-400' : p.status === 'rejected' ? 'text-red-400/60' : 'text-amber-400'}`}>
+                      {p.amount_fcfa.toLocaleString('fr-FR')} FCFA
+                    </span>
+                    <span className="text-white/20 text-xs tabular-nums ml-2">{timeAgo(p.created_at)}</span>
+                  </div>
+                ))}
+                {recentPaymentRequests.length === 0 && (
+                  <p className="text-white/20 text-sm text-center py-6">Aucun paiement</p>
+                )}
+              </div>
             </div>
 
             <div className="rounded-xl border border-white/6 p-5" style={cardStyle}>
