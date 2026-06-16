@@ -1,13 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   Swords, ChevronRight, Search, Layers, Radio, Gift,
-  TrendingUp, TrendingDown, Minus, Check, X, Clock, Users,
+  TrendingUp, TrendingDown, Minus, Check, X, Clock, Users, AlertTriangle, ShieldOff,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+function BanCountdown({ banUntil }: { banUntil: string }) {
+  const [secs, setSecs] = useState(Math.max(0, Math.floor((new Date(banUntil).getTime() - Date.now()) / 1000)))
+  useEffect(() => {
+    const t = setInterval(() => {
+      const s = Math.max(0, Math.floor((new Date(banUntil).getTime() - Date.now()) / 1000))
+      setSecs(s)
+      if (s <= 0) clearInterval(t)
+    }, 1000)
+    return () => clearInterval(t)
+  }, [banUntil])
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return <span className="font-black tabular-nums">{m}:{s.toString().padStart(2, '0')}</span>
+}
 
 interface Profile { id: string | null; pseudo: string; nation: string; photo_url: string | null }
 
@@ -43,10 +58,12 @@ const HOW_IT_WORKS = [
 
 
 
-export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
+export function BattlesHub({ duels, currentUserId, penaltyBattles = [], abandonCount = 0, banUntil = null }: {
   duels: Duel[]
   currentUserId: string
   penaltyBattles?: PenaltyBattle[]
+  abandonCount?: number
+  banUntil?: string | null
 }) {
   const router = useRouter()
   const [searching, setSearching] = useState(false)
@@ -54,7 +71,10 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [searchingPenalty, setSearchingPenalty] = useState(false)
 
+  const isBanned = !!banUntil && new Date(banUntil) > new Date()
+
   async function findDuel() {
+    if (isBanned) { toast.error('Accès suspendu — attends la fin du ban'); return }
     setSearching(true)
     try {
       const res = await fetch('/api/duels/find', { method: 'POST' })
@@ -91,6 +111,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   }
 
   async function startPenalty() {
+    if (isBanned) { toast.error('Accès suspendu — attends la fin du ban'); return }
     setSearchingPenalty(true)
     try {
       const res = await fetch('/api/penalty/find', { method: 'POST' })
@@ -204,18 +225,61 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
             </div>
           )}
 
+          {/* Ban banner */}
+          {isBanned && banUntil && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+              className="mb-5 rounded-2xl border border-red-500/30 p-4"
+              style={{ background: 'rgba(239,68,68,0.07)' }}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                  <ShieldOff size={16} className="text-red-400" />
+                </div>
+                <div>
+                  <p className="text-red-400 font-black text-sm uppercase tracking-wide">Accès suspendu</p>
+                  <p className="text-white/40 text-xs">Trop d&apos;abandons en battle détectés</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.10)' }}>
+                <p className="text-white/50 text-xs">Levée du ban dans</p>
+                <p className="text-red-300 text-xl"><BanCountdown banUntil={banUntil} /></p>
+              </div>
+              <p className="text-white/25 text-[10px] mt-2 text-center">
+                Quitter une battle en cours compte comme un abandon · 3 abandons = 30 min de ban
+              </p>
+            </motion.div>
+          )}
+
+          {/* Warning (1–2 abandons, pas encore banni) */}
+          {!isBanned && abandonCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              className="mb-4 flex items-center gap-3 rounded-xl border border-orange-500/25 px-4 py-3"
+              style={{ background: 'rgba(249,115,22,0.06)' }}
+            >
+              <AlertTriangle size={15} className="text-orange-400 flex-shrink-0" />
+              <p className="text-orange-300 text-xs leading-relaxed">
+                <span className="font-bold">{abandonCount}/3 abandon{abandonCount > 1 ? 's' : ''} détecté{abandonCount > 1 ? 's' : ''}</span>
+                {' '}— au 3ème tu seras suspendu 30 min
+              </p>
+            </motion.div>
+          )}
+
           {/* Main CTA */}
           <motion.button
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: isBanned ? 1 : 0.97 }}
             onClick={findDuel}
-            disabled={searching}
-            className="w-full relative overflow-hidden bg-[#F5C518] text-black font-black py-5 rounded-2xl text-2xl flex items-center justify-center gap-3 shadow-2xl shadow-yellow-500/25 disabled:opacity-70 mb-8"
+            disabled={searching || isBanned}
+            className="w-full relative overflow-hidden bg-[#F5C518] text-black font-black py-5 rounded-2xl text-2xl flex items-center justify-center gap-3 shadow-2xl shadow-yellow-500/25 disabled:opacity-40 mb-8"
             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-            animate={!searching ? { boxShadow: ['0 0 24px rgba(245,197,24,0.2)', '0 0 40px rgba(245,197,24,0.5)', '0 0 24px rgba(245,197,24,0.2)'] } : {}}
+            animate={!searching && !isBanned ? { boxShadow: ['0 0 24px rgba(245,197,24,0.2)', '0 0 40px rgba(245,197,24,0.5)', '0 0 24px rgba(245,197,24,0.2)'] } : {}}
             transition={{ duration: 2.5, repeat: Infinity }}
           >
             {searching ? (
               <><div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" /> RECHERCHE…</>
+            ) : isBanned ? (
+              <><ShieldOff size={22} /> SUSPENDU</>
             ) : (
               <><Swords size={24} /> TROUVER UN DUEL</>
             )}
@@ -254,16 +318,18 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
 
           {/* Penalty CTA */}
           <motion.button
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: isBanned ? 1 : 0.97 }}
             onClick={startPenalty}
-            disabled={searchingPenalty}
-            className="w-full relative overflow-hidden bg-green-500 text-black font-black py-4 rounded-2xl text-xl flex items-center justify-center gap-3 shadow-2xl shadow-green-500/25 disabled:opacity-70 mb-4"
+            disabled={searchingPenalty || isBanned}
+            className="w-full relative overflow-hidden bg-green-500 text-black font-black py-4 rounded-2xl text-xl flex items-center justify-center gap-3 shadow-2xl shadow-green-500/25 disabled:opacity-40 mb-4"
             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-            animate={!searchingPenalty ? { boxShadow: ['0 0 20px rgba(34,197,94,0.2)', '0 0 35px rgba(34,197,94,0.5)', '0 0 20px rgba(34,197,94,0.2)'] } : {}}
+            animate={!searchingPenalty && !isBanned ? { boxShadow: ['0 0 20px rgba(34,197,94,0.2)', '0 0 35px rgba(34,197,94,0.5)', '0 0 20px rgba(34,197,94,0.2)'] } : {}}
             transition={{ duration: 2.5, repeat: Infinity }}
           >
             {searchingPenalty ? (
               <><div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" /> RECHERCHE…</>
+            ) : isBanned ? (
+              <><ShieldOff size={20} /> SUSPENDU</>
             ) : (
               <>⚽ TIRS AU BUT</>
             )}

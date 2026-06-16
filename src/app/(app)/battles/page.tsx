@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { BattlesHub } from './BattlesHub'
 import { botNation } from '@/lib/duel-engine'
+import { checkAndClearBan } from '@/lib/battle-sanctions'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +14,25 @@ export default async function BattlesPage() {
 
   const admin = createAdminClient()
 
-  const { data: duels } = await admin
-    .from('duels')
-    .select('*')
-    .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
-    .not('status', 'eq', 'cancelled')
-    .order('created_at', { ascending: false })
-    .limit(30)
+  const [banInfo, { data: duels }, { data: penaltyBattles }] = await Promise.all([
+    checkAndClearBan(user.id, admin),
+    admin
+      .from('duels')
+      .select('*')
+      .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+      .not('status', 'eq', 'cancelled')
+      .order('created_at', { ascending: false })
+      .limit(30),
+    admin
+      .from('penalty_battles')
+      .select('*')
+      .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+      .in('status', ['waiting', 'picking', 'active', 'stealing', 'finished'])
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ])
 
-  // Enrich with profiles
+  // Enrich duels with profiles
   const enriched = await Promise.all((duels ?? []).map(async (d) => {
     const [{ data: challenger }, { data: opponent }] = await Promise.all([
       admin.from('users').select('id, pseudo, nation, photo_url').eq('id', d.challenger_id).single(),
@@ -36,15 +47,7 @@ export default async function BattlesPage() {
     }
   }))
 
-  // Penalty battles
-  const { data: penaltyBattles } = await admin
-    .from('penalty_battles')
-    .select('*')
-    .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
-    .in('status', ['waiting', 'picking', 'active', 'stealing', 'finished'])
-    .order('created_at', { ascending: false })
-    .limit(20)
-
+  // Enrich penalty battles with profiles
   const enrichedPenalty = await Promise.all((penaltyBattles ?? []).map(async (pb) => {
     const playerIds = [pb.challenger_id, pb.opponent_id].filter(Boolean)
     const { data: profiles } = await admin
@@ -59,5 +62,13 @@ export default async function BattlesPage() {
     }
   }))
 
-  return <BattlesHub duels={enriched} currentUserId={user.id} penaltyBattles={enrichedPenalty} />
+  return (
+    <BattlesHub
+      duels={enriched}
+      currentUserId={user.id}
+      penaltyBattles={enrichedPenalty}
+      abandonCount={banInfo.abandonCount}
+      banUntil={banInfo.banUntil}
+    />
+  )
 }
