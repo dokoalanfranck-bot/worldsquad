@@ -154,12 +154,12 @@ export async function POST(
       ? battle.opponent_id
       : battle.challenger_id
     const randomChoice = (['left', 'center', 'right'] as const)[Math.floor(Math.random() * 3)]
-    await admin.from('penalty_choices').insert({
+    await admin.from('penalty_choices').upsert({
       battle_id: battleId,
       round_number: battle.current_round,
       player_id: missingId,
       choice: randomChoice,
-    }).onConflict('battle_id,round_number,player_id').ignore()
+    }, { onConflict: 'battle_id,round_number,player_id', ignoreDuplicates: true })
   }
 
   // Reload choices (may have just inserted auto-fill)
