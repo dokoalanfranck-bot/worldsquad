@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CreditCard, CheckCircle2, XCircle, Clock, Settings,
-  Save, Eye, ChevronDown, ChevronUp, Phone, ExternalLink,
+  Save, Eye, ChevronDown, ChevronUp, Phone, ExternalLink, RefreshCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { createClient } from '@/lib/supabase/client'
 
 interface ShopConfig {
   id: string
@@ -49,8 +48,7 @@ function timeAgo(iso: string) {
 }
 
 export default function AdminShopPage() {
-  // useMemo pour que supabase ne change pas de référence à chaque re-render
-  const supabase = useMemo(() => createClient(), [])
+  const refreshingRef = useRef(false)
 
   const [config, setConfig] = useState<ShopConfig | null>(null)
   const [pendingRequests, setPendingRequests] = useState<PaymentRequest[]>([])
@@ -62,6 +60,7 @@ export default function AdminShopPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Charge uniquement la config — NE PAS appeler depuis Realtime
   const loadConfig = useCallback(async () => {
@@ -89,19 +88,15 @@ export default function AdminShopPage() {
     loadConfig()
     loadRequests()
 
-    const channel = supabase
-      .channel('admin-payments')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_requests' }, () => {
-        loadRequests() // NE PAS appeler loadConfig ici
-        toast('💳 Nouvelle demande de paiement !', { icon: '🔔' })
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'payment_requests' }, () => {
-        loadRequests()
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [loadConfig, loadRequests, supabase])
+    // PaymentNotifier (layout) dispatche cet event quand il reçoit un INSERT/UPDATE
+    const handleNewPayment = () => {
+      if (refreshingRef.current) return
+      refreshingRef.current = true
+      loadRequests().finally(() => { refreshingRef.current = false })
+    }
+    window.addEventListener('payment-request-received', handleNewPayment)
+    return () => { window.removeEventListener('payment-request-received', handleNewPayment) }
+  }, [loadConfig, loadRequests])
 
   async function saveConfig() {
     setSavingConfig(true)
@@ -197,6 +192,15 @@ export default function AdminShopPage() {
       {/* Pending requests */}
       {tab === 'pending' && (
         <div>
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={async () => { setRefreshing(true); await loadRequests(); setRefreshing(false) }}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white text-xs transition-all disabled:opacity-40">
+              <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+              Rafraîchir
+            </button>
+          </div>
           {pendingRequests.length === 0 ? (
             <div className="glass rounded-2xl p-12 border border-white/5 text-center">
               <Clock size={32} className="text-white/20 mx-auto mb-3" />

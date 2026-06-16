@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CreditCard, X } from 'lucide-react'
 import Link from 'next/link'
@@ -19,18 +19,11 @@ function fcfa(n: number) {
 }
 
 export function PaymentNotifier() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [alerts, setAlerts] = useState<PendingAlert[]>([])
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    // Initial pending count
-    supabase
-      .from('payment_requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .then(({ count }) => setPendingCount(count ?? 0))
-
     const channel = supabase
       .channel('payment-notifier')
       .on(
@@ -56,6 +49,9 @@ export function PaymentNotifier() {
           setTimeout(() => {
             setAlerts((prev) => prev.filter((a) => a.id !== pr.id))
           }, 8000)
+
+          // Notifie la page admin/shop de rafraîchir sa liste
+          window.dispatchEvent(new CustomEvent('payment-request-received'))
         }
       )
       .on(
@@ -66,6 +62,7 @@ export function PaymentNotifier() {
           if (pr.status !== 'pending') {
             setPendingCount((c) => Math.max(0, c - 1))
           }
+          window.dispatchEvent(new CustomEvent('payment-request-received'))
         }
       )
       .subscribe()
