@@ -21,11 +21,13 @@ export default async function LeaderboardPage() {
     admin
       .from('users')
       .select('id, pseudo, photo_url, nation, predictions_correct')
+      .eq('is_admin', false)
       .order('predictions_correct', { ascending: false })
       .limit(100),
     admin
       .from('users')
       .select('id, pseudo, photo_url, nation, battles_won, battles_played, battle_streak, best_streak')
+      .eq('is_admin', false)
       .gt('battles_won', 0)
       .limit(200),
     admin
@@ -77,7 +79,7 @@ export default async function LeaderboardPage() {
 
   const topCardUserIds = sortedCardEntries.map(([id]) => id)
   const { data: cardUsers } = topCardUserIds.length > 0
-    ? await admin.from('users').select('id, pseudo, photo_url, nation').in('id', topCardUserIds)
+    ? await admin.from('users').select('id, pseudo, photo_url, nation').eq('is_admin', false).in('id', topCardUserIds)
     : { data: [] }
 
   const cardUsersMap = new Map((cardUsers ?? []).map((u) => [u.id, u]))
