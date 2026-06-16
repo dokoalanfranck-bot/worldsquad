@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { creditCoins } from '@/lib/coins'
 
-export const MISSION_REWARDS = {
+export const DEFAULT_MISSION_REWARDS = {
   prediction: 300,
   pack: 30,
   battle: 300,
@@ -31,6 +31,25 @@ export interface DailyMissionsRow {
   battle_won: boolean
   bonus_claimed: boolean
   created_at: string
+}
+
+export interface MissionConfig {
+  prediction_coins: number
+  pack_coins: number
+  battle_coins: number
+  bonus_coins: number
+}
+
+export async function getMissionConfig(): Promise<MissionConfig> {
+  const admin = createAdminClient()
+  const { data } = await admin.from('mission_config').select('*').limit(1).maybeSingle()
+  if (!data) return { prediction_coins: 300, pack_coins: 30, battle_coins: 300, bonus_coins: 200 }
+  return {
+    prediction_coins: data.prediction_coins,
+    pack_coins: data.pack_coins,
+    battle_coins: data.battle_coins,
+    bonus_coins: data.bonus_coins,
+  }
 }
 
 export async function getTodayMissions(userId: string): Promise<DailyMissionsRow | null> {
@@ -69,7 +88,6 @@ export async function completeMission(
     .eq('date', today)
     .single()
 
-  // Create row if it doesn't exist
   if (!current) {
     await admin.from('daily_missions').insert({ user_id: userId, date: today })
   }
@@ -83,7 +101,11 @@ export async function completeMission(
     .eq('user_id', userId)
     .eq('date', today)
 
-  const coins = MISSION_REWARDS[type]
+  const config = await getMissionConfig()
+  const coins = type === 'prediction' ? config.prediction_coins
+    : type === 'pack' ? config.pack_coins
+    : config.battle_coins
+
   await creditCoins(userId, coins, `Mission du jour — ${MISSION_LABEL[type]}`)
 
   return { alreadyDone: false, coins }
@@ -116,7 +138,8 @@ export async function claimDailyBonus(
     .eq('user_id', userId)
     .eq('date', today)
 
-  const coins = MISSION_REWARDS.bonus
+  const config = await getMissionConfig()
+  const coins = config.bonus_coins
   await creditCoins(userId, coins, 'Bonus missions du jour — Complet !')
 
   return { success: true, coins }

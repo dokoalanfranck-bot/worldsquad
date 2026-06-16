@@ -22,6 +22,7 @@ import {
   Video,
   Zap,
   CreditCard,
+  Target,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/flash-challenges', icon: Zap, label: 'Défis Flash' },
   { href: '/admin/pub', icon: Video, label: 'Espace Pub' },
   { href: '/admin/shop', icon: CreditCard, label: 'Paiements' },
+  { href: '/admin/missions', icon: Target, label: 'Missions du jour' },
 ]
 
 interface AdminSidebarProps {
