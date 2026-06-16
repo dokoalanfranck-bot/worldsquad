@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AdminSidebar } from './_components/AdminSidebar'
+import { PaymentNotifier } from './_components/PaymentNotifier'
 import { PingProvider } from '@/components/PingProvider'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-[#0A0A0F]">
       <PingProvider />
+      <PaymentNotifier />
       <AdminSidebar pseudo={profile.pseudo} />
       <main className="lg:pl-64 min-h-screen">
         <div className="p-4 lg:p-8">
