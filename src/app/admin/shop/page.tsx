@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CreditCard, CheckCircle2, XCircle, Clock, Settings,
@@ -49,7 +49,9 @@ function timeAgo(iso: string) {
 }
 
 export default function AdminShopPage() {
-  const supabase = createClient()
+  // useMemo pour que supabase ne change pas de référence à chaque re-render
+  const supabase = useMemo(() => createClient(), [])
+
   const [config, setConfig] = useState<ShopConfig | null>(null)
   const [pendingRequests, setPendingRequests] = useState<PaymentRequest[]>([])
   const [historyRequests, setHistoryRequests] = useState<PaymentRequest[]>([])
@@ -61,9 +63,10 @@ export default function AdminShopPage() {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
-    const cfgRes = await fetch('/api/shop/config', { cache: 'no-store' })
-    const cfg = await cfgRes.json() as ShopConfig
+  // Charge uniquement la config — NE PAS appeler depuis Realtime
+  const loadConfig = useCallback(async () => {
+    const res = await fetch('/api/shop/config?t=' + Date.now(), { cache: 'no-store' })
+    const cfg = await res.json() as ShopConfig
     setConfig(cfg)
     setConfigDraft({
       orange_money: cfg.orange_money,
@@ -71,40 +74,44 @@ export default function AdminShopPage() {
       prices_fcfa: { ...cfg.prices_fcfa },
       is_active: cfg.is_active,
     })
+  }, [])
 
-    const { data: pending } = await supabase
-      .from('payment_requests')
-      .select('*, users(pseudo, photo_url)')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
+  // Charge uniquement les demandes — appelé aussi par Realtime sans toucher configDraft
+  const loadRequests = useCallback(async () => {
+    const [{ data: pending }, { data: history }] = await Promise.all([
+      supabase
+        .from('payment_requests')
+        .select('*, users(pseudo, photo_url)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('payment_requests')
+        .select('*, users(pseudo, photo_url)')
+        .neq('status', 'pending')
+        .order('reviewed_at', { ascending: false })
+        .limit(50),
+    ])
     setPendingRequests((pending ?? []) as PaymentRequest[])
-
-    const { data: history } = await supabase
-      .from('payment_requests')
-      .select('*, users(pseudo, photo_url)')
-      .neq('status', 'pending')
-      .order('reviewed_at', { ascending: false })
-      .limit(50)
     setHistoryRequests((history ?? []) as PaymentRequest[])
   }, [supabase])
 
   useEffect(() => {
-    loadData()
+    loadConfig()
+    loadRequests()
 
-    // Realtime pour nouvelles demandes
     const channel = supabase
       .channel('admin-payments')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_requests' }, () => {
-        loadData()
+        loadRequests() // NE PAS appeler loadConfig ici
         toast('💳 Nouvelle demande de paiement !', { icon: '🔔' })
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'payment_requests' }, () => {
-        loadData()
+        loadRequests()
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [loadData, supabase])
+  }, [loadConfig, loadRequests, supabase])
 
   async function saveConfig() {
     setSavingConfig(true)
@@ -114,8 +121,15 @@ export default function AdminShopPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configDraft),
       })
-      if (res.ok) { toast.success('Configuration sauvegardée'); await loadData() }
-      else toast.error('Erreur lors de la sauvegarde')
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Configuration sauvegardée')
+        await loadConfig() // Recharge uniquement la config
+      } else {
+        toast.error(data.error ?? 'Erreur lors de la sauvegarde')
+      }
+    } catch {
+      toast.error('Erreur réseau')
     } finally {
       setSavingConfig(false)
     }
@@ -125,7 +139,7 @@ export default function AdminShopPage() {
     setProcessingId(id)
     try {
       const res = await fetch(`/api/admin/payment-requests/${id}/approve`, { method: 'POST' })
-      if (res.ok) { toast.success('Paiement approuvé ✅'); await loadData() }
+      if (res.ok) { toast.success('Paiement approuvé ✅'); await loadRequests() }
       else { const d = await res.json(); toast.error(d.error ?? 'Erreur') }
     } finally {
       setProcessingId(null)
@@ -144,7 +158,7 @@ export default function AdminShopPage() {
         toast.success('Paiement rejeté')
         setRejectingId(null)
         setRejectNote('')
-        await loadData()
+        await loadRequests()
       } else {
         const d = await res.json()
         toast.error(d.error ?? 'Erreur')
@@ -155,7 +169,7 @@ export default function AdminShopPage() {
   }
 
   const TABS = [
-    { key: 'pending', label: `En attente ${pendingRequests.length > 0 ? `(${pendingRequests.length})` : ''}` },
+    { key: 'pending', label: `En attente${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
     { key: 'history', label: 'Historique' },
     { key: 'config', label: 'Configuration' },
   ] as const
@@ -203,7 +217,6 @@ export default function AdminShopPage() {
               {pendingRequests.map((r) => (
                 <motion.div key={r.id} layout
                   className="glass rounded-2xl border border-amber-500/20 overflow-hidden">
-                  {/* Card header */}
                   <div className="p-4 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
                       <Clock size={18} className="text-amber-400" />
@@ -223,18 +236,18 @@ export default function AdminShopPage() {
                       </span>
                       <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
                         className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                        {expandedId === r.id ? <ChevronUp size={14} className="text-white/50" /> : <ChevronDown size={14} className="text-white/50" />}
+                        {expandedId === r.id
+                          ? <ChevronUp size={14} className="text-white/50" />
+                          : <ChevronDown size={14} className="text-white/50" />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Expanded */}
                   <AnimatePresence>
                     {expandedId === r.id && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }} className="overflow-hidden">
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="px-4 pb-4 space-y-4">
-                          {/* Info */}
                           <div className="bg-white/5 rounded-xl p-3 space-y-2">
                             <div className="flex items-center gap-2 text-sm">
                               <Phone size={13} className="text-white/40" />
@@ -247,7 +260,6 @@ export default function AdminShopPage() {
                             </div>
                           </div>
 
-                          {/* Screenshot */}
                           {r.screenshot_url && (
                             <div>
                               <p className="text-white/30 text-xs uppercase tracking-wider mb-2">Capture d'écran</p>
@@ -262,15 +274,11 @@ export default function AdminShopPage() {
                             </div>
                           )}
 
-                          {/* Actions */}
                           {rejectingId === r.id ? (
                             <div className="space-y-2">
-                              <input
-                                value={rejectNote}
-                                onChange={(e) => setRejectNote(e.target.value)}
+                              <input value={rejectNote} onChange={(e) => setRejectNote(e.target.value)}
                                 placeholder="Raison du rejet (optionnel)"
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none placeholder-gray-600 focus:border-red-500/40"
-                              />
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none placeholder-gray-600 focus:border-red-500/40" />
                               <div className="flex gap-2">
                                 <button onClick={() => { setRejectingId(null); setRejectNote('') }}
                                   className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/50 text-sm hover:border-white/20">
@@ -279,7 +287,7 @@ export default function AdminShopPage() {
                                 <button onClick={() => reject(r.id)} disabled={processingId === r.id}
                                   className="flex-1 bg-red-500/20 border border-red-500/30 text-red-400 font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                                   {processingId === r.id
-                                    ? <><div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" /></>
+                                    ? <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
                                     : <><XCircle size={14} /> Confirmer rejet</>}
                                 </button>
                               </div>
@@ -293,7 +301,7 @@ export default function AdminShopPage() {
                               <button onClick={() => approve(r.id)} disabled={processingId === r.id}
                                 className="flex-1 bg-green-500/20 border border-green-500/30 text-green-400 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-green-500/30 transition-all">
                                 {processingId === r.id
-                                  ? <><div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin" /></>
+                                  ? <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin" />
                                   : <><CheckCircle2 size={14} /> Approuver</>}
                               </button>
                             </div>
@@ -324,8 +332,7 @@ export default function AdminShopPage() {
                     ${r.status === 'approved' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
                     {r.status === 'approved'
                       ? <CheckCircle2 size={15} className="text-green-400" />
-                      : <XCircle size={15} className="text-red-400" />
-                    }
+                      : <XCircle size={15} className="text-red-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold">{r.users?.pseudo ?? r.user_id.slice(0, 8)}</p>
@@ -354,7 +361,7 @@ export default function AdminShopPage() {
       )}
 
       {/* Config */}
-      {tab === 'config' && config && (
+      {tab === 'config' && (
         <div className="space-y-6">
           {/* Status */}
           <div className="glass rounded-2xl border border-white/5 p-5">
@@ -368,7 +375,7 @@ export default function AdminShopPage() {
               </div>
               <button
                 onClick={() => setConfigDraft((d) => ({ ...d, is_active: !d.is_active }))}
-                className={`w-12 h-6 rounded-full transition-all relative
+                className={`w-12 h-6 rounded-full transition-all relative flex-shrink-0
                   ${configDraft.is_active ? 'bg-green-500' : 'bg-white/10'}`}>
                 <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all
                   ${configDraft.is_active ? 'left-6' : 'left-0.5'}`} />
@@ -419,12 +426,12 @@ export default function AdminShopPage() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    value={configDraft.prices_fcfa?.[p.key] ?? 0}
+                    value={configDraft.prices_fcfa?.[p.key] ?? ''}
                     onChange={(e) => setConfigDraft((d) => ({
                       ...d,
                       prices_fcfa: { ...(d.prices_fcfa ?? {}), [p.key]: parseInt(e.target.value) || 0 },
                     }))}
-                    className="w-24 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-white/30 text-right"
+                    className="w-28 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-white/30 text-right"
                   />
                   <span className="text-white/30 text-sm">FCFA</span>
                 </div>
@@ -437,8 +444,7 @@ export default function AdminShopPage() {
             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             {savingConfig
               ? <><div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> SAUVEGARDE…</>
-              : <><Save size={16} /> SAUVEGARDER LA CONFIGURATION</>
-            }
+              : <><Save size={16} /> SAUVEGARDER LA CONFIGURATION</>}
           </button>
         </div>
       )}
