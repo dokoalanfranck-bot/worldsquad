@@ -11,21 +11,28 @@ export async function GET() {
   const { data: profile } = await admin.from('users').select('is_admin').eq('id', user.id).single()
   if (!profile?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const [{ data: pending }, { data: history }] = await Promise.all([
+  const [
+    { data: pending, error: pendingErr },
+    { data: history, error: historyErr },
+  ] = await Promise.all([
     admin
       .from('payment_requests')
-      .select('*, users(pseudo, photo_url)')
+      .select('*, user:user_id(pseudo, photo_url)')
       .eq('status', 'pending')
       .order('created_at', { ascending: true }),
     admin
       .from('payment_requests')
-      .select('*, users(pseudo, photo_url)')
+      .select('*, user:user_id(pseudo, photo_url)')
       .neq('status', 'pending')
       .order('reviewed_at', { ascending: false })
       .limit(50),
   ])
 
-  return NextResponse.json({ pending: pending ?? [], history: history ?? [] }, {
-    headers: { 'Cache-Control': 'no-store' },
-  })
+  if (pendingErr) console.error('[admin/payment-requests] pending:', pendingErr.message)
+  if (historyErr) console.error('[admin/payment-requests] history:', historyErr.message)
+
+  return NextResponse.json(
+    { pending: pending ?? [], history: history ?? [] },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }

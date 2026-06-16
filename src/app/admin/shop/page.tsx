@@ -30,7 +30,7 @@ interface PaymentRequest {
   admin_note: string | null
   created_at: string
   reviewed_at: string | null
-  users?: { pseudo: string; photo_url: string | null }
+  user?: { pseudo: string; photo_url: string | null }
 }
 
 function fcfa(n: number) {
@@ -223,7 +223,7 @@ export default function AdminShopPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white font-bold text-sm">{r.users?.pseudo ?? r.user_id.slice(0, 8)}</p>
+                        <p className="text-white font-bold text-sm">{r.user?.pseudo ?? r.user_id.slice(0, 8)}</p>
                         <span className="text-white/20 text-xs">·</span>
                         <p className="text-white/50 text-xs">{timeAgo(r.created_at)}</p>
                       </div>
@@ -335,7 +335,7 @@ export default function AdminShopPage() {
                       : <XCircle size={15} className="text-red-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-bold">{r.users?.pseudo ?? r.user_id.slice(0, 8)}</p>
+                    <p className="text-white text-sm font-bold">{r.user?.pseudo ?? r.user_id.slice(0, 8)}</p>
                     <p className="text-white/30 text-xs truncate">
                       {r.pack_name} · {fcfa(r.amount_fcfa)} · {r.payment_method === 'orange_money' ? 'Orange' : 'MTN'}
                       {r.admin_note && <span className="text-red-400"> · {r.admin_note}</span>}
