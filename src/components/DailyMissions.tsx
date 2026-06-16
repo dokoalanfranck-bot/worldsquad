@@ -20,7 +20,7 @@ export function DailyMissions({ initial, streak, rewards }: Props) {
     prediction_coins: DEFAULT_MISSION_REWARDS.prediction,
     pack_coins: DEFAULT_MISSION_REWARDS.pack,
     battle_coins: DEFAULT_MISSION_REWARDS.battle,
-    bonus_coins: DEFAULT_r.bonus_coins,
+    bonus_coins: DEFAULT_MISSION_REWARDS.bonus,
   }
 
   const MISSIONS = [
