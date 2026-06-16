@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, Check, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
 import toast from 'react-hot-toast'
@@ -71,10 +71,318 @@ function useDeadlineCountdown(deadline: string | null): number {
     setTimeLeft(Math.max(0, Math.ceil((new Date(deadline).getTime() - Date.now()) / 1000)))
     const t = setInterval(() => {
       setTimeLeft(Math.max(0, Math.ceil((new Date(deadline).getTime() - Date.now()) / 1000)))
-    }, 1000)
+    }, 500)
     return () => clearInterval(t)
   }, [deadline])
   return timeLeft
+}
+
+// ── ScoreBoard ─────────────────────────────────────────────────────────────────
+
+function ShotDot({ state }: { state: 'goal' | 'miss' | 'current' | 'empty' }) {
+  return (
+    <motion.div
+      initial={state === 'goal' ? { scale: 0 } : state === 'miss' ? { scale: 0 } : {}}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 450, damping: 18 }}
+      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[9px] font-black ${
+        state === 'goal'    ? 'bg-green-500 border-green-400 shadow-[0_0_8px_#22c55e88]' :
+        state === 'miss'    ? 'bg-red-900/40 border-red-500/60 text-red-400' :
+        state === 'current' ? 'border-white/50 bg-white/8' :
+        'border-white/12 bg-transparent'
+      }`}
+    >
+      {state === 'goal' ? '⚽' : state === 'miss' ? '✕' : state === 'current' ? '' : ''}
+    </motion.div>
+  )
+}
+
+function ScoreBoard({
+  battle, currentUserId, challenger, opponent,
+}: {
+  battle: PenaltyBattle; currentUserId: string
+  challenger: Profile | null; opponent: Profile | null
+}) {
+  const isChallenger = battle.challenger_id === currentUserId
+  const me = isChallenger ? challenger : opponent
+  const them = isChallenger ? opponent : challenger
+  const myScore = isChallenger ? battle.challenger_score : battle.opponent_score
+  const theirScore = isChallenger ? battle.opponent_score : battle.challenger_score
+  const myId = currentUserId
+  const theirId = isChallenger ? battle.opponent_id : battle.challenger_id
+
+  const rounds = (battle.rounds ?? []) as RoundResult[]
+  const currentRound = battle.current_round
+
+  // Compute dots for a player's shots (5 slots = 5 standard kicks)
+  function getDots(pid: string | null): Array<'goal' | 'miss' | 'current' | 'empty'> {
+    if (!pid) return Array(5).fill('empty')
+    const shots = rounds.filter((r) => r.shooter_id === pid)
+    // Which rounds does this player shoot? Challenger=odd, Opponent=even
+    const isPlayerChallenger = pid === battle.challenger_id
+    const playerShootingRounds = [1, 3, 5, 7, 9].filter((r) => isPlayerChallenger ? r % 2 === 1 : r % 2 === 0)
+    return Array.from({ length: 5 }, (_, i) => {
+      const expectedRound = playerShootingRounds[i]
+      if (!expectedRound) return 'empty'
+      const shot = shots.find((r) => r.round === expectedRound)
+      if (shot) return shot.is_goal ? 'goal' : 'miss'
+      if (expectedRound === currentRound) return 'current'
+      if (expectedRound < currentRound) return 'miss'
+      return 'empty'
+    })
+  }
+
+  const myDots = getDots(myId)
+  const theirDots = getDots(theirId ?? null)
+  const delta = myScore - theirScore
+  const leaderText = delta > 0 ? 'VOUS MENEZ' : delta < 0 ? 'ILS MÈNENT' : 'ÉGALITÉ'
+  const leaderColor = delta > 0 ? '#22c55e' : delta < 0 ? '#ef4444' : '#a1a1aa'
+
+  return (
+    <div className="px-4 pt-4 pb-3 max-w-2xl mx-auto">
+      {/* Leader badge */}
+      <div className="flex justify-center mb-2">
+        <motion.div
+          key={leaderText}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest"
+          style={{ color: leaderColor, background: `${leaderColor}18`, border: `1px solid ${leaderColor}40` }}
+        >
+          {leaderText}
+        </motion.div>
+      </div>
+
+      {/* Score row */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Me */}
+        <div className="flex-1 text-left">
+          <p className="text-white/40 text-[10px] uppercase truncate">{flag(me?.nation ?? '')} {me?.pseudo}</p>
+          <motion.p
+            key={myScore}
+            initial={{ scale: 1.4, color: '#22c55e' }}
+            animate={{ scale: 1, color: '#ffffff' }}
+            transition={{ duration: 0.4 }}
+            className="text-5xl font-black leading-none tabular-nums"
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+          >
+            {myScore}
+          </motion.p>
+          <div className="flex gap-1 mt-1.5">
+            {myDots.map((d, i) => <ShotDot key={i} state={d} />)}
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div className="text-white/20 font-black text-2xl" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>—</div>
+
+        {/* Them */}
+        <div className="flex-1 text-right">
+          <p className="text-white/40 text-[10px] uppercase truncate">{flag(them?.nation ?? '')} {them?.pseudo}</p>
+          <motion.p
+            key={theirScore}
+            initial={{ scale: 1.4, color: '#ef4444' }}
+            animate={{ scale: 1, color: '#ffffff' }}
+            transition={{ duration: 0.4 }}
+            className="text-5xl font-black leading-none tabular-nums"
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+          >
+            {theirScore}
+          </motion.p>
+          <div className="flex gap-1 mt-1.5 justify-end">
+            {theirDots.map((d, i) => <ShotDot key={i} state={d} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── GoalAnimation ─────────────────────────────────────────────────────────────
+
+const BALL_TARGET: Record<string, { x: number; y: number; scale: number }> = {
+  left:    { x: -88, y: -90,  scale: 0.5  },
+  center:  { x: 0,   y: -118, scale: 0.45 },
+  right:   { x: 88,  y: -90,  scale: 0.5  },
+  panenka: { x: 0,   y: -142, scale: 0.38 },
+}
+const GK_TARGET: Record<string, { x: number; rotate: number }> = {
+  left:    { x: -75, rotate: -62 },
+  center:  { x: 0,   rotate: 0   },
+  right:   { x: 75,  rotate: 62  },
+  panenka: { x: 0,   rotate: 6   },
+}
+
+function GoalAnimation({
+  result, onDone, newCScore, newOScore, isChallenger,
+}: {
+  result: RoundResult; onDone: () => void
+  newCScore: number; newOScore: number; isChallenger: boolean
+}) {
+  const isGoal = result.is_goal
+  const ball = BALL_TARGET[result.shooter_choice] ?? BALL_TARGET.center
+  const gk = GK_TARGET[result.gk_choice] ?? GK_TARGET.center
+  const [phase, setPhase] = useState<'fly' | 'result' | 'score'>('fly')
+  const myScore = isChallenger ? newCScore : newOScore
+  const theirScore = isChallenger ? newOScore : newCScore
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('result'), 650)
+    const t2 = setTimeout(() => setPhase('score'), 1250)
+    const t3 = setTimeout(() => onDone(), 2100)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [onDone])
+
+  const glowColor = isGoal ? '#22c55e' : '#3b82f6'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.3 } }}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 overflow-hidden"
+      style={{ background: 'rgba(0,0,0,0.95)' }}
+    >
+      {/* Crowd flash */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: phase === 'result' || phase === 'score' ? 0.22 : 0 }}
+        transition={{ duration: 0.35 }}
+        style={{ background: `radial-gradient(ellipse at 50% 60%, ${glowColor} 0%, transparent 65%)` }}
+      />
+
+      {/* Spotlight lines */}
+      {isGoal && phase !== 'fly' && (
+        <motion.div
+          className="absolute inset-0 pointer-events-none"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
+          style={{
+            background: 'conic-gradient(from 180deg at 50% 100%, transparent 60deg, rgba(255,255,255,0.03) 90deg, transparent 120deg, rgba(255,255,255,0.03) 150deg, transparent 180deg, rgba(255,255,255,0.03) 210deg, transparent 240deg)',
+          }}
+        />
+      )}
+
+      {/* Goal frame */}
+      <div className="relative" style={{ width: 300, height: 178 }}>
+        <svg className="absolute inset-0" width="300" height="178" viewBox="0 0 300 178">
+          {/* Net — vertical */}
+          {Array.from({ length: 12 }, (_, i) => (
+            <line key={`nv${i}`} x1={14 + i * 24} y1="14" x2={14 + i * 24} y2="158"
+              stroke="rgba(255,255,255,0.055)" strokeWidth="1" />
+          ))}
+          {/* Net — horizontal */}
+          {Array.from({ length: 6 }, (_, i) => (
+            <line key={`nh${i}`} x1="14" y1={14 + i * 24} x2="286" y2={14 + i * 24}
+              stroke="rgba(255,255,255,0.055)" strokeWidth="1" />
+          ))}
+          {/* Goal flash on score */}
+          {isGoal && phase === 'score' && (
+            <rect x="14" y="14" width="272" height="144" fill="rgba(34,197,94,0.07)" rx="2" />
+          )}
+          {/* Posts */}
+          <line x1="14" y1="14" x2="14" y2="162" stroke="white" strokeWidth="6" strokeLinecap="round" />
+          <line x1="286" y1="14" x2="286" y2="162" stroke="white" strokeWidth="6" strokeLinecap="round" />
+          <line x1="14" y1="14" x2="286" y2="14" stroke="white" strokeWidth="6" strokeLinecap="round" />
+          {/* Ground */}
+          <line x1="0" y1="162" x2="300" y2="162" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
+          {/* Penalty spot */}
+          <circle cx="150" cy="171" r="3.5" fill="rgba(255,255,255,0.22)" />
+          {/* Penalty arc line */}
+          <line x1="90" y1="162" x2="210" y2="162" stroke="rgba(255,255,255,0.10)" strokeWidth="1.5" />
+        </svg>
+
+        {/* GK silhouette */}
+        <motion.div
+          className="absolute"
+          style={{ bottom: 10, left: '50%', marginLeft: -14 }}
+          initial={{ x: 0, rotate: 0 }}
+          animate={{ x: gk.x, rotate: gk.rotate }}
+          transition={{ delay: 0.12, duration: 0.45, ease: [0.18, 0, 0.38, 1] }}
+        >
+          <svg width="28" height="44" viewBox="0 0 28 44" fill="rgba(255,255,255,0.72)">
+            {/* Head */}
+            <circle cx="14" cy="6" r="6" />
+            {/* Body */}
+            <rect x="7" y="13" width="14" height="16" rx="4" />
+            {/* Arms */}
+            <rect x="-4" y="15" width="12" height="5" rx="2.5" />
+            <rect x="20" y="15" width="12" height="5" rx="2.5" />
+            {/* Legs */}
+            <rect x="7" y="29" width="5" height="14" rx="2.5" />
+            <rect x="16" y="29" width="5" height="14" rx="2.5" />
+          </svg>
+        </motion.div>
+
+        {/* Ball */}
+        <motion.div
+          className="absolute text-4xl select-none"
+          style={{ bottom: 5, left: '50%', marginLeft: -20 }}
+          initial={{ x: 0, y: 0, scale: 1, rotate: 0 }}
+          animate={{ x: ball.x, y: ball.y, scale: ball.scale, rotate: result.shooter_choice === 'panenka' ? 360 : (result.shooter_choice === 'left' ? -270 : 270) }}
+          transition={{ duration: 0.6, ease: [0.12, 0.0, 0.22, 1.0] }}
+        >
+          ⚽
+        </motion.div>
+      </div>
+
+      {/* Result text */}
+      <AnimatePresence mode="wait">
+        {phase === 'fly' && (
+          <motion.div key="fly" initial={{ opacity: 0 }} animate={{ opacity: 0 }} className="h-24" />
+        )}
+        {phase === 'result' && (
+          <motion.div
+            key="result"
+            initial={{ opacity: 0, scale: 0.3, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -10 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 16 }}
+            className="text-center"
+          >
+            <p className="text-8xl font-black leading-none" style={{
+              fontFamily: 'Bebas Neue, sans-serif',
+              color: isGoal ? '#22c55e' : '#60a5fa',
+              textShadow: `0 0 60px ${isGoal ? '#22c55e' : '#60a5fa'}99`,
+            }}>
+              {isGoal ? 'BUT !' : 'ARRÊT !'}
+            </p>
+            <p className="text-white/35 text-xs mt-2 uppercase tracking-widest font-bold">
+              {result.shooter_choice === 'panenka' ? '⭐ Panenka'
+                : result.shooter_choice === 'left' ? '← Gauche'
+                : result.shooter_choice === 'center' ? '↑ Centre'
+                : 'Droite →'}
+              {'  ·  GK '}
+              {result.gk_choice === 'left' ? '←' : result.gk_choice === 'center' ? '↑' : '→'}
+            </p>
+          </motion.div>
+        )}
+        {phase === 'score' && (
+          <motion.div
+            key="score"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+          >
+            <motion.p
+              initial={{ scale: 0.7 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 14 }}
+              className="text-7xl font-black tabular-nums"
+              style={{
+                fontFamily: 'Bebas Neue, sans-serif',
+                color: isGoal ? '#22c55e' : '#60a5fa',
+                textShadow: `0 0 40px ${isGoal ? '#22c55e' : '#60a5fa'}88`,
+              }}
+            >
+              {myScore} <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span> {theirScore}
+            </motion.p>
+            <p className="text-white/30 text-xs mt-1 uppercase tracking-widest">Score</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
 }
 
 // ── WaitingView ───────────────────────────────────────────────────────────────
@@ -106,11 +414,8 @@ function WaitingView({ battle, isChallenger }: { battle: PenaltyBattle; isChalle
         ⚽
       </motion.div>
       {isChallenger && (
-        <button
-          onClick={cancel}
-          disabled={cancelling}
-          className="text-white/30 hover:text-white/50 text-sm underline transition-colors disabled:opacity-50"
-        >
+        <button onClick={cancel} disabled={cancelling}
+          className="text-white/30 hover:text-white/50 text-sm underline transition-colors disabled:opacity-50">
           {cancelling ? 'Annulation…' : 'Annuler la recherche'}
         </button>
       )}
@@ -123,12 +428,9 @@ function WaitingView({ battle, isChallenger }: { battle: PenaltyBattle; isChalle
 function PickingView({
   battle, currentUserId, challenger, opponent, myCards, initialMyPicksSubmitted,
 }: {
-  battle: PenaltyBattle
-  currentUserId: string
-  challenger: Profile | null
-  opponent: Profile | null
-  myCards: Card[]
-  initialMyPicksSubmitted: boolean
+  battle: PenaltyBattle; currentUserId: string
+  challenger: Profile | null; opponent: Profile | null
+  myCards: Card[]; initialMyPicksSubmitted: boolean
 }) {
   const isChallenger = battle.challenger_id === currentUserId
   const me = isChallenger ? challenger : opponent
@@ -154,8 +456,7 @@ function PickingView({
 
   useEffect(() => {
     if (timeLeft === 0 && !submitted && sorted.length >= 4) {
-      const auto = sorted.slice(0, 4)
-      submitPicks(auto.slice(0, 3), auto[3])
+      submitPicks(sorted.slice(0, 3), sorted[3])
     }
   }, [timeLeft]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -202,7 +503,6 @@ function PickingView({
           transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
           className="flex flex-col items-center glass rounded-xl px-4 py-2"
         >
-          <Clock size={12} style={{ color: timerColor }} />
           <span className="text-xl font-black font-mono" style={{ color: timerColor, fontFamily: 'Bebas Neue, sans-serif' }}>
             {timeLeft}
           </span>
@@ -221,7 +521,7 @@ function PickingView({
       {submitted || myPicks ? (
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
           className="glass rounded-2xl p-8 text-center">
-          <Check className="w-10 h-10 text-green-400 mx-auto mb-3" />
+          <div className="text-4xl mb-3">✅</div>
           <p className="text-white font-bold text-lg">Équipe confirmée !</p>
           <p className="text-white/40 text-sm mt-1">
             {theirPicks ? 'Les tirs commencent…' : `En attente de ${them?.pseudo ?? '…'}`}
@@ -289,13 +589,11 @@ function PickingView({
 
       {!submitted && !myPicks && (
         <div className="fixed bottom-20 left-0 right-0 px-4 max-w-2xl mx-auto">
-          <motion.button
-            whileTap={{ scale: 0.98 }}
+          <motion.button whileTap={{ scale: 0.98 }}
             disabled={!canSubmit || loading}
             onClick={() => canSubmit && selectedGK && submitPicks(selectedShooters, selectedGK)}
             className="w-full bg-green-500 disabled:opacity-30 text-black font-black py-4 rounded-xl text-lg flex items-center justify-center gap-2 shadow-xl shadow-green-500/20"
-            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-          >
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             {loading ? 'Confirmation…' : 'CONFIRMER MON ÉQUIPE ⚽'}
           </motion.button>
         </div>
@@ -304,169 +602,20 @@ function PickingView({
   )
 }
 
-// ── GoalAnimation ─────────────────────────────────────────────────────────────
-
-// Ball: starts at center-bottom, flies to corner.
-// Offsets relative to center-bottom of the 280×170px goal frame:
-const BALL_ANIM: Record<string, { x: number; y: number; scale: number }> = {
-  left:    { x: -84, y: -94,  scale: 0.55 },
-  center:  { x: 0,   y: -120, scale: 0.5  },
-  right:   { x: 84,  y: -94,  scale: 0.55 },
-  panenka: { x: 0,   y: -140, scale: 0.4  },
-}
-
-// GK silhouette: starts centered at bottom, dives on their side
-const GK_ANIM: Record<string, { x: number; rotate: number }> = {
-  left:    { x: -72, rotate: -58 },
-  center:  { x: 0,   rotate: 0   },
-  right:   { x: 72,  rotate: 58  },
-  panenka: { x: 0,   rotate: 8   },
-}
-
-function GoalAnimation({
-  result, onDone,
-}: {
-  result: RoundResult
-  onDone: () => void
-}) {
-  const isGoal = result.is_goal
-  const ballAnim = BALL_ANIM[result.shooter_choice] ?? BALL_ANIM.center
-  const gkAnim = GK_ANIM[result.gk_choice] ?? GK_ANIM.center
-  const [showText, setShowText] = useState(false)
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setShowText(true), 850)
-    const t2 = setTimeout(() => onDone(), 2800)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [onDone])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 overflow-hidden"
-      style={{ background: 'rgba(0,0,0,0.93)' }}
-    >
-      {/* Stadium glow */}
-      <motion.div
-        className="absolute inset-0 pointer-events-none"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: showText ? 0.18 : 0 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          background: isGoal
-            ? 'radial-gradient(ellipse at 50% 60%, #22c55e 0%, transparent 65%)'
-            : 'radial-gradient(ellipse at 50% 60%, #3b82f6 0%, transparent 65%)',
-        }}
-      />
-
-      {/* Goal frame */}
-      <div className="relative" style={{ width: 280, height: 170 }}>
-        <svg className="absolute inset-0" width="280" height="170" viewBox="0 0 280 170">
-          {/* Net grid */}
-          {[0,1,2,3,4].map((i) => (
-            <line key={`h${i}`} x1="12" y1={14 + i * 28} x2="268" y2={14 + i * 28}
-              stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
-          ))}
-          {[0,1,2,3,4,5,6,7,8,9].map((i) => (
-            <line key={`v${i}`} x1={12 + i * 28} y1="14" x2={12 + i * 28} y2="154"
-              stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
-          ))}
-          {/* Posts */}
-          <line x1="12" y1="14" x2="12" y2="158" stroke="white" strokeWidth="5" strokeLinecap="round" />
-          <line x1="268" y1="14" x2="268" y2="158" stroke="white" strokeWidth="5" strokeLinecap="round" />
-          <line x1="12" y1="14" x2="268" y2="14" stroke="white" strokeWidth="5" strokeLinecap="round" />
-          {/* Goal-line flash when scored */}
-          {isGoal && showText && (
-            <rect x="12" y="14" width="256" height="144" fill="rgba(34,197,94,0.08)" rx="2" />
-          )}
-          {/* Ground */}
-          <line x1="0" y1="158" x2="280" y2="158" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
-          {/* Penalty spot */}
-          <circle cx="140" cy="165" r="3" fill="rgba(255,255,255,0.25)" />
-        </svg>
-
-        {/* GK silhouette */}
-        <motion.div
-          className="absolute"
-          style={{ bottom: 8, left: '50%', marginLeft: -13 }}
-          initial={{ x: 0, rotate: 0 }}
-          animate={{ x: gkAnim.x, rotate: gkAnim.rotate }}
-          transition={{ delay: 0.15, duration: 0.48, ease: [0.2, 0, 0.4, 1] }}
-        >
-          <div className="flex flex-col items-center">
-            <div className="w-6 h-6 rounded-full bg-white/75" />
-            <div className="relative w-5 h-7 bg-white/75 rounded-full mt-0.5">
-              <div className="absolute top-1.5 -left-4 w-4 h-2 bg-white/75 rounded-full" />
-              <div className="absolute top-1.5 -right-4 w-4 h-2 bg-white/75 rounded-full" />
-            </div>
-            <div className="flex gap-0.5 mt-0.5">
-              <div className="w-2 h-4 bg-white/75 rounded-full" />
-              <div className="w-2 h-4 bg-white/75 rounded-full" />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Ball */}
-        <motion.div
-          className="absolute text-3xl select-none"
-          style={{ bottom: 4, left: '50%', marginLeft: -18 }}
-          initial={{ x: 0, y: 0, scale: 1, rotate: 0 }}
-          animate={{
-            x: ballAnim.x,
-            y: ballAnim.y,
-            scale: ballAnim.scale,
-            rotate: result.shooter_choice === 'panenka' ? 0 : (result.shooter_choice === 'left' ? -180 : 180),
-          }}
-          transition={{ duration: 0.65, ease: [0.15, 0.0, 0.25, 1.0] }}
-        >
-          ⚽
-        </motion.div>
-      </div>
-
-      {/* Result text */}
-      <AnimatePresence>
-        {showText && (
-          <motion.div
-            key="result-text"
-            initial={{ opacity: 0, scale: 0.4, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 18 }}
-            className="text-center"
-          >
-            <p className="text-7xl font-black tracking-tight" style={{
-              fontFamily: 'Bebas Neue, sans-serif',
-              color: isGoal ? '#22c55e' : '#60a5fa',
-              textShadow: isGoal ? '0 0 50px #22c55e88' : '0 0 50px #60a5fa88',
-            }}>
-              {isGoal ? 'BUT !' : 'ARRÊT !'}
-            </p>
-            <p className="text-white/30 text-xs mt-2 uppercase tracking-widest">
-              {result.shooter_choice === 'panenka' ? '⭐ Panenka'
-                : result.shooter_choice === 'left' ? '← Gauche'
-                : result.shooter_choice === 'center' ? '↑ Centre'
-                : 'Droite →'}
-              {' · GK → '}
-              {result.gk_choice === 'left' ? '←' : result.gk_choice === 'center' ? '↑' : '→'}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  )
-}
-
 // ── ActiveView ────────────────────────────────────────────────────────────────
 
+type RoundPhase = 'intro' | 'choosing' | 'waiting'
+
 function ActiveView({
-  battle, currentUserId, challenger, opponent, initialMyChoice,
+  battle, currentUserId, challenger, opponent, initialMyChoice, onRoundResolved, isAnimating,
 }: {
   battle: PenaltyBattle
   currentUserId: string
   challenger: Profile | null
   opponent: Profile | null
   initialMyChoice: string | null
+  onRoundResolved: (r: RoundResult) => void
+  isAnimating: boolean
 }) {
   const isChallenger = battle.challenger_id === currentUserId
   const me = isChallenger ? challenger : opponent
@@ -479,54 +628,61 @@ function ActiveView({
   const iAmShooter = shooterId === currentUserId
 
   const shooterPickIdx = Math.floor((round - 1) / 2) % 3
-  const myActiveCard = (iAmShooter ? myPicks[shooterPickIdx] : myPicks[3]) as unknown as Card | undefined
-  const theirActiveCard = (iAmShooter ? theirPicks[3] : theirPicks[shooterPickIdx]) as unknown as Card | undefined
+  const myShooterCard = myPicks[shooterPickIdx] as unknown as Card | undefined
+  const myGKCard = myPicks[3] as unknown as Card | undefined
+  const theirShooterCard = theirPicks[shooterPickIdx] as unknown as Card | undefined
+  const theirGKCard = theirPicks[3] as unknown as Card | undefined
 
-  const timeLeft = useDeadlineCountdown(battle.round_deadline)
+  // Cards for display: who shoots, who guards
+  const shooterCard = iAmShooter ? myShooterCard : theirShooterCard
+  const gkCard = iAmShooter ? theirGKCard : myGKCard
+  const shooterProfile = iAmShooter ? me : them
+  const gkProfile = iAmShooter ? them : me
+
+  const timeLeft = useDeadlineCountdown(isAnimating ? null : battle.round_deadline)
   const [myChoice, setMyChoice] = useState<string | null>(initialMyChoice)
-  const [roundPhase, setRoundPhase] = useState<'choosing' | 'waiting' | 'animating'>(() =>
-    initialMyChoice ? 'waiting' : 'choosing'
-  )
-  const [animatingResult, setAnimatingResult] = useState<RoundResult | null>(null)
+  const [phase, setPhase] = useState<RoundPhase>(() => initialMyChoice ? 'waiting' : 'choosing')
   const [loading, setLoading] = useState(false)
-
   const usedPanenka = isChallenger ? battle.challenger_used_panenka : battle.opponent_used_panenka
-  const shownRef = useRef(new Set<number>())
 
-  function startAnimation(r: RoundResult) {
-    if (shownRef.current.has(r.round)) return
-    shownRef.current.add(r.round)
-    setAnimatingResult(r)
-    setRoundPhase('animating')
-  }
+  const prevRoundRef = useRef(round)
+  const autoSubmitGuardRef = useRef(false) // prevents instant auto-submit on stale deadline
 
-  function onAnimationDone() {
-    setAnimatingResult(null)
-    setRoundPhase('choosing')
-    setMyChoice(null)
-  }
-
-  // Realtime rounds: start animation for the round we haven't seen yet
+  // Detect round change → show intro for new round
   useEffect(() => {
-    const rounds = (battle.rounds ?? []) as RoundResult[]
-    for (const r of rounds) {
-      if (!shownRef.current.has(r.round)) {
-        startAnimation(r)
-        break
-      }
+    if (round !== prevRoundRef.current) {
+      prevRoundRef.current = round
+      setMyChoice(null)
+      autoSubmitGuardRef.current = false
+      setPhase('intro')
     }
-  }, [battle.rounds]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [round])
 
-  // Auto-submit at deadline
+  // 'intro' auto-advances to 'choosing' after 1600ms
   useEffect(() => {
-    if (timeLeft === 0 && roundPhase === 'choosing' && !myChoice) {
+    if (phase !== 'intro') return
+    const t = setTimeout(() => setPhase('choosing'), 1600)
+    return () => clearTimeout(t)
+  }, [phase])
+
+  // Guard: only allow auto-submit if timer has been > 5 at some point
+  useEffect(() => {
+    if (timeLeft > 5) autoSubmitGuardRef.current = true
+  }, [timeLeft])
+
+  // Auto-submit on deadline
+  useEffect(() => {
+    if (timeLeft === 0 && phase === 'choosing' && !myChoice && autoSubmitGuardRef.current) {
       const choices = ['left', 'center', 'right'] as const
       submitChoice(choices[Math.floor(Math.random() * 3)])
     }
   }, [timeLeft]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function submitChoice(choice: string) {
-    if (loading || myChoice || roundPhase !== 'choosing') return
+    if (loading || myChoice || phase !== 'choosing') return
+    // Optimistic: mark immediately
+    setMyChoice(choice)
+    setPhase('waiting')
     setLoading(true)
     try {
       const res = await fetch(`/api/penalty/${battle.id}/choose`, {
@@ -538,156 +694,229 @@ function ActiveView({
         submitted: boolean; resolved: boolean
         roundResult?: RoundResult; alreadySubmitted?: boolean; error?: string
       }
-      if (!res.ok) { toast.error(data.error ?? 'Erreur'); return }
-      setMyChoice(choice)
-      setRoundPhase('waiting')
-      // If we resolved the round → animate immediately
-      if (data.resolved && data.roundResult) {
-        startAnimation(data.roundResult)
+      if (!res.ok) {
+        toast.error(data.error ?? 'Erreur')
+        setMyChoice(null); setPhase('choosing')
+        return
       }
-    } catch { toast.error('Erreur réseau') }
+      if (data.resolved && data.roundResult) {
+        onRoundResolved(data.roundResult)
+      }
+    } catch {
+      toast.error('Erreur réseau')
+      setMyChoice(null); setPhase('choosing')
+    }
     finally { setLoading(false) }
   }
 
-  const myScore = isChallenger ? battle.challenger_score : battle.opponent_score
-  const theirScore = isChallenger ? battle.opponent_score : battle.challenger_score
-  const timerPct = battle.round_deadline
-    ? Math.max(0, (new Date(battle.round_deadline).getTime() - Date.now()) / 15000)
+  const timerPct = battle.round_deadline && !isAnimating
+    ? Math.max(0, Math.min(1, (new Date(battle.round_deadline).getTime() - Date.now()) / 15000))
     : 0
-  const timerColor = timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : '#22c55e'
+  const timerColor = isAnimating ? '#52525b' : timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : '#22c55e'
+
+  const directions = [
+    { id: 'left',   label: '←', sub: 'Gauche'  },
+    { id: 'center', label: '↑', sub: 'Centre'  },
+    { id: 'right',  label: '→', sub: 'Droite'  },
+  ] as const
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      {/* Stadium atmosphere pulse */}
+      {/* Atmosphere pulse */}
       <motion.div
         className="absolute inset-0 pointer-events-none"
-        animate={{
-          opacity: roundPhase === 'choosing' ? [0.04, 0.09, 0.04] : 0,
-        }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        style={{
-          background: 'radial-gradient(ellipse at 50% 100%, #22c55e 0%, transparent 60%)',
-        }}
+        animate={{ opacity: phase === 'choosing' ? [0.04, 0.10, 0.04] : 0 }}
+        transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ background: 'radial-gradient(ellipse at 50% 100%, #22c55e 0%, transparent 55%)' }}
       />
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative px-4 py-4 max-w-2xl mx-auto">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-white/30 text-xs">
-              Round {round} · {iAmShooter ? '⚽ Vous tirez' : '🧤 Vous êtes gardien'}
-            </p>
-            <div className="text-4xl font-black text-white tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              {myScore} <span className="text-white/30">—</span> {theirScore}
-            </div>
-            <p className="text-white/30 text-xs mt-0.5">
-              {flag(me?.nation ?? '')} {me?.pseudo} vs {flag(them?.nation ?? '')} {them?.pseudo}
-            </p>
-          </div>
-
-          {/* Timer ring */}
-          <div className="relative flex items-center justify-center" style={{ width: 56, height: 56 }}>
-            <svg className="absolute inset-0 -rotate-90" width="56" height="56">
-              <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
-              <motion.circle
-                cx="28" cy="28" r="22" fill="none"
-                stroke={timerColor} strokeWidth="3"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 22}`}
-                animate={{ strokeDashoffset: (1 - timerPct) * 2 * Math.PI * 22 }}
-                transition={{ duration: 0.5 }}
-              />
-            </svg>
-            <span className="text-xl font-black font-mono tabular-nums z-10" style={{ color: timerColor, fontFamily: 'Bebas Neue, sans-serif' }}>
-              {timeLeft}
-            </span>
-          </div>
-        </div>
-
-        {/* Shooter card & GK card */}
-        <div className="flex items-end gap-4 mb-7 justify-center">
-          <div className="text-center">
-            <p className="text-white/25 text-[9px] uppercase tracking-wider mb-1.5">
-              {iAmShooter ? 'Tireur (vous)' : `Tireur (${them?.pseudo ?? '?'})`}
-            </p>
-            <motion.div
-              className="w-[72px]"
-              animate={roundPhase === 'choosing' && iAmShooter ? {
-                y: [0, -3, 0], filter: ['drop-shadow(0 0 0px #22c55e00)', 'drop-shadow(0 0 12px #22c55e88)', 'drop-shadow(0 0 0px #22c55e00)'],
-              } : {}}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      {/* Intro overlay */}
+      <AnimatePresence>
+        {phase === 'intro' && !isAnimating && (
+          <motion.div
+            key="intro"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-black/85"
+          >
+            <motion.p
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-white/25 uppercase tracking-[0.35em] text-[11px] font-bold"
             >
-              {(iAmShooter ? myActiveCard : theirActiveCard)
-                ? <GameCard card={(iAmShooter ? myActiveCard : theirActiveCard)!} owned size="sm" />
-                : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-2xl">⚽</div>}
-            </motion.div>
-          </div>
-
-          <div className="text-white/20 text-xl pb-5">VS</div>
-
-          <div className="text-center">
-            <p className="text-white/25 text-[9px] uppercase tracking-wider mb-1.5">
-              {iAmShooter ? `Gardien (${them?.pseudo ?? '?'})` : 'Gardien (vous)'}
-            </p>
-            <motion.div
-              className="w-[72px]"
-              animate={roundPhase === 'choosing' && !iAmShooter ? {
-                y: [0, -3, 0], filter: ['drop-shadow(0 0 0px #3b82f600)', 'drop-shadow(0 0 12px #3b82f688)', 'drop-shadow(0 0 0px #3b82f600)'],
-              } : {}}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              Tir numéro
+            </motion.p>
+            <motion.p
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 16, delay: 0.1 }}
+              className="text-9xl font-black leading-none"
+              style={{ fontFamily: 'Bebas Neue, sans-serif', color: '#22c55e', textShadow: '0 0 60px #22c55e66' }}
             >
-              {(iAmShooter ? theirActiveCard : myActiveCard)
-                ? <GameCard card={(iAmShooter ? theirActiveCard : myActiveCard)!} owned size="sm" />
-                : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-2xl">🧤</div>}
-            </motion.div>
-          </div>
-        </div>
+              {Math.ceil(round / 2)}
+            </motion.p>
 
-        {/* Chosen indicator */}
-        {myChoice && roundPhase === 'waiting' && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-xl p-2.5 mb-4 flex items-center justify-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-xs text-white/50">
-              {iAmShooter ? 'Tir confirmé' : 'Plongeon confirmé'} · En attente de l'adversaire…
-            </span>
+            {shooterCard && (
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 280, damping: 18 }}
+                className="w-28 relative"
+              >
+                <GameCard card={shooterCard} owned size="sm" />
+              </motion.div>
+            )}
+
+            <motion.div
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.35 }}
+              className="text-center"
+            >
+              <p className="text-white font-black text-base">{shooterProfile?.pseudo}</p>
+              <p className="text-white/40 text-xs mt-0.5">
+                {iAmShooter ? '⚽ Préparez votre tir !' : '🧤 Préparez votre plongeon !'}
+              </p>
+            </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      <div className="relative px-4 py-2 max-w-2xl mx-auto">
+
+        {/* Round label + timer ring */}
+        <div className="flex items-center justify-between mb-3 pt-2">
+          <div>
+            <p className="text-white/25 text-[10px] uppercase tracking-widest">
+              {iAmShooter ? '⚽ Vous tirez' : '🧤 Vous gardez'} · Round {round}
+            </p>
+          </div>
+          {/* Timer ring */}
+          <div className="relative flex items-center justify-center" style={{ width: 52, height: 52 }}>
+            <svg className="absolute inset-0 -rotate-90" width="52" height="52">
+              <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+              <motion.circle
+                cx="26" cy="26" r="20" fill="none"
+                stroke={timerColor} strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 20}`}
+                animate={{ strokeDashoffset: (1 - timerPct) * 2 * Math.PI * 20 }}
+                transition={{ duration: 0.4 }}
+              />
+            </svg>
+            <span className="text-lg font-black font-mono tabular-nums z-10" style={{ color: timerColor, fontFamily: 'Bebas Neue, sans-serif' }}>
+              {isAnimating ? '…' : timeLeft}
+            </span>
+          </div>
+        </div>
+
+        {/* Cards: who shoots vs who guards */}
+        <div className="flex items-center justify-center gap-6 mb-5">
+          {/* Shooter */}
+          <div className="text-center">
+            <p className="text-white/25 text-[9px] uppercase tracking-wider mb-1">
+              {iAmShooter ? 'Vous' : them?.pseudo ?? '?'}
+            </p>
+            <motion.div
+              className="w-20"
+              animate={phase === 'choosing' && iAmShooter ? {
+                y: [0, -4, 0],
+                filter: ['drop-shadow(0 0 0px #22c55e00)', 'drop-shadow(0 0 14px #22c55eaa)', 'drop-shadow(0 0 0px #22c55e00)'],
+              } : {}}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {shooterCard
+                ? <GameCard card={shooterCard} owned size="sm" />
+                : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-2xl">⚽</div>}
+            </motion.div>
+            <div className="mt-1 flex items-center justify-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <span className="text-green-400 text-[9px] font-bold uppercase">Tireur</span>
+            </div>
+          </div>
+
+          {/* VS */}
+          <div className="flex flex-col items-center gap-1">
+            <div className="text-white/10 text-xs font-black">VS</div>
+            <div className="w-px h-8 bg-white/10" />
+          </div>
+
+          {/* GK */}
+          <div className="text-center">
+            <p className="text-white/25 text-[9px] uppercase tracking-wider mb-1">
+              {!iAmShooter ? 'Vous' : them?.pseudo ?? '?'}
+            </p>
+            <motion.div
+              className="w-20"
+              animate={phase === 'choosing' && !iAmShooter ? {
+                y: [0, -4, 0],
+                filter: ['drop-shadow(0 0 0px #3b82f600)', 'drop-shadow(0 0 14px #3b82f6aa)', 'drop-shadow(0 0 0px #3b82f600)'],
+              } : {}}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {gkCard
+                ? <GameCard card={gkCard} owned size="sm" />
+                : <div className="aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center text-2xl">🧤</div>}
+            </motion.div>
+            <div className="mt-1 flex items-center justify-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span className="text-blue-400 text-[9px] font-bold uppercase">Gardien</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Waiting indicator */}
+        <AnimatePresence>
+          {phase === 'waiting' && !isAnimating && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="glass rounded-xl p-2.5 mb-4 flex items-center justify-center gap-2"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs text-white/45 font-medium">
+                {iAmShooter ? 'Tir envoyé' : 'Plongeon confirmé'} · En attente de l&apos;adversaire…
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Direction buttons */}
         <div className="space-y-3">
-          <p className="text-white/50 text-xs text-center font-bold uppercase tracking-widest">
-            {iAmShooter ? '⚽ Choisir la direction du tir' : '🧤 Choisir la direction du plongeon'}
+          <p className="text-white/35 text-[10px] text-center font-bold uppercase tracking-[0.25em]">
+            {iAmShooter ? 'CHOISIR LA DIRECTION DU TIR' : 'CHOISIR LA DIRECTION DU PLONGEON'}
           </p>
-          <div className="grid grid-cols-3 gap-3">
-            {(['left', 'center', 'right'] as const).map((dir) => {
-              const chosen = myChoice === dir
-              const disabled = roundPhase !== 'choosing' || loading
-              const labels: Record<string, string> = { left: '← Gauche', center: '↑ Centre', right: 'Droite →' }
+
+          <div className="grid grid-cols-3 gap-2.5">
+            {directions.map(({ id, label, sub }) => {
+              const chosen = myChoice === id
+              const disabled = phase !== 'choosing' || loading || isAnimating
               return (
-                <motion.button key={dir}
-                  whileTap={disabled ? {} : { scale: 0.91 }}
-                  whileHover={disabled ? {} : { scale: 1.03 }}
+                <motion.button
+                  key={id}
+                  whileTap={disabled ? {} : { scale: 0.89 }}
                   disabled={disabled}
-                  onClick={() => submitChoice(dir)}
-                  className={`py-5 rounded-2xl font-black text-sm uppercase tracking-wider transition-colors relative overflow-hidden ${
+                  onClick={() => submitChoice(id)}
+                  className={`relative overflow-hidden py-5 rounded-2xl font-black uppercase tracking-wider transition-all flex flex-col items-center gap-0.5 ${
                     chosen
-                      ? 'bg-green-500 text-black shadow-lg shadow-green-500/40'
+                      ? 'bg-green-500 text-black shadow-lg shadow-green-500/35'
                       : disabled
                         ? 'bg-white/4 text-white/15'
-                        : 'bg-white/8 text-white hover:bg-white/12 border border-white/8'
+                        : 'bg-white/8 text-white hover:bg-white/13 border border-white/8 active:bg-white/15'
                   }`}
-                  style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                  style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                >
                   {chosen && (
                     <motion.div
-                      className="absolute inset-0 bg-white/20"
-                      initial={{ scale: 0, opacity: 1, borderRadius: '100%' }}
-                      animate={{ scale: 3, opacity: 0 }}
-                      transition={{ duration: 0.5 }}
+                      className="absolute inset-0 bg-white/25 rounded-full"
+                      initial={{ scale: 0, opacity: 0.8 }}
+                      animate={{ scale: 4, opacity: 0 }}
+                      transition={{ duration: 0.6 }}
                     />
                   )}
-                  {labels[dir]}
+                  <span className="text-2xl leading-none">{label}</span>
+                  <span className="text-[10px]">{sub}</span>
                 </motion.button>
               )
             })}
@@ -695,26 +924,35 @@ function ActiveView({
 
           {iAmShooter && !usedPanenka && (
             <motion.button
-              whileTap={roundPhase !== 'choosing' ? {} : { scale: 0.96 }}
-              disabled={roundPhase !== 'choosing' || loading}
+              whileTap={phase !== 'choosing' || isAnimating ? {} : { scale: 0.97 }}
+              disabled={phase !== 'choosing' || loading || isAnimating}
               onClick={() => submitChoice('panenka')}
-              className={`w-full py-3 rounded-2xl font-black text-sm transition-all relative overflow-hidden ${
+              className={`w-full py-3 rounded-2xl font-black text-sm transition-all relative overflow-hidden flex items-center justify-center gap-2 ${
                 myChoice === 'panenka'
-                  ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/40'
-                  : roundPhase !== 'choosing'
+                  ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/35'
+                  : phase !== 'choosing' || isAnimating
                     ? 'bg-white/4 text-white/15'
-                    : 'bg-yellow-500/8 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/14'
+                    : 'bg-yellow-500/8 text-yellow-400 border border-yellow-500/25 hover:bg-yellow-500/13'
               }`}
-              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              ⭐ PANENKA — usage unique
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
+              {myChoice === 'panenka' && (
+                <motion.div
+                  className="absolute inset-0 bg-white/25 rounded-full"
+                  initial={{ scale: 0, opacity: 0.8 }}
+                  animate={{ scale: 4, opacity: 0 }}
+                  transition={{ duration: 0.6 }}
+                />
+              )}
+              ⭐ PANENKA <span className="text-[10px] font-normal opacity-60">(usage unique)</span>
             </motion.button>
           )}
         </div>
 
-        {/* Round history */}
+        {/* Round history dots (compact) */}
         {((battle.rounds?.length ?? 0) > 0) && (
-          <div className="mt-7">
-            <p className="text-white/20 text-[9px] uppercase tracking-widest mb-2">Historique</p>
+          <div className="mt-5">
+            <p className="text-white/15 text-[9px] uppercase tracking-widest mb-1.5">Historique des tirs</p>
             <div className="flex gap-1.5 flex-wrap">
               {((battle.rounds ?? []) as RoundResult[]).map((r, i) => {
                 const iShot = r.shooter_id === currentUserId
@@ -722,11 +960,12 @@ function ActiveView({
                 return (
                   <motion.div key={i}
                     initial={{ scale: 0 }} animate={{ scale: 1 }}
-                    transition={{ type: 'spring', delay: i * 0.05 }}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-sm border ${
+                    transition={{ type: 'spring', delay: i * 0.04 }}
+                    title={`Round ${r.round} · ${r.is_goal ? 'But' : 'Arrêt'}`}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] border ${
                       positive
-                        ? 'bg-green-500/15 border-green-500/30 text-green-400'
-                        : 'bg-red-500/10 border-red-500/20 text-red-400'
+                        ? 'bg-green-500/15 border-green-500/35 text-green-400'
+                        : 'bg-red-500/10 border-red-500/25 text-red-400'
                     }`}>
                     {r.is_goal ? '⚽' : '🧤'}
                   </motion.div>
@@ -735,18 +974,7 @@ function ActiveView({
             </div>
           </div>
         )}
-      </motion.div>
-
-      {/* Goal animation overlay */}
-      <AnimatePresence>
-        {animatingResult && (
-          <GoalAnimation
-            key={`anim-${animatingResult.round}`}
-            result={animatingResult}
-            onDone={onAnimationDone}
-          />
-        )}
-      </AnimatePresence>
+      </div>
     </div>
   )
 }
@@ -797,8 +1025,7 @@ function StealingView({
     setLoading(true)
     try {
       const res = await fetch(`/api/penalty/${battle.id}/steal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardIds: ids }),
       })
       const data = await res.json()
@@ -907,16 +1134,25 @@ function FinishedView({
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
       className="min-h-screen flex flex-col items-center justify-center px-4 py-6 gap-6">
-      <div className={`w-20 h-20 rounded-full flex items-center justify-center text-5xl ${iWon ? 'bg-green-500/15' : 'bg-red-500/15'}`}>
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 16, delay: 0.1 }}
+        className={`w-24 h-24 rounded-full flex items-center justify-center text-6xl ${iWon ? 'bg-green-500/15 shadow-[0_0_40px_#22c55e44]' : 'bg-red-500/15'}`}
+      >
         {iWon ? '🏆' : '😔'}
-      </div>
+      </motion.div>
       <div className="text-center">
-        <h1 className="text-5xl font-black mb-2" style={{
-          fontFamily: 'Bebas Neue, sans-serif', color: iWon ? '#22c55e' : '#ef4444',
-        }}>
+        <motion.h1
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', delay: 0.2 }}
+          className="text-6xl font-black mb-2"
+          style={{ fontFamily: 'Bebas Neue, sans-serif', color: iWon ? '#22c55e' : '#ef4444' }}
+        >
           {iWon ? 'VICTOIRE !' : 'DÉFAITE'}
-        </h1>
-        <p className="text-3xl font-black text-white tabular-nums">{myScore} — {theirScore}</p>
+        </motion.h1>
+        <p className="text-4xl font-black text-white tabular-nums">{myScore} — {theirScore}</p>
         <p className="text-white/40 text-sm mt-1">vs {flag(them?.nation ?? '')} {them?.pseudo}</p>
       </div>
 
@@ -958,10 +1194,34 @@ export function PenaltyClient({
 }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [battle, setBattle] = useState<PenaltyBattle>(initialBattle)
+  const [pendingResult, setPendingResult] = useState<RoundResult | null>(null)
 
   const isChallenger = battle.challenger_id === currentUserId
   const myPicksSubmitted = isChallenger ? !!battle.challenger_picks : !!battle.opponent_picks
 
+  // Track which rounds have been animated (never re-animate)
+  const shownRoundsRef = useRef(new Set<number>())
+
+  // Called by ActiveView when API returns resolved:true (faster path for 2nd submitter)
+  const onRoundResolved = useCallback((result: RoundResult) => {
+    if (shownRoundsRef.current.has(result.round)) return
+    shownRoundsRef.current.add(result.round)
+    setPendingResult(result)
+  }, [])
+
+  // Called by Realtime for the 1st submitter (who didn't get resolved:true from API)
+  useEffect(() => {
+    const rounds = (battle.rounds ?? []) as RoundResult[]
+    for (const r of rounds) {
+      if (!shownRoundsRef.current.has(r.round)) {
+        shownRoundsRef.current.add(r.round)
+        setPendingResult(r)
+        break
+      }
+    }
+  }, [battle.rounds]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime subscription
   useEffect(() => {
     const ch = supabase
       .channel(`penalty-${battle.id}`)
@@ -974,6 +1234,7 @@ export function PenaltyClient({
     return () => { supabase.removeChannel(ch) }
   }, [battle.id, supabase])
 
+  // Fallback polling
   useEffect(() => {
     const poll = setInterval(async () => {
       try {
@@ -982,12 +1243,33 @@ export function PenaltyClient({
         const data = await r.json() as { battle?: PenaltyBattle }
         if (data.battle) setBattle((prev) => ({ ...prev, ...data.battle }))
       } catch {}
-    }, 3000)
+    }, 4000)
     return () => clearInterval(poll)
   }, [battle.id])
 
+  // Compute updated scores for GoalAnimation
+  const newCScore = pendingResult
+    ? battle.challenger_score - (pendingResult.is_goal && pendingResult.shooter_id === battle.challenger_id ? 0 : 0)
+    : battle.challenger_score
+  const newOScore = pendingResult ? battle.opponent_score : battle.opponent_score
+
+  // Actually scores in battle are already updated by the time Realtime fires
+  // Pass them directly
+  const displayCScore = battle.challenger_score
+  const displayOScore = battle.opponent_score
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-black to-gray-950">
+      {/* ScoreBoard (always visible when active/stealing) */}
+      {(battle.status === 'active' || battle.status === 'stealing') && (
+        <ScoreBoard
+          battle={battle}
+          currentUserId={currentUserId}
+          challenger={challenger}
+          opponent={opponent}
+        />
+      )}
+
       <AnimatePresence mode="wait">
         {battle.status === 'waiting' && (
           <WaitingView key="waiting" battle={battle} isChallenger={isChallenger} />
@@ -1011,6 +1293,8 @@ export function PenaltyClient({
             challenger={challenger}
             opponent={opponent}
             initialMyChoice={initialMyChoice}
+            onRoundResolved={onRoundResolved}
+            isAnimating={!!pendingResult}
           />
         )}
         {battle.status === 'stealing' && (
@@ -1036,6 +1320,20 @@ export function PenaltyClient({
             className="min-h-screen flex items-center justify-center text-white/40 text-lg">
             Battle annulée
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* GoalAnimation overlay — at top level, above everything */}
+      <AnimatePresence>
+        {pendingResult && (
+          <GoalAnimation
+            key={`anim-${pendingResult.round}`}
+            result={pendingResult}
+            onDone={() => setPendingResult(null)}
+            newCScore={displayCScore}
+            newOScore={displayOScore}
+            isChallenger={isChallenger}
+          />
         )}
       </AnimatePresence>
     </div>
