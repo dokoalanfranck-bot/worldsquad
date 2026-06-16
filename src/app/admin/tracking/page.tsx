@@ -74,6 +74,15 @@ export default async function TrackingPage() {
     { data: activeDuelsRaw },
     // Card source breakdown
     { data: cardsByVia },
+    // Penalty battles
+    { count: totalPenalties },
+    { count: penaltiesToday },
+    { count: activePenalties },
+    { count: penaltiesFinished },
+    { data: penaltiesByHour },
+    { data: penaltiesByDay },
+    { data: recentPenaltiesRaw },
+    { data: activePenaltiesRaw },
   ] = await Promise.all([
     // Users
     admin.from('users').select('*', { count: 'exact', head: true }),
@@ -132,16 +141,27 @@ export default async function TrackingPage() {
     admin.from('duels').select('id, created_at, is_bot, bot_name, challenger_id, opponent_id, status, coins_stake').in('status', ['open', 'picking']).order('created_at', { ascending: false }).limit(20),
     // Card source breakdown today
     admin.from('user_cards').select('obtained_via').gte('obtained_at', todayStr),
+    // Penalty battles
+    admin.from('penalty_battles').select('*', { count: 'exact', head: true }),
+    admin.from('penalty_battles').select('*', { count: 'exact', head: true }).gte('created_at', todayStr),
+    admin.from('penalty_battles').select('*', { count: 'exact', head: true }).in('status', ['waiting', 'picking', 'active']),
+    admin.from('penalty_battles').select('*', { count: 'exact', head: true }).eq('status', 'finished'),
+    admin.from('penalty_battles').select('created_at').gte('created_at', last24h).order('created_at', { ascending: true }),
+    admin.from('penalty_battles').select('created_at').gte('created_at', weekStr).order('created_at', { ascending: true }),
+    admin.from('penalty_battles').select('id, created_at, status, challenger_score, opponent_score, winner_id, current_round, challenger_id, opponent_id').in('status', ['finished', 'stealing']).order('created_at', { ascending: false }).limit(20),
+    admin.from('penalty_battles').select('id, created_at, status, challenger_id, opponent_id, current_round, challenger_score, opponent_score').in('status', ['waiting', 'picking', 'active']).order('created_at', { ascending: false }).limit(10),
   ])
 
   const [
     { count: newUsersYesterday },
     { count: duelsYesterday },
     { count: predictionsYesterday },
+    { count: penaltiesYesterday },
   ] = await Promise.all([
     admin.from('users').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
     admin.from('duels').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
     admin.from('predictions').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
+    admin.from('penalty_battles').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStr).lt('created_at', todayStr),
   ])
 
   // Enrich recent finished duels
@@ -235,6 +255,80 @@ export default async function TrackingPage() {
     cardsBySource[key] = (cardsBySource[key] ?? 0) + 1
   }
 
+  // Penalty hourly chart
+  const penaltyHourBuckets: Record<number, number> = {}
+  for (let h = 0; h < 24; h++) penaltyHourBuckets[h] = 0
+  for (const p of penaltiesByHour ?? []) {
+    const h = new Date(p.created_at).getHours()
+    penaltyHourBuckets[h] = (penaltyHourBuckets[h] ?? 0) + 1
+  }
+  const penaltyChart = Object.entries(penaltyHourBuckets).map(([h, count]) => ({ hour: Number(h), count }))
+
+  // 7-day side-by-side chart for modes
+  const duelDayBuckets: Record<string, number> = {}
+  const penaltyDayBuckets: Record<string, number> = {}
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(now.getDate() - i); d.setHours(0, 0, 0, 0)
+    const key = d.toISOString().split('T')[0]
+    duelDayBuckets[key] = 0
+    penaltyDayBuckets[key] = 0
+  }
+  // Reuse usersByDay query range for duels (already fetched duelsByHour last24h)
+  // Use fresh 7-day data from penaltiesByDay
+  for (const u of usersByDay ?? []) {
+    const day = new Date(u.created_at).toISOString().split('T')[0]
+    if (day in duelDayBuckets) duelDayBuckets[day]++
+  }
+  for (const p of penaltiesByDay ?? []) {
+    const day = new Date(p.created_at).toISOString().split('T')[0]
+    if (day in penaltyDayBuckets) penaltyDayBuckets[day]++
+  }
+  const modeChart7d = Object.keys(duelDayBuckets).map((date) => ({
+    date,
+    duels: duelDayBuckets[date],
+    penalties: penaltyDayBuckets[date],
+  }))
+
+  // Enrich recent penalty battles
+  const penaltyUserIds = Array.from(new Set([
+    ...(recentPenaltiesRaw ?? []).map((p) => p.challenger_id),
+    ...(recentPenaltiesRaw ?? []).filter((p) => p.opponent_id).map((p) => p.opponent_id as string),
+  ].filter(Boolean)))
+  const { data: penaltyProfiles } = penaltyUserIds.length
+    ? await admin.from('users').select('id, pseudo').in('id', penaltyUserIds)
+    : { data: [] }
+  const penProfileMap = Object.fromEntries((penaltyProfiles ?? []).map((p) => [p.id, p.pseudo]))
+  const recentPenalties = (recentPenaltiesRaw ?? []).map((p) => ({
+    id: p.id,
+    created_at: p.created_at,
+    status: p.status as string,
+    challenger_score: p.challenger_score as number,
+    opponent_score: p.opponent_score as number,
+    winner_id: p.winner_id as string | null,
+    current_round: p.current_round as number,
+    challenger_pseudo: penProfileMap[p.challenger_id as string] ?? '?',
+    opponent_pseudo: p.opponent_id ? (penProfileMap[p.opponent_id as string] ?? '?') : '—',
+    challenger_id: p.challenger_id as string,
+  }))
+
+  // Enrich active penalty battles
+  const activePenUserIds = Array.from(new Set([
+    ...(activePenaltiesRaw ?? []).map((p) => p.challenger_id),
+    ...(activePenaltiesRaw ?? []).filter((p) => p.opponent_id).map((p) => p.opponent_id as string),
+  ].filter(Boolean)))
+  const { data: activePenProfiles } = activePenUserIds.length
+    ? await admin.from('users').select('id, pseudo').in('id', activePenUserIds)
+    : { data: [] }
+  const activePenMap = Object.fromEntries((activePenProfiles ?? []).map((p) => [p.id, p.pseudo]))
+  const activePenaltiesList = (activePenaltiesRaw ?? []).map((p) => ({
+    id: p.id,
+    created_at: p.created_at,
+    status: p.status as string,
+    current_round: p.current_round as number,
+    challenger_pseudo: activePenMap[p.challenger_id as string] ?? '?',
+    opponent_pseudo: p.opponent_id ? (activePenMap[p.opponent_id as string] ?? '?') : 'En attente…',
+  }))
+
   const revenueToday = (recentPurchases ?? [])
     .filter((p) => p.status === 'completed' && new Date(p.created_at) >= todayStart)
     .reduce((s, p) => s + p.amount_paid / 100, 0)
@@ -284,6 +378,12 @@ export default async function TrackingPage() {
         newUsersYesterday: newUsersYesterday ?? 0,
         duelsYesterday: duelsYesterday ?? 0,
         predictionsYesterday: predictionsYesterday ?? 0,
+        // Penalty
+        totalPenalties: totalPenalties ?? 0,
+        penaltiesToday: penaltiesToday ?? 0,
+        penaltiesYesterday: penaltiesYesterday ?? 0,
+        activePenalties: activePenalties ?? 0,
+        penaltiesFinished: penaltiesFinished ?? 0,
       }}
       recentSignups={recentSignups ?? []}
       recentDuels={recentDuels}
@@ -301,6 +401,10 @@ export default async function TrackingPage() {
       duelChart={duelChart}
       packChart={packChart}
       signupChart={signupChart}
+      penaltyChart={penaltyChart}
+      modeChart7d={modeChart7d}
+      recentPenalties={recentPenalties}
+      activePenaltiesList={activePenaltiesList}
       fetchedAt={now.toISOString()}
     />
   )

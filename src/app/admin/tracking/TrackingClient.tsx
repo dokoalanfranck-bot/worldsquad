@@ -29,6 +29,9 @@ interface Stats {
   cardsBySource: Record<string, number>
   reasonBreakdown: Record<string, { in: number; out: number; count: number }>
   newUsersYesterday: number; duelsYesterday: number; predictionsYesterday: number
+  // Penalty
+  totalPenalties: number; penaltiesToday: number; penaltiesYesterday: number
+  activePenalties: number; penaltiesFinished: number
 }
 interface OnlineUser { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; last_seen_at: string; battles_played: number }
 interface ActiveDuel { id: string; challenger_pseudo: string; opponent_pseudo: string; is_bot: boolean; status: string; coins_stake: number; created_at: string }
@@ -41,6 +44,9 @@ interface TransactionRow { id: string; user_id: string; amount: number; reason: 
 interface UserRow { id: string; pseudo: string; nation: string; photo_url: string | null; is_vip: boolean; coins: number; battles_won: number; battles_played: number; predictions_correct: number; battle_streak: number; best_streak: number; created_at: string; last_seen_at?: string | null; daily_streak?: number; win_rate: number; losses: number }
 interface ChartPoint { hour: number; count: number }
 interface DayPoint { date: string; count: number }
+interface PenaltyRow { id: string; created_at: string; status: string; challenger_score: number; opponent_score: number; winner_id: string | null; current_round: number; challenger_pseudo: string; opponent_pseudo: string; challenger_id: string }
+interface ActivePenaltyRow { id: string; created_at: string; status: string; current_round: number; challenger_pseudo: string; opponent_pseudo: string }
+interface ModeDay { date: string; duels: number; penalties: number }
 
 interface Props {
   stats: Stats
@@ -56,6 +62,10 @@ interface Props {
   duelChart: ChartPoint[]
   packChart: ChartPoint[]
   signupChart: DayPoint[]
+  penaltyChart: ChartPoint[]
+  modeChart7d: ModeDay[]
+  recentPenalties: PenaltyRow[]
+  activePenaltiesList: ActivePenaltyRow[]
   fetchedAt: string
 }
 
@@ -340,10 +350,11 @@ function Avatar({ user, size = 7 }: { user: { pseudo: string; photo_url: string 
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
-type Tab = 'live' | 'global' | 'duels' | 'packs' | 'pronos' | 'economie' | 'joueurs'
+type Tab = 'live' | 'global' | 'modes' | 'duels' | 'packs' | 'pronos' | 'economie' | 'joueurs'
 const TABS: { key: Tab; label: string; emoji: string }[] = [
   { key: 'live',     label: 'Live',     emoji: '🔴' },
   { key: 'global',   label: 'Global',   emoji: '📊' },
+  { key: 'modes',    label: 'Modes',    emoji: '🏆' },
   { key: 'duels',    label: 'Duels',    emoji: '⚔️' },
   { key: 'packs',    label: 'Packs',    emoji: '📦' },
   { key: 'pronos',   label: 'Pronos',   emoji: '⚽' },
@@ -356,7 +367,8 @@ export function TrackingClient(props: Props) {
   const {
     stats, recentSignups, recentDuels, recentPredictions,
     recentPurchases, recentPaymentRequests, recentTransactions, topUsers,
-    onlineUsers, activeDuelsList, duelChart, packChart, signupChart, fetchedAt,
+    onlineUsers, activeDuelsList, duelChart, packChart, signupChart,
+    penaltyChart, modeChart7d, recentPenalties, activePenaltiesList, fetchedAt,
   } = props
 
   const router = useRouter()
@@ -399,6 +411,12 @@ export function TrackingClient(props: Props) {
   const signupTrend = trendPct(stats.newUsersToday, stats.newUsersYesterday)
   const duelTrend = trendPct(stats.duelsToday, stats.duelsYesterday)
   const predTrend = trendPct(stats.predictionsToday, stats.predictionsYesterday)
+  const penaltyTrend = trendPct(stats.penaltiesToday, stats.penaltiesYesterday)
+  const totalBattlesToday = stats.duelsToday + stats.penaltiesToday
+  const totalBattlesAll = stats.totalDuels + stats.totalPenalties
+  const penaltyPctToday = totalBattlesToday > 0 ? Math.round((stats.penaltiesToday / totalBattlesToday) * 100) : 0
+  const duelPctToday = totalBattlesToday > 0 ? Math.round((stats.duelsToday / totalBattlesToday) * 100) : 0
+  const penaltyCompletionRate = stats.totalPenalties > 0 ? Math.round((stats.penaltiesFinished / stats.totalPenalties) * 100) : 0
 
   const sortedUsers = [...topUsers]
     .filter((u) => u.pseudo.toLowerCase().includes(search.toLowerCase()))
@@ -448,6 +466,7 @@ export function TrackingClient(props: Props) {
           { label: 'Inscrits',    value: stats.newUsersToday,      color: 'text-sky-400',    pulse: false },
           { label: 'Actifs',      value: stats.activeDuels,        color: 'text-orange-400', pulse: true  },
           { label: 'Duels',       value: stats.duelsToday,         color: 'text-amber-400',  pulse: false },
+          { label: 'Tirs au but', value: stats.penaltiesToday,     color: 'text-green-400',  pulse: false },
           { label: 'Pronos',      value: stats.predictionsToday,   color: 'text-emerald-400',pulse: false },
           { label: 'Cartes',      value: stats.cardsFromPacksToday,color: 'text-pink-400',   pulse: false },
           { label: 'Achats',      value: stats.purchasesToday,     color: 'text-violet-400', pulse: false },
@@ -530,13 +549,18 @@ export function TrackingClient(props: Props) {
                   </div>
                 </div>
 
-                {/* Active duels */}
+                {/* Active battles (duels + penalties) */}
                 <div className="rounded-xl border border-white/6 overflow-hidden" style={cardStyle}>
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
                     <Radio className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
-                    <span className="text-white text-sm font-bold">{stats.activeDuels} duel{stats.activeDuels !== 1 ? 's' : ''} en cours</span>
+                    <span className="text-white text-sm font-bold">
+                      {stats.activeDuels + stats.activePenalties} partie{stats.activeDuels + stats.activePenalties !== 1 ? 's' : ''} en cours
+                    </span>
+                    <span className="ml-auto text-[10px] text-white/20">{stats.activeDuels} duels · {stats.activePenalties} TAB</span>
                   </div>
-                  {activeDuelsList.length > 0 ? (
+                  {activeDuelsList.length === 0 && activePenaltiesList.length === 0 ? (
+                    <p className="text-white/20 text-sm text-center py-4 px-4">Aucune partie active</p>
+                  ) : (
                     <div className="divide-y divide-white/4">
                       {activeDuelsList.map((d) => (
                         <div key={d.id} className="flex items-center gap-2.5 px-4 py-2.5">
@@ -545,13 +569,22 @@ export function TrackingClient(props: Props) {
                           <span className="text-white/20 text-[10px] flex-shrink-0">⚔</span>
                           <span className="text-white/55 text-xs flex-1 truncate">{d.opponent_pseudo}</span>
                           <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${d.status === 'picking' ? 'bg-orange-500/20 text-orange-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                            {d.status === 'picking' ? 'SELECT' : 'WAIT'}
+                            DUEL
+                          </span>
+                        </div>
+                      ))}
+                      {activePenaltiesList.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2.5 px-4 py-2.5">
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-green-400 animate-pulse" />
+                          <span className="text-white text-xs font-semibold flex-1 truncate">{p.challenger_pseudo}</span>
+                          <span className="text-white/20 text-[10px] flex-shrink-0">⚽</span>
+                          <span className="text-white/55 text-xs flex-1 truncate">{p.opponent_pseudo}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 bg-green-500/15 text-green-400">
+                            TAB R{p.current_round}
                           </span>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-white/20 text-sm text-center py-4 px-4">Aucun duel actif</p>
                   )}
                 </div>
               </div>
@@ -656,6 +689,261 @@ export function TrackingClient(props: Props) {
                   </Link>
                 ))}
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ══════════════════════════════════ MODES ═════════════════════════════ */}
+        {tab === 'modes' && (
+          <motion.div key="modes" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
+
+            {/* Winner banner */}
+            <div className="rounded-xl border overflow-hidden" style={{
+              background: penaltyPctToday >= 50 ? 'rgba(34,197,94,0.06)' : 'rgba(249,115,22,0.06)',
+              borderColor: penaltyPctToday >= 50 ? 'rgba(34,197,94,0.2)' : 'rgba(249,115,22,0.2)',
+            }}>
+              <div className="px-5 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-white/30 text-[10px] uppercase tracking-widest mb-1">Mode le plus joué aujourd&apos;hui</p>
+                  <p className="text-2xl font-black" style={{
+                    fontFamily: 'Bebas Neue, sans-serif',
+                    color: penaltyPctToday >= 50 ? '#22c55e' : '#f97316',
+                  }}>
+                    {penaltyPctToday >= 50 ? '⚽ Tirs au but' : '⚔️ Battle classique'}
+                  </p>
+                  <p className="text-white/30 text-xs mt-0.5">
+                    {penaltyPctToday >= 50 ? penaltyPctToday : duelPctToday}% des parties du jour
+                  </p>
+                </div>
+                <div className="text-5xl opacity-20">
+                  {penaltyPctToday >= 50 ? '⚽' : '⚔️'}
+                </div>
+              </div>
+            </div>
+
+            {/* KPI comparison */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Battles classiques */}
+              <div className="rounded-xl border border-orange-500/20 p-4 space-y-3" style={{ background: 'rgba(249,115,22,0.04)' }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-orange-500/15 flex items-center justify-center text-sm">⚔️</div>
+                  <p className="text-white font-bold text-sm">Battle Classique</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Total', value: stats.totalDuels },
+                    { label: 'Aujourd\'hui', value: stats.duelsToday, trend: duelTrend },
+                    { label: 'En cours', value: stats.activeDuels },
+                    { label: '% du jour', value: `${duelPctToday}%`, isStr: true },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-lg p-2.5" style={{ background: 'rgba(249,115,22,0.08)' }}>
+                      <p className="text-orange-300 text-lg font-black leading-none tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        {s.isStr ? s.value : (s.value as number).toLocaleString()}
+                      </p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <p className="text-white/30 text-[10px]">{s.label}</p>
+                        {s.trend !== undefined && (
+                          <span className={`text-[9px] font-bold px-1 rounded-full ${s.trend >= 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                            {s.trend >= 0 ? '↑' : '↓'}{Math.abs(s.trend)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tirs au but */}
+              <div className="rounded-xl border border-green-500/20 p-4 space-y-3" style={{ background: 'rgba(34,197,94,0.04)' }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-green-500/15 flex items-center justify-center text-sm">⚽</div>
+                  <p className="text-white font-bold text-sm">Tirs au but</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Total', value: stats.totalPenalties },
+                    { label: 'Aujourd\'hui', value: stats.penaltiesToday, trend: penaltyTrend },
+                    { label: 'En cours', value: stats.activePenalties },
+                    { label: 'Taux finition', value: `${penaltyCompletionRate}%`, isStr: true },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-lg p-2.5" style={{ background: 'rgba(34,197,94,0.08)' }}>
+                      <p className="text-green-300 text-lg font-black leading-none tabular-nums" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        {s.isStr ? s.value : (s.value as number).toLocaleString()}
+                      </p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <p className="text-white/30 text-[10px]">{s.label}</p>
+                        {s.trend !== undefined && (
+                          <span className={`text-[9px] font-bold px-1 rounded-full ${s.trend >= 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                            {s.trend >= 0 ? '↑' : '↓'}{Math.abs(s.trend)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Part de marché today */}
+            <div className="rounded-xl border border-white/6 p-5" style={cardStyle}>
+              <p className="text-white font-bold text-sm mb-4">Répartition des parties — aujourd&apos;hui</p>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-orange-300 text-xs font-bold flex items-center gap-1.5">⚔️ Battle classique</span>
+                    <span className="text-white text-sm font-black tabular-nums">{stats.duelsToday} <span className="text-white/25 font-normal text-xs">({duelPctToday}%)</span></span>
+                  </div>
+                  <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${duelPctToday}%` }} transition={{ duration: 0.8, ease: 'easeOut' }}
+                      className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #f97316, #fb923c)' }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-green-300 text-xs font-bold flex items-center gap-1.5">⚽ Tirs au but</span>
+                    <span className="text-white text-sm font-black tabular-nums">{stats.penaltiesToday} <span className="text-white/25 font-normal text-xs">({penaltyPctToday}%)</span></span>
+                  </div>
+                  <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${penaltyPctToday}%` }} transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+                      className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #22c55e, #4ade80)' }} />
+                  </div>
+                </div>
+                <p className="text-white/15 text-[10px] text-right tabular-nums">{totalBattlesToday} parties au total</p>
+              </div>
+            </div>
+
+            {/* 7-day dual chart */}
+            <div className="rounded-xl border border-white/6 p-5" style={cardStyle}>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-white font-bold text-sm">Évolution sur 7 jours</p>
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block bg-orange-400" /> Duels</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block bg-green-400" /> Tirs au but</span>
+                </div>
+              </div>
+              <p className="text-white/20 text-xs mb-4">Nombre de parties créées par jour</p>
+              {(() => {
+                const maxVal = Math.max(...modeChart7d.map((d) => d.duels + d.penalties), 1)
+                return (
+                  <div>
+                    <div className="flex items-end gap-1.5 h-20">
+                      {modeChart7d.map((d) => (
+                        <div key={d.date} className="flex-1 flex flex-col items-center gap-0 group relative">
+                          <div className="w-full flex flex-col justify-end" style={{ height: '100%' }}>
+                            <motion.div
+                              initial={{ scaleY: 0 }}
+                              animate={{ scaleY: 1 }}
+                              transition={{ duration: 0.4 }}
+                              style={{
+                                height: `${Math.max((d.penalties / maxVal) * 100, d.penalties > 0 ? 4 : 1)}%`,
+                                background: '#22c55e',
+                                transformOrigin: 'bottom',
+                              }}
+                              className="w-full rounded-t-sm"
+                            />
+                            <motion.div
+                              initial={{ scaleY: 0 }}
+                              animate={{ scaleY: 1 }}
+                              transition={{ duration: 0.4, delay: 0.05 }}
+                              style={{
+                                height: `${Math.max((d.duels / maxVal) * 100, d.duels > 0 ? 4 : 1)}%`,
+                                background: '#f97316',
+                                transformOrigin: 'bottom',
+                              }}
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-[#0D1520] border border-white/10 text-white text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                            ⚔️ {d.duels} · ⚽ {d.penalties}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between mt-1.5">
+                      {modeChart7d.map((d) => (
+                        <span key={d.date} className="text-white/15 text-[9px]">
+                          {new Date(d.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Penalty hourly chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-white/6 p-4" style={cardStyle}>
+                <p className="text-white font-bold text-sm">⚔️ Duels par heure (24h)</p>
+                <p className="text-white/25 text-xs mb-4">Battle classique</p>
+                <BarChart data={duelChart} activeColor="#f97316" />
+              </div>
+              <div className="rounded-xl border border-white/6 p-4" style={cardStyle}>
+                <p className="text-white font-bold text-sm">⚽ Tirs au but par heure (24h)</p>
+                <p className="text-white/25 text-xs mb-4">Penalty battles</p>
+                <BarChart data={penaltyChart} activeColor="#22c55e" />
+              </div>
+            </div>
+
+            {/* Recent penalty battles */}
+            <div className="rounded-xl border border-white/6 overflow-hidden" style={cardStyle}>
+              <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
+                <span className="text-base">⚽</span>
+                <span className="text-white font-bold text-sm">Dernières séances de tirs au but</span>
+                <span className="ml-auto text-white/20 text-xs">{recentPenalties.length} parties</span>
+              </div>
+              {recentPenalties.length === 0 ? (
+                <p className="text-white/20 text-sm text-center py-8">Aucun tir au but terminé</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-white/5 text-[10px] uppercase tracking-wider text-white/25 font-semibold">
+                        <th className="px-4 py-2.5 text-left">Challenger</th>
+                        <th className="px-3 py-2.5 text-left">Adversaire</th>
+                        <th className="px-3 py-2.5 text-center">Score</th>
+                        <th className="px-3 py-2.5 text-center">Rounds</th>
+                        <th className="px-3 py-2.5 text-center">Statut</th>
+                        <th className="px-3 py-2.5 text-right">Il y a</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/4 text-sm">
+                      {recentPenalties.map((p) => {
+                        const challWon = p.winner_id === p.challenger_id
+                        const oppWon = p.winner_id && p.winner_id !== p.challenger_id
+                        return (
+                          <tr key={p.id} className="hover:bg-white/2 transition-colors">
+                            <td className="px-4 py-2.5 font-semibold">
+                              <span className={challWon ? 'text-green-400' : 'text-white/70'}>{p.challenger_pseudo}</span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className={oppWon ? 'text-green-400' : 'text-white/40'}>{p.opponent_pseudo}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-center font-black tabular-nums">
+                              <span className={challWon ? 'text-green-400' : 'text-white/55'}>{p.challenger_score}</span>
+                              <span className="text-white/15 mx-1">—</span>
+                              <span className={oppWon ? 'text-green-400' : 'text-white/55'}>{p.opponent_score}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-center text-white/30 text-xs tabular-nums">
+                              {p.current_round - 1}
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                                p.status === 'finished' ? 'bg-green-500/15 text-green-400'
+                                : p.status === 'stealing' ? 'bg-yellow-500/15 text-yellow-400'
+                                : 'bg-white/5 text-white/30'
+                              }`}>
+                                {p.status === 'finished' ? 'FIN' : p.status === 'stealing' ? 'BUTIN' : p.status.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-white/25 text-xs tabular-nums">{timeAgo(p.created_at)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
