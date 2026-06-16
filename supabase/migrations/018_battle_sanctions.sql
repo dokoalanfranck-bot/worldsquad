@@ -23,74 +23,76 @@ CREATE INDEX IF NOT EXISTS idx_penalty_cleanup
   WHERE status IN ('waiting', 'picking');
 
 -- ──────────────────────────────────────────────────────────────────────────────
--- pg_cron (optionnel — activer l'extension dans Supabase si dispo)
--- Exécuter ces lignes manuellement dans le SQL Editor si pg_cron est disponible
+-- pg_cron — à exécuter dans Supabase SQL Editor (Extensions > pg_cron requis)
+-- pg_cron est activé par défaut sur tous les projets Supabase
 -- ──────────────────────────────────────────────────────────────────────────────
 
--- SELECT cron.unschedule('worldsquad-battle-cleanup');
+-- Supprimer le job existant si relancé
+SELECT cron.unschedule('worldsquad-battle-cleanup')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'worldsquad-battle-cleanup');
 
--- SELECT cron.schedule(
---   'worldsquad-battle-cleanup',
---   '* * * * *',   -- toutes les minutes
---   $$
---     -- 1. Annuler les duels open sans adversaire depuis > 65s
---     UPDATE public.duels
---     SET status = 'cancelled', cancelled_reason = 'no_opponent'
---     WHERE status = 'open'
---       AND is_bot = false
---       AND opponent_id IS NULL
---       AND created_at < now() - INTERVAL '65 seconds';
---
---     -- 2. Annuler les penalty battles en waiting depuis > 65s
---     UPDATE public.penalty_battles
---     SET status = 'cancelled', cancelled_reason = 'no_opponent'
---     WHERE status = 'waiting'
---       AND opponent_id IS NULL
---       AND created_at < now() - INTERVAL '65 seconds';
---
---     -- 3. Pénaliser + annuler les duels dont le picks_deadline est expiré
---     WITH cancelled AS (
---       UPDATE public.duels
---       SET status = 'cancelled', cancelled_reason = 'picking_timeout'
---       WHERE status = 'picking'
---         AND is_bot = false
---         AND picks_deadline IS NOT NULL
---         AND picks_deadline < now() - INTERVAL '5 seconds'
---       RETURNING challenger_id, opponent_id, challenger_picks, opponent_picks
---     )
---     UPDATE public.users u
---     SET abandon_count = CASE
---           WHEN u.abandon_count + 1 >= 3 THEN 0
---           ELSE u.abandon_count + 1
---         END,
---         battle_ban_until = CASE
---           WHEN u.abandon_count + 1 >= 3 THEN now() + INTERVAL '30 minutes'
---           ELSE u.battle_ban_until
---         END
---     FROM cancelled c
---     WHERE (c.challenger_picks IS NULL AND u.id = c.challenger_id)
---        OR (c.opponent_picks  IS NULL AND c.opponent_id IS NOT NULL AND u.id = c.opponent_id);
---
---     -- 4. Pénaliser + annuler les penalty_battles dont le picks_deadline est expiré
---     WITH cancelled AS (
---       UPDATE public.penalty_battles
---       SET status = 'cancelled', cancelled_reason = 'picking_timeout'
---       WHERE status = 'picking'
---         AND picks_deadline IS NOT NULL
---         AND picks_deadline < now() - INTERVAL '5 seconds'
---       RETURNING challenger_id, opponent_id, challenger_picks, opponent_picks
---     )
---     UPDATE public.users u
---     SET abandon_count = CASE
---           WHEN u.abandon_count + 1 >= 3 THEN 0
---           ELSE u.abandon_count + 1
---         END,
---         battle_ban_until = CASE
---           WHEN u.abandon_count + 1 >= 3 THEN now() + INTERVAL '30 minutes'
---           ELSE u.battle_ban_until
---         END
---     FROM cancelled c
---     WHERE (c.challenger_picks IS NULL AND u.id = c.challenger_id)
---        OR (c.opponent_picks  IS NULL AND c.opponent_id IS NOT NULL AND u.id = c.opponent_id);
---   $$
--- );
+SELECT cron.schedule(
+  'worldsquad-battle-cleanup',
+  '* * * * *',
+  $$
+    -- 1. Annuler les duels open sans adversaire depuis > 65s
+    UPDATE public.duels
+    SET status = 'cancelled', cancelled_reason = 'no_opponent'
+    WHERE status = 'open'
+      AND is_bot = false
+      AND opponent_id IS NULL
+      AND created_at < now() - INTERVAL '65 seconds';
+
+    -- 2. Annuler les penalty battles en waiting depuis > 65s
+    UPDATE public.penalty_battles
+    SET status = 'cancelled', cancelled_reason = 'no_opponent'
+    WHERE status = 'waiting'
+      AND opponent_id IS NULL
+      AND created_at < now() - INTERVAL '65 seconds';
+
+    -- 3. Pénaliser + annuler les duels dont le picks_deadline est expiré
+    WITH cancelled AS (
+      UPDATE public.duels
+      SET status = 'cancelled', cancelled_reason = 'picking_timeout'
+      WHERE status = 'picking'
+        AND is_bot = false
+        AND picks_deadline IS NOT NULL
+        AND picks_deadline < now() - INTERVAL '5 seconds'
+      RETURNING challenger_id, opponent_id, challenger_picks, opponent_picks
+    )
+    UPDATE public.users u
+    SET abandon_count = CASE
+          WHEN u.abandon_count + 1 >= 3 THEN 0
+          ELSE u.abandon_count + 1
+        END,
+        battle_ban_until = CASE
+          WHEN u.abandon_count + 1 >= 3 THEN now() + INTERVAL '30 minutes'
+          ELSE u.battle_ban_until
+        END
+    FROM cancelled c
+    WHERE (c.challenger_picks IS NULL AND u.id = c.challenger_id)
+       OR (c.opponent_picks  IS NULL AND c.opponent_id IS NOT NULL AND u.id = c.opponent_id);
+
+    -- 4. Pénaliser + annuler les penalty_battles dont le picks_deadline est expiré
+    WITH cancelled AS (
+      UPDATE public.penalty_battles
+      SET status = 'cancelled', cancelled_reason = 'picking_timeout'
+      WHERE status = 'picking'
+        AND picks_deadline IS NOT NULL
+        AND picks_deadline < now() - INTERVAL '5 seconds'
+      RETURNING challenger_id, opponent_id, challenger_picks, opponent_picks
+    )
+    UPDATE public.users u
+    SET abandon_count = CASE
+          WHEN u.abandon_count + 1 >= 3 THEN 0
+          ELSE u.abandon_count + 1
+        END,
+        battle_ban_until = CASE
+          WHEN u.abandon_count + 1 >= 3 THEN now() + INTERVAL '30 minutes'
+          ELSE u.battle_ban_until
+        END
+    FROM cancelled c
+    WHERE (c.challenger_picks IS NULL AND u.id = c.challenger_id)
+       OR (c.opponent_picks  IS NULL AND c.opponent_id IS NOT NULL AND u.id = c.opponent_id);
+  $$
+);
