@@ -76,24 +76,14 @@ export default function AdminShopPage() {
     })
   }, [])
 
-  // Charge uniquement les demandes — appelé aussi par Realtime sans toucher configDraft
+  // Charge uniquement les demandes via route admin (service role, bypass RLS)
   const loadRequests = useCallback(async () => {
-    const [{ data: pending }, { data: history }] = await Promise.all([
-      supabase
-        .from('payment_requests')
-        .select('*, users(pseudo, photo_url)')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('payment_requests')
-        .select('*, users(pseudo, photo_url)')
-        .neq('status', 'pending')
-        .order('reviewed_at', { ascending: false })
-        .limit(50),
-    ])
-    setPendingRequests((pending ?? []) as PaymentRequest[])
-    setHistoryRequests((history ?? []) as PaymentRequest[])
-  }, [supabase])
+    const res = await fetch('/api/admin/payment-requests?t=' + Date.now(), { cache: 'no-store' })
+    if (!res.ok) return
+    const { pending, history } = await res.json() as { pending: PaymentRequest[]; history: PaymentRequest[] }
+    setPendingRequests(pending)
+    setHistoryRequests(history)
+  }, [])
 
   useEffect(() => {
     loadConfig()
