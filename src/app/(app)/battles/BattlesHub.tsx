@@ -1,15 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Swords, ChevronRight, Search, Layers, Radio, Gift,
   TrendingUp, TrendingDown, Minus, Check, X, Clock, Users,
+  Star,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 import toast from 'react-hot-toast'
 
 interface Profile { id: string | null; pseudo: string; nation: string; photo_url: string | null }
+
+interface PenaltyBattle {
+  id: string; status: string; current_round: number
+  challenger_score: number; opponent_score: number
+  winner_id: string | null; challenger_id: string; opponent_id: string | null
+  challenger: Profile; opponent: Profile | null; created_at: string
+}
+
+interface CardDef { id: string; name: string; rarity: string; image_url: string | null }
+interface UserCard { id: string; card_id: string; card: CardDef }
+
 interface Duel {
   id: string; status: string; is_bot: boolean; is_friend_battle: boolean; bot_name: string | null
   challenger_score: number | null; opponent_score: number | null
@@ -33,11 +47,124 @@ const HOW_IT_WORKS = [
   { icon: Gift, label: 'Vol de carte', desc: 'Choisis les cartes à voler parmi les picks adverses', accent: 'bg-amber-500/10 text-amber-400' },
 ]
 
-export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUserId: string }) {
+const RARITY_BORDER: Record<string, string> = {
+  Legend: 'border-yellow-500/50',
+  Epic: 'border-purple-500/50',
+  Rare: 'border-blue-500/50',
+  Common: 'border-white/20',
+}
+
+function CardPickModal({
+  onPick,
+  onClose,
+}: {
+  onPick: (cardId: string) => void
+  onClose: () => void
+}) {
+  const supabase = useMemo(() => createClient(), [])
+  const [cards, setCards] = useState<UserCard[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('user_cards')
+        .select('id, card_id, card:cards(id, name, rarity, image_url)')
+        .eq('user_id', user.id)
+        .order('obtained_at', { ascending: false })
+        .limit(50)
+      setCards((data ?? []) as unknown as UserCard[])
+      setLoading(false)
+    }
+    load()
+  }, [supabase])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="glass rounded-3xl border border-white/10 w-full max-w-md p-5 space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-black text-lg">Choisir votre mise</h3>
+            <p className="text-white/40 text-xs">La carte perdante revient au gagnant</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl bg-white/5 text-white/40 hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="py-8 text-center text-white/30 text-sm">Chargement…</div>
+        ) : cards.length === 0 ? (
+          <div className="py-8 text-center text-white/30 text-sm">Aucune carte disponible</div>
+        ) : (
+          <div className="grid grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
+            {cards.map((uc) => (
+              <button
+                key={uc.id}
+                onClick={() => setSelected(uc.id)}
+                className={`rounded-xl overflow-hidden border-2 transition-all ${
+                  selected === uc.id
+                    ? 'border-green-400 scale-105'
+                    : RARITY_BORDER[uc.card.rarity] ?? 'border-white/10'
+                }`}
+              >
+                <div className="aspect-[3/4] relative">
+                  {uc.card.image_url
+                    ? <Image src={uc.card.image_url} alt={uc.card.name} fill className="object-cover" />
+                    : <div className="w-full h-full bg-white/5 flex items-center justify-center">
+                        <Star size={16} className="text-white/20" />
+                      </div>
+                  }
+                  {selected === uc.id && (
+                    <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
+                      <Check size={20} className="text-green-400" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[9px] text-white/50 text-center px-1 py-0.5 truncate">{uc.card.name}</p>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => selected && onPick(selected)}
+          disabled={!selected}
+          className="w-full py-3 rounded-xl bg-green-500 text-black font-black text-sm disabled:opacity-40 hover:bg-green-400 transition-colors"
+        >
+          CONFIRMER LA MISE
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
+  duels: Duel[]
+  currentUserId: string
+  penaltyBattles?: PenaltyBattle[]
+}) {
   const router = useRouter()
   const [searching, setSearching] = useState(false)
   const [accepting, setAccepting] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [showCardPicker, setShowCardPicker] = useState(false)
+  const [searchingPenalty, setSearchingPenalty] = useState(false)
 
   async function findDuel() {
     setSearching(true)
@@ -75,9 +202,28 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
     finally { setCancelling(null) }
   }
 
+  async function startPenalty(wagerUserCardId: string) {
+    setSearchingPenalty(true)
+    setShowCardPicker(false)
+    try {
+      const res = await fetch('/api/penalty/find', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wagerUserCardId }),
+      })
+      const data = await res.json() as { battleId?: string; error?: string }
+      if (!res.ok || !data.battleId) { toast.error(data.error ?? 'Erreur'); return }
+      router.push(`/battles/penalty/${data.battleId}`)
+    } catch { toast.error('Erreur réseau') }
+    finally { setSearchingPenalty(false) }
+  }
+
   const invitedDuels  = duels.filter((d) => d.status === 'invited' && d.opponent_id === currentUserId)
   const activeDuels   = duels.filter((d) => ['open', 'picking', 'stealing'].includes(d.status))
   const finished      = duels.filter((d) => d.status === 'finished')
+
+  const activePenalty  = penaltyBattles.filter((p) => ['waiting', 'active'].includes(p.status))
+  const finishedPenalty = penaltyBattles.filter((p) => p.status === 'finished')
 
   return (
     <div className="min-h-screen px-4 lg:px-8 py-6 max-w-2xl lg:max-w-5xl mx-auto pb-28">
@@ -192,6 +338,54 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
             )}
           </motion.button>
 
+          {/* Penalty active battles */}
+          {activePenalty.length > 0 && (
+            <div className="mb-5">
+              <p className="text-white/30 text-[10px] uppercase tracking-widest mb-3">Tirs au but en cours</p>
+              <div className="space-y-2">
+                {activePenalty.map((pb) => {
+                  const isChallenger = pb.challenger_id === currentUserId
+                  const them = isChallenger ? pb.opponent : pb.challenger
+                  const statusLabel = pb.status === 'waiting' ? 'En attente…' : `Tour ${pb.current_round}`
+                  return (
+                    <motion.div key={pb.id} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                      onClick={() => router.push(`/battles/penalty/${pb.id}`)}
+                      className="glass rounded-2xl p-4 border border-green-500/25 flex items-center gap-3 cursor-pointer hover:border-green-500/40 transition-colors">
+                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-green-400 text-xs font-black uppercase tracking-wider">{statusLabel}</p>
+                        <p className="text-white font-bold text-sm mt-0.5 truncate">⚽ vs {them?.pseudo ?? '…'}</p>
+                      </div>
+                      <p className="text-white font-black text-lg tabular-nums">
+                        {isChallenger ? pb.challenger_score : pb.opponent_score}
+                        {' — '}
+                        {isChallenger ? pb.opponent_score : pb.challenger_score}
+                      </p>
+                      <ChevronRight size={16} className="text-green-400 flex-shrink-0" />
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Penalty CTA */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowCardPicker(true)}
+            disabled={searchingPenalty}
+            className="w-full relative overflow-hidden bg-green-500 text-black font-black py-4 rounded-2xl text-xl flex items-center justify-center gap-3 shadow-2xl shadow-green-500/25 disabled:opacity-70 mb-4"
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            animate={!searchingPenalty ? { boxShadow: ['0 0 20px rgba(34,197,94,0.2)', '0 0 35px rgba(34,197,94,0.5)', '0 0 20px rgba(34,197,94,0.2)'] } : {}}
+            transition={{ duration: 2.5, repeat: Infinity }}
+          >
+            {searchingPenalty ? (
+              <><div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" /> RECHERCHE…</>
+            ) : (
+              <>⚽ TIRS AU BUT</>
+            )}
+          </motion.button>
+
           {/* How it works */}
           <div className="glass rounded-2xl p-5 border border-white/5">
             <p className="text-white/30 text-[10px] uppercase tracking-widest mb-4">Comment ça marche</p>
@@ -212,7 +406,7 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
         </div>
 
         {/* Right col: History */}
-        <div>
+        <div className="space-y-6">
           {finished.length > 0 ? (
             <div>
               <p className="text-white/30 text-[10px] uppercase tracking-widest mb-3 mt-8 lg:mt-0">Historique</p>
@@ -276,9 +470,59 @@ export function BattlesHub({ duels, currentUserId }: { duels: Duel[]; currentUse
               <p className="text-white/30 text-xs mt-1">Lance-toi et défie un adversaire</p>
             </div>
           )}
+          {/* Penalty history */}
+          {finishedPenalty.length > 0 && (
+            <div>
+              <p className="text-white/30 text-[10px] uppercase tracking-widest mb-3">⚽ Historique Tirs au but</p>
+              <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+                {finishedPenalty.map((pb) => {
+                  const isChallenger = pb.challenger_id === currentUserId
+                  const iWon = pb.winner_id === currentUserId
+                  const myScore = isChallenger ? pb.challenger_score : pb.opponent_score
+                  const theirScore = isChallenger ? pb.opponent_score : pb.challenger_score
+                  const them = isChallenger ? pb.opponent : pb.challenger
+                  return (
+                    <motion.div
+                      key={pb.id}
+                      whileTap={{ scale: 0.99 }}
+                      onClick={() => router.push(`/battles/penalty/${pb.id}`)}
+                      className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-white/3 transition-colors"
+                    >
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iWon ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                        {iWon ? <TrendingUp size={15} className="text-green-400" /> : <TrendingDown size={15} className="text-red-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm truncate">
+                          ⚽ {flag(them?.nation ?? '')} {them?.pseudo ?? '?'}
+                        </p>
+                        <p className="text-white/30 text-xs mt-0.5 tabular-nums">
+                          {myScore} — {theirScore}
+                          {' · '}
+                          <span className={iWon ? 'text-green-400' : 'text-red-400'}>
+                            {iWon ? 'Carte gagnée' : 'Carte perdue'}
+                          </span>
+                        </p>
+                      </div>
+                      <ChevronRight size={14} className="text-white/15 flex-shrink-0" />
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
+
+      {/* Card picker modal */}
+      <AnimatePresence>
+        {showCardPicker && (
+          <CardPickModal
+            onPick={startPenalty}
+            onClose={() => setShowCardPicker(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
