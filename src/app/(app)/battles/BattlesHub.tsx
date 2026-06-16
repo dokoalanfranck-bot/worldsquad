@@ -69,6 +69,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], abandonC
   const [searching, setSearching] = useState(false)
   const [accepting, setAccepting] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [cancellingPenalty, setCancellingPenalty] = useState<string | null>(null)
   const [searchingPenalty, setSearchingPenalty] = useState(false)
 
   const isBanned = !!banUntil && new Date(banUntil) > new Date()
@@ -108,6 +109,16 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], abandonC
       router.refresh()
     } catch { toast.error('Erreur réseau') }
     finally { setCancelling(null) }
+  }
+
+  async function cancelPenalty(battleId: string) {
+    setCancellingPenalty(battleId)
+    try {
+      const res = await fetch(`/api/penalty/${battleId}/cancel`, { method: 'POST' })
+      if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Impossible d\'annuler'); return }
+      router.refresh()
+    } catch { toast.error('Erreur réseau') }
+    finally { setCancellingPenalty(null) }
   }
 
   async function startPenalty() {
@@ -294,21 +305,36 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], abandonC
                   const isChallenger = pb.challenger_id === currentUserId
                   const them = isChallenger ? pb.opponent : pb.challenger
                   const statusLabel = pb.status === 'waiting' ? 'En attente…' : pb.status === 'picking' ? 'Sélection équipe…' : pb.status === 'stealing' ? 'Vol de carte…' : `Tour ${pb.current_round}`
+                  const canCancel = ['waiting', 'picking'].includes(pb.status)
                   return (
                     <motion.div key={pb.id} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                      onClick={() => router.push(`/battles/penalty/${pb.id}`)}
-                      className="glass rounded-2xl p-4 border border-green-500/25 flex items-center gap-3 cursor-pointer hover:border-green-500/40 transition-colors">
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-green-400 text-xs font-black uppercase tracking-wider">{statusLabel}</p>
-                        <p className="text-white font-bold text-sm mt-0.5 truncate">⚽ vs {them?.pseudo ?? '…'}</p>
+                      className="glass rounded-2xl p-4 border border-green-500/25 flex items-center gap-3">
+                      <div
+                        className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => router.push(`/battles/penalty/${pb.id}`)}>
+                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-green-400 text-xs font-black uppercase tracking-wider">{statusLabel}</p>
+                          <p className="text-white font-bold text-sm mt-0.5 truncate">⚽ vs {them?.pseudo ?? '…'}</p>
+                        </div>
+                        <p className="text-white font-black text-lg tabular-nums">
+                          {isChallenger ? pb.challenger_score : pb.opponent_score}
+                          {' — '}
+                          {isChallenger ? pb.opponent_score : pb.challenger_score}
+                        </p>
+                        <ChevronRight size={16} className="text-green-400 flex-shrink-0" />
                       </div>
-                      <p className="text-white font-black text-lg tabular-nums">
-                        {isChallenger ? pb.challenger_score : pb.opponent_score}
-                        {' — '}
-                        {isChallenger ? pb.opponent_score : pb.challenger_score}
-                      </p>
-                      <ChevronRight size={16} className="text-green-400 flex-shrink-0" />
+                      {canCancel && (
+                        <button
+                          onClick={() => cancelPenalty(pb.id)}
+                          disabled={cancellingPenalty === pb.id}
+                          className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors flex-shrink-0 disabled:opacity-40"
+                        >
+                          {cancellingPenalty === pb.id
+                            ? <div className="w-3 h-3 border border-red-400/40 border-t-red-400 rounded-full animate-spin" />
+                            : <X size={14} />}
+                        </button>
+                      )}
                     </motion.div>
                   )
                 })}

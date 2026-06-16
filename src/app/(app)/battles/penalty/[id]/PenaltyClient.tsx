@@ -432,6 +432,7 @@ function PickingView({
   challenger: Profile | null; opponent: Profile | null
   myCards: Card[]; initialMyPicksSubmitted: boolean
 }) {
+  const router = useRouter()
   const isChallenger = battle.challenger_id === currentUserId
   const me = isChallenger ? challenger : opponent
   const them = isChallenger ? opponent : challenger
@@ -443,6 +444,15 @@ function PickingView({
   const [tab, setTab] = useState<'shooters' | 'gk'>('shooters')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(initialMyPicksSubmitted || !!myPicks)
+  const [cancelling, setCancelling] = useState(false)
+
+  async function cancelBattle() {
+    setCancelling(true)
+    try {
+      await fetch(`/api/penalty/${battle.id}/cancel`, { method: 'POST' })
+      router.push('/battles')
+    } catch { toast.error('Erreur réseau'); setCancelling(false) }
+  }
 
   const timeLeft = useDeadlineCountdown(battle.picks_deadline)
 
@@ -492,11 +502,22 @@ function PickingView({
       className="min-h-screen px-4 py-4 max-w-2xl mx-auto pb-28">
 
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-white/30 text-xs">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
-          <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            ⚽ CHOISIS TON ÉQUIPE
-          </h1>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={cancelBattle}
+            disabled={cancelling || submitted || !!myPicks}
+            className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-30 flex-shrink-0"
+          >
+            {cancelling
+              ? <div className="w-3 h-3 border border-red-400/40 border-t-red-400 rounded-full animate-spin" />
+              : <span className="text-xs font-bold">✕</span>}
+          </button>
+          <div>
+            <p className="text-white/30 text-xs">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
+            <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              ⚽ CHOISIS TON ÉQUIPE
+            </h1>
+          </div>
         </div>
         <motion.div
           animate={{ scale: timeLeft <= 10 ? [1, 1.05, 1] : 1 }}
