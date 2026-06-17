@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { trackAbandon } from '@/lib/battle-sanctions'
 
-// Called by Vercel Cron every minute (see vercel.json)
-// Also callable manually: GET /api/cron/cleanup (protected by CRON_SECRET)
+// Called by Supabase pg_cron every minute (see migration 018)
 export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
@@ -13,9 +11,8 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient()
-  const now = new Date()
-  const staleThreshold = new Date(now.getTime() - 65_000).toISOString()
-  const pickingThreshold = new Date(now.getTime() - 5_000).toISOString()
+  const staleThreshold = new Date(Date.now() - 65_000).toISOString()
+  const pickingThreshold = new Date(Date.now() - 5_000).toISOString()
 
   // ── 1. Cancel open duels with no opponent after 65s ───────────────────────
   await admin
@@ -34,49 +31,35 @@ export async function GET(req: NextRequest) {
     .is('opponent_id', null)
     .lt('created_at', staleThreshold)
 
-  // ── 3. Penalize + cancel picking-expired duels ────────────────────────────
+  // ── 3. Cancel picking-expired duels ──────────────────────────────────────
   const { data: expiredDuels } = await admin
     .from('duels')
-    .select('id, challenger_id, opponent_id, challenger_picks, opponent_picks')
+    .select('id')
     .eq('status', 'picking')
     .eq('is_bot', false)
     .not('picks_deadline', 'is', null)
     .lt('picks_deadline', pickingThreshold)
 
-  for (const duel of expiredDuels ?? []) {
-    const topenalize: string[] = []
-    if (!duel.challenger_picks) topenalize.push(duel.challenger_id)
-    if (!duel.opponent_picks && duel.opponent_id) topenalize.push(duel.opponent_id as string)
-
-    await Promise.all(topenalize.map((uid) => trackAbandon(uid, admin)))
-
+  if (expiredDuels && expiredDuels.length > 0) {
     await admin
       .from('duels')
       .update({ status: 'cancelled', cancelled_reason: 'picking_timeout' })
-      .eq('id', duel.id)
-      .eq('status', 'picking')
+      .in('id', expiredDuels.map((d) => d.id))
   }
 
-  // ── 4. Penalize + cancel picking-expired penalty battles ──────────────────
+  // ── 4. Cancel picking-expired penalty battles ─────────────────────────────
   const { data: expiredPenalties } = await admin
     .from('penalty_battles')
-    .select('id, challenger_id, opponent_id, challenger_picks, opponent_picks')
+    .select('id')
     .eq('status', 'picking')
     .not('picks_deadline', 'is', null)
     .lt('picks_deadline', pickingThreshold)
 
-  for (const battle of expiredPenalties ?? []) {
-    const topenalize: string[] = []
-    if (!battle.challenger_picks) topenalize.push(battle.challenger_id)
-    if (!battle.opponent_picks && battle.opponent_id) topenalize.push(battle.opponent_id as string)
-
-    await Promise.all(topenalize.map((uid) => trackAbandon(uid, admin)))
-
+  if (expiredPenalties && expiredPenalties.length > 0) {
     await admin
       .from('penalty_battles')
       .update({ status: 'cancelled', cancelled_reason: 'picking_timeout' })
-      .eq('id', battle.id)
-      .eq('status', 'picking')
+      .in('id', expiredPenalties.map((b) => b.id))
   }
 
   return NextResponse.json({

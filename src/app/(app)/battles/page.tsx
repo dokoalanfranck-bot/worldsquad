@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { BattlesHub } from './BattlesHub'
 import { botNation } from '@/lib/duel-engine'
-import { checkAndClearBan } from '@/lib/battle-sanctions'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,8 +13,7 @@ export default async function BattlesPage() {
 
   const admin = createAdminClient()
 
-  const [banInfo, { data: duels }, { data: penaltyBattles }] = await Promise.all([
-    checkAndClearBan(user.id, admin),
+  const [{ data: duels }, { data: penaltyBattles }] = await Promise.all([
     admin
       .from('duels')
       .select('*')
@@ -67,8 +65,6 @@ export default async function BattlesPage() {
       duels={enriched}
       currentUserId={user.id}
       penaltyBattles={enrichedPenalty}
-      abandonCount={banInfo.abandonCount}
-      banUntil={banInfo.banUntil}
     />
   )
 }

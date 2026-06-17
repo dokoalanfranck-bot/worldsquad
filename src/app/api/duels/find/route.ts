@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { checkAndClearBan } from '@/lib/battle-sanctions'
 
 export async function POST() {
   const supabase = await createClient()
@@ -9,11 +8,6 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   const admin = createAdminClient()
-
-  const { banned, banUntil } = await checkAndClearBan(user.id, admin)
-  if (banned) {
-    return NextResponse.json({ error: 'Temporairement suspendu des battles', banUntil }, { status: 403 })
-  }
 
   // Already in an active duel?
   const { data: active } = await admin
