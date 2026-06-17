@@ -33,9 +33,12 @@ export async function POST(
     return NextResponse.json({ error: `Sélectionne exactement ${stakeCount} carte(s)` }, { status: 400 })
   }
 
-  const loserId: string = battle.winner_id === battle.challenger_id ? battle.opponent_id : battle.challenger_id
+  const loserId: string = battle.winner_id === battle.challenger_id
+    ? battle.opponent_id
+    : battle.challenger_id
   if (!loserId) return NextResponse.json({ error: 'Adversaire introuvable' }, { status: 400 })
 
+  // Verify selected cards are among loser's picks
   const loserPicks = (battle.winner_id === battle.challenger_id
     ? battle.opponent_picks
     : battle.challenger_picks) as Array<{ id: string }> | null
@@ -47,27 +50,29 @@ export async function POST(
     }
   }
 
-  // Transfer each chosen card from loser to winner
-  for (const cardId of cardIds) {
-    const { data: uc } = await admin
-      .from('user_cards')
-      .select('id')
-      .eq('user_id', loserId)
-      .eq('card_id', cardId)
-      .limit(1)
-      .maybeSingle()
+  // ── Transfer ────────────────────────────────────────────────────────────────
+  // 1. Remove from loser (unconditional — delete by card_id, no need to find row id first)
+  await Promise.all(
+    cardIds.map((cardId) =>
+      admin.from('user_cards').delete().eq('user_id', loserId).eq('card_id', cardId)
+    )
+  )
 
-    if (uc) {
-      await admin.from('user_cards').delete().eq('id', uc.id)
-      await admin.from('user_cards').insert({
-        user_id: user.id,
-        card_id: cardId,
-        obtained_via: 'penalty_battle',
-      })
-    }
+  // 2. Add to winner — insert all at once, check error
+  const { error: insertErr } = await admin.from('user_cards').insert(
+    cardIds.map((cardId) => ({
+      user_id: user.id,
+      card_id: cardId,
+      obtained_via: 'penalty_battle',
+    }))
+  )
+
+  if (insertErr) {
+    console.error('[penalty steal] insert user_cards failed:', insertErr)
+    return NextResponse.json({ error: 'Erreur lors du transfert des cartes' }, { status: 500 })
   }
 
-  // Finalize battle
+  // ── Finalize ────────────────────────────────────────────────────────────────
   await admin.from('penalty_battles').update({
     status: 'finished',
     stolen_card_ids: cardIds,

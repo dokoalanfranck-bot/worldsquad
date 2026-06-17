@@ -1008,6 +1008,7 @@ function StealingView({
   battle: PenaltyBattle; currentUserId: string
   challenger: Profile | null; opponent: Profile | null
 }) {
+  const router = useRouter()
   const isWinner = battle.winner_id === currentUserId
   const them = battle.challenger_id === currentUserId ? opponent : challenger
   const stakeCount: number = battle.stake_count ?? 1
@@ -1050,7 +1051,12 @@ function StealingView({
         body: JSON.stringify({ cardIds: ids }),
       })
       const data = await res.json()
-      if (!res.ok) { toast.error(data.error ?? 'Erreur') }
+      if (!res.ok) {
+        toast.error(data.error ?? 'Erreur lors du transfert')
+        return
+      }
+      toast.success(`🃏 Carte${ids.length > 1 ? 's' : ''} volée${ids.length > 1 ? 's' : ''} !`)
+      router.push('/battles')
     } catch { toast.error('Erreur réseau') }
     finally { setLoading(false) }
   }
