@@ -23,6 +23,7 @@ import {
   Zap,
   CreditCard,
   Target,
+  Gift,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -50,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/pub', icon: Video, label: 'Espace Pub' },
   { href: '/admin/shop', icon: CreditCard, label: 'Paiements' },
   { href: '/admin/missions', icon: Target, label: 'Missions du jour' },
+  { href: '/admin/gift-cards', icon: Gift, label: 'Envoyer des cartes' },
 ]
 
 interface AdminSidebarProps {
