@@ -160,7 +160,7 @@ create table if not exists public.user_cards (
   user_id uuid references public.users(id) on delete cascade,
   card_id uuid references public.cards(id) on delete cascade,
   obtained_at timestamptz default now(),
-  obtained_via text check (obtained_via in ('pack','battle','event','purchase','signup'))
+  obtained_via text check (obtained_via in ('pack','battle','event','purchase','signup','admin_gift','penalty_battle'))
 );
 
 alter table public.user_cards enable row level security;
