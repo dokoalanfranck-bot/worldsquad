@@ -32,13 +32,13 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   // Verify user exists
-  const { data: target } = await admin
+  const { data: target, error: userErr } = await admin
     .from('users')
-    .select('id, pseudo, push_token')
+    .select('id, pseudo')
     .eq('id', userId)
     .single()
 
-  if (!target) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 })
+  if (userErr || !target) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 })
 
   // Verify all cards exist
   const { data: cards } = await admin
