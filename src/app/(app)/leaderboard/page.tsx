@@ -15,6 +15,7 @@ export default async function LeaderboardPage() {
   const [
     { data: topPredictionsRaw },
     { data: rawBattles },
+    { data: rawDailyBattles },
     { data: cardCountsRaw },
     { data: predStats },
   ] = await Promise.all([
@@ -29,7 +30,15 @@ export default async function LeaderboardPage() {
       .select('id, pseudo, photo_url, nation, battles_won, battles_played, battle_streak, best_streak')
       .eq('is_admin', false)
       .gt('battles_won', 0)
-      .limit(200),
+      .order('battles_won', { ascending: false })
+      .limit(100),
+    admin
+      .from('users')
+      .select('id, pseudo, photo_url, nation, daily_battles_won, battles_played, battle_streak, best_streak')
+      .eq('is_admin', false)
+      .gt('daily_battles_won', 0)
+      .order('daily_battles_won', { ascending: false })
+      .limit(100),
     admin
       .from('user_card_counts')
       .select('user_id, total_cards, unique_cards')
@@ -41,16 +50,16 @@ export default async function LeaderboardPage() {
       .neq('status', 'pending'),
   ])
 
-  // Battles — sorted by victories count
+  // Battles all-time
   const topBattles = (rawBattles ?? [])
-    .map((p) => ({
-      ...p,
-      losses: p.battles_played - p.battles_won,
-    }))
-    .sort((a, b) => {
-      if (b.battles_won !== a.battles_won) return b.battles_won - a.battles_won
-      return b.battles_played - a.battles_played
-    })
+    .map((p) => ({ ...p, losses: p.battles_played - p.battles_won }))
+    .sort((a, b) => b.battles_won !== a.battles_won ? b.battles_won - a.battles_won : b.battles_played - a.battles_played)
+    .slice(0, 100)
+
+  // Battles daily
+  const topDailyBattles = (rawDailyBattles ?? [])
+    .map((p) => ({ ...p, losses: p.battles_played - p.daily_battles_won, battles_won: p.daily_battles_won }))
+    .sort((a, b) => b.battles_won - a.battles_won)
     .slice(0, 100)
 
   // Predictions — add wrong count per user
@@ -87,6 +96,7 @@ export default async function LeaderboardPage() {
     <LeaderboardClient
       topPredictions={topPredictions}
       topBattles={topBattles}
+      topDailyBattles={topDailyBattles}
       topCards={topCards}
       currentUserId={user.id}
     />

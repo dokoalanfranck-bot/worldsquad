@@ -469,9 +469,15 @@ function FinalView({ t, currentUserId }: { t: TournamentData; currentUserId: str
           )}
 
           {!isFinalist && (
-            <p className="text-white/25 text-xs text-center">
-              Tu as été éliminé en demi-finale — suis la finale
-            </p>
+            <div className="space-y-3 text-center">
+              <p className="text-white/25 text-xs">Éliminé en demi-finale</p>
+              <button
+                onClick={() => router.push('/battles')}
+                className="w-full py-3 rounded-xl border border-white/10 text-white/50 text-sm font-bold hover:bg-white/5 transition-colors"
+              >
+                Quitter le tournoi
+              </button>
+            </div>
           )}
         </motion.div>
       )}
@@ -572,8 +578,7 @@ function BracketView({ t, currentUserId }: { t: TournamentData; currentUserId: s
   const finalist2 = players[s2w]
   const champion  = players[fw]
   const isUserChamp = champion.isUser
-  const loserSlot   = s1w === fw ? s2w : s1w
-  const coinsWon    = isUserChamp ? 300 : players[loserSlot].isUser ? 100 : 0
+  const coinsWon    = isUserChamp ? 75 : 0
 
   return (
     <div className="space-y-4">
@@ -679,9 +684,7 @@ function BracketView({ t, currentUserId }: { t: TournamentData; currentUserId: s
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>+{coinsWon} COINS</span>
                   <span className="text-xl">🪙</span>
                 </div>
-                <p className="text-white/30 text-xs mt-2">
-                  {isUserChamp ? '🏆 1ère place' : '🥈 2ème place — finaliste'}
-                </p>
+                <p className="text-white/30 text-xs mt-2">🏆 1ère place — vainqueur du tournoi</p>
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}

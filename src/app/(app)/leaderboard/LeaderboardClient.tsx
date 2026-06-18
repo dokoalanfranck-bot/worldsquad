@@ -20,6 +20,7 @@ interface CardRow {
 interface Props {
   topPredictions: PredRow[]
   topBattles: BattleRow[]
+  topDailyBattles: BattleRow[]
   topCards: CardRow[]
   currentUserId: string
 }
@@ -169,9 +170,9 @@ function Podium({ players, showPrizes }: { players: { id: string; pseudo: string
   )
 }
 
-function BattlePlayerRow({ player, rank, isCurrentUser }: { player: BattleRow; rank: number; isCurrentUser: boolean }) {
+function BattlePlayerRow({ player, rank, isCurrentUser, showPrize = true }: { player: BattleRow; rank: number; isCurrentUser: boolean; showPrize?: boolean }) {
   const flag = NATION_FLAGS[player.nation] ?? '🌍'
-  const prize = rank <= 3 ? PRIZE_COINS[rank - 1] : null
+  const prize = showPrize && rank <= 3 ? PRIZE_COINS[rank - 1] : null
   return (
     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(rank * 0.03, 0.5) }}
       className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-colors ${isCurrentUser ? 'bg-[#F5C518]/10 border border-[#F5C518]/30' : rank <= 3 ? 'bg-white/5 border border-white/5' : 'hover:bg-white/3'}`}>
@@ -288,8 +289,9 @@ const TABS = [
   { key: 'predictions', label: 'Pronos', icon: Target },
 ] as const
 
-export function LeaderboardClient({ topPredictions, topBattles, topCards, currentUserId }: Props) {
+export function LeaderboardClient({ topPredictions, topBattles, topDailyBattles, topCards, currentUserId }: Props) {
   const [tab, setTab] = useState<'battles' | 'cards' | 'predictions'>('battles')
+  const [battleTab, setBattleTab] = useState<'daily' | 'general'>('daily')
   const [countdown, setCountdown] = useState('')
 
   useEffect(() => {
@@ -308,10 +310,11 @@ export function LeaderboardClient({ topPredictions, topBattles, topCards, curren
     return () => clearInterval(t)
   }, [])
 
-  const currentUserBattleRank = topBattles.findIndex((p) => p.id === currentUserId) + 1
+  const activeBattles = battleTab === 'daily' ? topDailyBattles : topBattles
+  const currentUserDailyRank = topDailyBattles.findIndex((p) => p.id === currentUserId) + 1
 
   const podiumList =
-    tab === 'battles' ? topBattles :
+    tab === 'battles' ? activeBattles :
     tab === 'cards' ? topCards :
     topPredictions
 
@@ -325,11 +328,11 @@ export function LeaderboardClient({ topPredictions, topBattles, topCards, curren
           </div>
           <h1 className="text-5xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>CLASSEMENT</h1>
         </div>
-        <p className="text-white/30 text-sm mt-2">Top 100 · Mis à jour toutes les heures</p>
+        <p className="text-white/30 text-sm mt-2">Top 100 · Mis à jour en temps réel</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm transition-all ${tab === key ? 'bg-[#F5C518] text-black' : 'bg-white/5 text-white/40 hover:bg-white/10 border border-white/5'}`}>
@@ -338,18 +341,32 @@ export function LeaderboardClient({ topPredictions, topBattles, topCards, curren
         ))}
       </div>
 
-      {/* Prize pool banner — battles only */}
+      {/* Battle sub-tabs */}
       {tab === 'battles' && (
-        <PrizePoolBanner currentUserRank={currentUserBattleRank} countdown={countdown} />
+        <div className="flex gap-2 mb-5">
+          <button onClick={() => setBattleTab('daily')}
+            className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all ${battleTab === 'daily' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-white/5 text-white/30 border border-white/5 hover:bg-white/10'}`}>
+            ⚡ Journalier
+          </button>
+          <button onClick={() => setBattleTab('general')}
+            className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all ${battleTab === 'general' ? 'bg-[#F5C518]/15 text-[#F5C518] border border-[#F5C518]/25' : 'bg-white/5 text-white/30 border border-white/5 hover:bg-white/10'}`}>
+            🏆 Général (all-time)
+          </button>
+        </div>
+      )}
+
+      {/* Prize pool banner — daily battles only */}
+      {tab === 'battles' && battleTab === 'daily' && (
+        <PrizePoolBanner currentUserRank={currentUserDailyRank} countdown={countdown} />
       )}
 
       {/* Podium */}
-      {podiumList.length >= 3 && <Podium players={podiumList.slice(0, 3)} showPrizes={tab === 'battles'} />}
+      {podiumList.length >= 3 && <Podium players={podiumList.slice(0, 3)} showPrizes={tab === 'battles' && battleTab === 'daily'} />}
 
       {/* List */}
       <div className="space-y-1">
-        {tab === 'battles' && topBattles.map((player, i) => (
-          <BattlePlayerRow key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} />
+        {tab === 'battles' && activeBattles.map((player, i) => (
+          <BattlePlayerRow key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} showPrize={battleTab === 'daily'} />
         ))}
         {tab === 'predictions' && topPredictions.map((player, i) => (
           <PredPlayerRow key={player.id} player={player} rank={i + 1} isCurrentUser={player.id === currentUserId} />
@@ -364,7 +381,9 @@ export function LeaderboardClient({ topPredictions, topBattles, topCards, curren
           <div className="w-16 h-16 rounded-3xl bg-[#F5C518]/10 flex items-center justify-center mx-auto mb-4">
             <Trophy size={30} className="text-[#F5C518]/40" />
           </div>
-          <p className="text-white/30 text-sm">Aucun joueur classé pour l&apos;instant</p>
+          <p className="text-white/30 text-sm">
+            {tab === 'battles' && battleTab === 'daily' ? 'Aucune victoire aujourd\'hui — sois le premier !' : 'Aucun joueur classé pour l\'instant'}
+          </p>
         </div>
       )}
     </div>

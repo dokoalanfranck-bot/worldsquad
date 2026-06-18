@@ -43,25 +43,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         winner_slot: winnerSlot,
         winner_id:   winnerId,
         status:      'finished',
-        coins_won:   winnerSlot === 0 ? 300 : 0,
+        coins_won:   75,
       }).eq('id', id)
 
-      // Distribuer les coins
-      const finalistSlot = challWon ? t.semi2_winner_slot : t.semi1_winner_slot
-      const finalistId   = challWon ? t.semi2_winner_id   : t.semi1_winner_id
-
-      const prizes = [
-        { userId: winnerId,  amount: 300, label: '🏆 Tournoi 1ère place' },
-        ...(finalistId && finalistId !== winnerId ? [{ userId: finalistId, amount: 100, label: '🥈 Tournoi 2ème place' }] : []),
-      ]
-      await Promise.allSettled(
-        prizes.map((p) =>
-          Promise.all([
-            admin.rpc('increment_coins', { user_id: p.userId, delta: p.amount }),
-            admin.from('coin_transactions').insert({ user_id: p.userId, amount: p.amount, reason: `${p.label} — ${id.slice(0, 8)}` }),
-          ]),
-        ),
-      )
+      // 75 coins au vainqueur du tournoi
+      await Promise.allSettled([
+        admin.rpc('increment_coins', { user_id: winnerId, delta: 75 }),
+        admin.from('coin_transactions').insert({ user_id: winnerId, amount: 75, reason: `🏆 Victoire tournoi — ${id.slice(0, 8)}` }),
+      ])
     }
     return NextResponse.json({ status: 'final_active' })
   }

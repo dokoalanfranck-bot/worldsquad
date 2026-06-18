@@ -129,26 +129,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Update stats
     if (winnerId === challId) {
-      const { data: p } = await admin.from('users').select('battle_streak, best_streak, battles_played, battles_won').eq('id', challId).single()
+      const { data: p } = await admin.from('users').select('battle_streak, best_streak, battles_played, battles_won, daily_battles_won').eq('id', challId).single()
       const streak = (p?.battle_streak ?? 0) + 1
       await admin.from('users').update({
         battle_streak: streak,
         best_streak: Math.max(streak, p?.best_streak ?? 0),
         battles_played: (p?.battles_played ?? 0) + 1,
         battles_won: (p?.battles_won ?? 0) + 1,
+        daily_battles_won: (p?.daily_battles_won ?? 0) + 1,
       }).eq('id', challId)
       if (oppId) {
         const { data: q } = await admin.from('users').select('battles_played').eq('id', oppId).single()
         await admin.from('users').update({ battle_streak: 0, battles_played: (q?.battles_played ?? 0) + 1 }).eq('id', oppId)
       }
     } else if (winnerId === oppId && oppId) {
-      const { data: p } = await admin.from('users').select('battle_streak, best_streak, battles_played, battles_won').eq('id', oppId).single()
+      const { data: p } = await admin.from('users').select('battle_streak, best_streak, battles_played, battles_won, daily_battles_won').eq('id', oppId).single()
       const streak = (p?.battle_streak ?? 0) + 1
       await admin.from('users').update({
         battle_streak: streak,
         best_streak: Math.max(streak, p?.best_streak ?? 0),
         battles_played: (p?.battles_played ?? 0) + 1,
         battles_won: (p?.battles_won ?? 0) + 1,
+        daily_battles_won: (p?.daily_battles_won ?? 0) + 1,
       }).eq('id', oppId)
       const { data: q } = await admin.from('users').select('battles_played').eq('id', challId).single()
       await admin.from('users').update({ battle_streak: 0, battles_played: (q?.battles_played ?? 0) + 1 }).eq('id', challId)

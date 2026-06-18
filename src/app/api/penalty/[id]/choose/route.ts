@@ -155,6 +155,13 @@ export async function POST(
       updated_at: new Date().toISOString(),
     }).eq('id', battleId).eq('current_round', battle.current_round)
 
+    if (over && winnerId) {
+      const { data: wp } = await admin.from('users').select('battles_won, daily_battles_won').eq('id', winnerId).single()
+      await admin.from('users').update({
+        battles_won: (wp?.battles_won ?? 0) + 1,
+        daily_battles_won: (wp?.daily_battles_won ?? 0) + 1,
+      }).eq('id', winnerId)
+    }
     if (over && isTiebreakBot && winnerId) {
       const tdId = (battle as Record<string, unknown>).tournament_duel_id as string
       await admin.from('duels').update({ winner_id: winnerId, status: 'finished' }).eq('id', tdId)
@@ -262,6 +269,13 @@ export async function POST(
     return NextResponse.json({ submitted: true, resolved: false })
   }
 
+  if (over && winnerId) {
+    const { data: wp } = await admin.from('users').select('battles_won, daily_battles_won').eq('id', winnerId).single()
+    await admin.from('users').update({
+      battles_won: (wp?.battles_won ?? 0) + 1,
+      daily_battles_won: (wp?.daily_battles_won ?? 0) + 1,
+    }).eq('id', winnerId)
+  }
   if (over && isTiebreak && winnerId) {
     const tdId = (battle as Record<string, unknown>).tournament_duel_id as string
     await admin.from('duels').update({ winner_id: winnerId, status: 'finished' }).eq('id', tdId)
