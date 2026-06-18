@@ -10,7 +10,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const admin = createAdminClient()
 
-  const deadline = new Date(Date.now() + 30000).toISOString()
+  const deadline = new Date(Date.now() + 300000).toISOString()
 
   const { data: updated } = await admin
     .from('duels')

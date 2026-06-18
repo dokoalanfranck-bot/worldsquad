@@ -49,7 +49,7 @@ export async function POST() {
 
       if (otherDuels && otherDuels.length > 0) {
         const targetId = otherDuels[0].id
-        const deadline = new Date(Date.now() + 30000).toISOString()
+        const deadline = new Date(Date.now() + 300000).toISOString()
 
         const { data: joined } = await admin
           .from('duels')
@@ -87,7 +87,7 @@ export async function POST() {
 
   if (openDuels && openDuels.length > 0) {
     const duelId = openDuels[0].id
-    const deadline = new Date(Date.now() + 30000).toISOString()
+    const deadline = new Date(Date.now() + 300000).toISOString()
     const { data: updated } = await admin
       .from('duels')
       .update({ opponent_id: user.id, status: 'picking', picks_deadline: deadline })

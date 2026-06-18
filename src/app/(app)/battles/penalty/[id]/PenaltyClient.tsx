@@ -459,8 +459,6 @@ function PickingView({
     } catch { toast.error('Erreur réseau'); setCancelling(false) }
   }
 
-  const timeLeft = useDeadlineCountdown(battle.picks_deadline)
-
   const sorted = useMemo(() =>
     [...myCards].sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0))
   , [myCards])
@@ -468,12 +466,6 @@ function PickingView({
   const gkCards = useMemo(() =>
     sorted.filter((c) => typeof c.stats?.position === 'string' && (c.stats.position as string).toUpperCase() === 'GK')
   , [sorted])
-
-  useEffect(() => {
-    if (timeLeft === 0 && !submitted && sorted.length >= 4) {
-      submitPicks(sorted.slice(0, 3), sorted[3])
-    }
-  }, [timeLeft]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleShooter(card: Card) {
     setSelectedShooters((s) => {
@@ -500,39 +492,27 @@ function PickingView({
   }
 
   const canSubmit = selectedShooters.length === 3 && selectedGK !== null
-  const timerColor = timeLeft <= 10 ? '#ef4444' : '#22c55e'
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       className="min-h-screen px-4 py-4 max-w-2xl mx-auto pb-28">
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={cancelBattle}
-            disabled={cancelling || submitted || !!myPicks}
-            className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-30 flex-shrink-0"
-          >
-            {cancelling
-              ? <div className="w-3 h-3 border border-red-400/40 border-t-red-400 rounded-full animate-spin" />
-              : <span className="text-xs font-bold">✕</span>}
-          </button>
-          <div>
-            <p className="text-white/30 text-xs">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
-            <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-              ⚽ CHOISIS TON ÉQUIPE
-            </h1>
-          </div>
-        </div>
-        <motion.div
-          animate={{ scale: timeLeft <= 10 ? [1, 1.05, 1] : 1 }}
-          transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
-          className="flex flex-col items-center glass rounded-xl px-4 py-2"
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={cancelBattle}
+          disabled={cancelling || submitted || !!myPicks}
+          className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-30 flex-shrink-0"
         >
-          <span className="text-xl font-black font-mono" style={{ color: timerColor, fontFamily: 'Bebas Neue, sans-serif' }}>
-            {timeLeft}
-          </span>
-        </motion.div>
+          {cancelling
+            ? <div className="w-3 h-3 border border-red-400/40 border-t-red-400 rounded-full animate-spin" />
+            : <span className="text-xs font-bold">✕</span>}
+        </button>
+        <div>
+          <p className="text-white/30 text-xs">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
+          <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+            ⚽ CHOISIS TON ÉQUIPE
+          </h1>
+        </div>
       </div>
 
       <div className="glass rounded-xl p-3 mb-4 flex items-center gap-3">

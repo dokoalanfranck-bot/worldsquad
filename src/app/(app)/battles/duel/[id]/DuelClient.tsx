@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, ArrowDownRight, Star, Gift, LogOut } from 'lucide-react'
+import { Swords, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, ArrowDownRight, Star, Gift, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
 import { computePower } from '@/lib/duel-engine'
@@ -385,19 +385,7 @@ function PickingView({
   const [selectedCoach, setSelectedCoach] = useState<Card | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(!!myPicks)
-  const [timeLeft, setTimeLeft] = useState<number>(45)
   const [tab, setTab] = useState<'field' | 'gk' | 'coach'>('field')
-
-  useEffect(() => {
-    if (!duel.picks_deadline) return
-    const update = () => {
-      const secs = Math.max(0, Math.ceil((new Date(duel.picks_deadline).getTime() - Date.now()) / 1000))
-      setTimeLeft(secs)
-    }
-    update()
-    const t = setInterval(update, 500)
-    return () => clearInterval(t)
-  }, [duel.picks_deadline])
 
   const isCoachCard = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
   const isGKCard    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'GK'
@@ -406,17 +394,6 @@ function PickingView({
   const fieldCards  = useMemo(() => sorted.filter((c) => !isGKCard(c) && !isCoachCard(c)), [sorted])
   const gkCards     = useMemo(() => sorted.filter(isGKCard), [sorted])
   const coachCards  = useMemo(() => sorted.filter(isCoachCard), [sorted])
-
-  // Auto-pick when timer hits 0
-  useEffect(() => {
-    if (timeLeft > 0 || submitted || myPicks) return
-    const autoCoach = coachCards[0] ?? sorted[sorted.length - 1]
-    const autoGK    = gkCards[0] ?? sorted.find((c) => c.id !== autoCoach?.id) ?? sorted[1]
-    const autoField = fieldCards.filter((c) => c.id !== autoGK?.id && c.id !== autoCoach?.id).slice(0, 4)
-    if (autoField.length === 4 && autoGK && autoCoach) {
-      submitPicks(autoField, autoGK, autoCoach)
-    }
-  }, [timeLeft]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const cohesion = useMemo(() => {
     if (selectedField.length === 4 && selectedGK && selectedCoach) {
@@ -453,7 +430,6 @@ function PickingView({
   }
 
   const canSubmit = selectedField.length === 4 && selectedGK !== null && selectedCoach !== null
-  const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#f59e0b' : '#F5C518'
 
   return (
     <motion.div
@@ -463,23 +439,11 @@ function PickingView({
       className="min-h-screen px-4 py-4 max-w-2xl mx-auto pb-28"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-gray-600 text-xs uppercase tracking-wider">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
-          <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            CHOISIS TON ÉQUIPE
-          </h1>
-        </div>
-        <motion.div
-          animate={{ scale: timeLeft <= 10 ? [1, 1.05, 1] : 1 }}
-          transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
-          className="flex flex-col items-center glass rounded-xl px-4 py-2"
-        >
-          <Clock size={12} style={{ color: timerColor }} />
-          <span className="text-xl font-black font-mono" style={{ color: timerColor, fontFamily: 'Bebas Neue, sans-serif' }}>
-            {timeLeft}
-          </span>
-        </motion.div>
+      <div className="mb-4">
+        <p className="text-gray-600 text-xs uppercase tracking-wider">{me?.pseudo} vs {them?.pseudo ?? '…'}</p>
+        <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          CHOISIS TON ÉQUIPE
+        </h1>
       </div>
 
       {/* Opponent status */}

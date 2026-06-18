@@ -41,7 +41,7 @@ export async function POST() {
       .update({
         opponent_id: user.id,
         status: 'picking',
-        picks_deadline: new Date(Date.now() + 45000).toISOString(),
+        picks_deadline: new Date(Date.now() + 300000).toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', open.id)

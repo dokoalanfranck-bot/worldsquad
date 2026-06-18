@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       await admin.from('duels').update({
         opponent_picks: botPicks,
         status: 'picking',
-        picks_deadline: new Date(Date.now() + 30000).toISOString(),
+        picks_deadline: new Date(Date.now() + 300000).toISOString(),
       }).eq('id', duel.id)
 
       return NextResponse.json({ duelId: duel.id, mode: 'duel' })
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         is_bot: true,
         bot_name: botName ?? randomBotName(),
         status: 'picking',
-        picks_deadline: new Date(Date.now() + 45000).toISOString(),
+        picks_deadline: new Date(Date.now() + 300000).toISOString(),
         stake_count: stakeCount,
       }).select('id').single()
 
