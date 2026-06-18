@@ -14,6 +14,12 @@ export async function POST() {
 
   const admin = createAdminClient()
 
+  // Cancel lingering invited duels this challenger abandoned
+  await admin.from('duels')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('challenger_id', user.id)
+    .eq('status', 'invited')
+
   // Already in an active duel?
   const { data: active } = await admin
     .from('duels')

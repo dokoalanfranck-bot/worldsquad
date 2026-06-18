@@ -14,6 +14,12 @@ export async function POST() {
 
   const admin = createAdminClient()
 
+  // Cancel lingering invited penalties this challenger abandoned
+  await admin.from('penalty_battles')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('challenger_id', user.id)
+    .eq('status', 'invited')
+
   // Return existing active battle if any
   const { data: existing } = await admin
     .from('penalty_battles')

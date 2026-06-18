@@ -52,6 +52,41 @@ export async function POST(req: NextRequest) {
   const { data: me } = await admin.from('users').select('pseudo, is_admin').eq('id', user.id).single()
   if (me?.is_admin) return NextResponse.json({ error: 'Les comptes admin ne peuvent pas participer aux battles' }, { status: 403 })
 
+  // ── Cleanup: cancel orphaned challenger sessions before creating a new one ─
+  const [{ data: oldDuels }, { data: oldPenalties }] = await Promise.all([
+    admin.from('duels')
+      .select('id, is_bot, opponent_id, challenger_picks, status')
+      .eq('challenger_id', user.id)
+      .in('status', ['invited', 'open', 'picking']),
+    admin.from('penalty_battles')
+      .select('id')
+      .eq('challenger_id', user.id)
+      .in('status', ['invited', 'waiting', 'picking']),
+  ])
+
+  if (oldDuels && oldDuels.length > 0) {
+    await Promise.all(oldDuels.map(async (d) => {
+      const challPickIds = (d.challenger_picks as Array<{ id: string }> | null)?.map((c) => c.id) ?? []
+      const canForfeit = d.status === 'picking' && !d.is_bot && d.opponent_id && challPickIds.length > 0
+      if (canForfeit) {
+        await admin.from('duels').update({
+          status: 'stealing', winner_id: d.opponent_id,
+          stolen_card_ids: challPickIds, updated_at: new Date().toISOString(),
+        }).eq('id', d.id).eq('status', 'picking')
+      } else {
+        await admin.from('duels').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', d.id)
+      }
+    }))
+  }
+
+  if (oldPenalties && oldPenalties.length > 0) {
+    await admin.from('penalty_battles')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('challenger_id', user.id)
+      .in('status', ['invited', 'waiting', 'picking'])
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // ── BOT CHALLENGE ─────────────────────────────────────────────────────────
   if (isBot) {
     if (mode === 'duel') {
