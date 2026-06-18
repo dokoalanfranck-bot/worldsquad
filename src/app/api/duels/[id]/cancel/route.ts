@@ -14,7 +14,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .from('duels')
     .update({ status: 'cancelled' })
     .eq('id', duelId)
-    .in('status', ['open', 'picking'])
+    .in('status', ['open', 'picking', 'stealing'])
     .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
     .select('id')
 

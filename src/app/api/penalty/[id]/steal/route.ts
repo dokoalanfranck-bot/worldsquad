@@ -33,10 +33,11 @@ export async function POST(
     return NextResponse.json({ error: `Sélectionne exactement ${stakeCount} carte(s)` }, { status: 400 })
   }
 
-  const loserId: string = battle.winner_id === battle.challenger_id
+  const isBot = !!(battle as Record<string, unknown>).is_bot
+  const loserId: string | null = battle.winner_id === battle.challenger_id
     ? battle.opponent_id
     : battle.challenger_id
-  if (!loserId) return NextResponse.json({ error: 'Adversaire introuvable' }, { status: 400 })
+  if (!loserId && !isBot) return NextResponse.json({ error: 'Adversaire introuvable' }, { status: 400 })
 
   // Verify selected cards are among loser's picks
   const loserPicks = (battle.winner_id === battle.challenger_id
@@ -51,12 +52,14 @@ export async function POST(
   }
 
   // ── Transfer ────────────────────────────────────────────────────────────────
-  // 1. Remove from loser (unconditional — delete by card_id, no need to find row id first)
-  await Promise.all(
-    cardIds.map((cardId) =>
-      admin.from('user_cards').delete().eq('user_id', loserId).eq('card_id', cardId)
+  // 1. Remove from loser (skip for bot — bot has no user_cards)
+  if (!isBot && loserId) {
+    await Promise.all(
+      cardIds.map((cardId) =>
+        admin.from('user_cards').delete().eq('user_id', loserId).eq('card_id', cardId)
+      )
     )
-  )
+  }
 
   // 2. Add to winner — insert all at once, check error
   const { error: insertErr } = await admin.from('user_cards').insert(

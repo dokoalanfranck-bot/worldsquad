@@ -149,25 +149,10 @@ export async function POST(
       rounds: newRounds,
       round_deadline: over ? null : new Date(Date.now() + 15000).toISOString(),
       winner_id: winnerId,
-      status: over ? 'finished' : 'active',
+      status: over ? 'stealing' : 'active',
       ...panenkaUpdate,
       updated_at: new Date().toISOString(),
     }).eq('id', battleId).eq('current_round', battle.current_round)
-
-    // Update user stats when game ends
-    if (over) {
-      const userWon = winnerId === user.id
-      const { data: p } = await admin.from('users')
-        .select('battles_won, battles_played, battle_streak, best_streak')
-        .eq('id', user.id).single()
-      const newStreak = userWon ? (p?.battle_streak ?? 0) + 1 : 0
-      await admin.from('users').update({
-        battles_played: (p?.battles_played ?? 0) + 1,
-        battles_won:    (p?.battles_won    ?? 0) + (userWon ? 1 : 0),
-        battle_streak:  newStreak,
-        best_streak:    Math.max(p?.best_streak ?? 0, newStreak),
-      }).eq('id', user.id)
-    }
 
     return NextResponse.json({ submitted: true, resolved: true, isGoal, roundResult })
   }

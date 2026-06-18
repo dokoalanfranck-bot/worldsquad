@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star } from 'lucide-react'
+import { Star, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
 import toast from 'react-hot-toast'
@@ -1213,6 +1213,27 @@ function FinishedView({
   )
 }
 
+// ── CancelledView ─────────────────────────────────────────────────────────────
+
+function CancelledView({ onBack }: { onBack: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onBack, 2000)
+    return () => clearTimeout(t)
+  }, [onBack])
+  return (
+    <motion.div key="cancelled" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">
+      <div className="w-20 h-20 rounded-3xl bg-red-500/10 flex items-center justify-center">
+        <span className="text-4xl">❌</span>
+      </div>
+      <h2 className="text-3xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+        MATCH ANNULÉ
+      </h2>
+      <p className="text-white/40 text-sm">Redirection vers les battles…</p>
+    </motion.div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function PenaltyClient({
@@ -1260,6 +1281,23 @@ export function PenaltyClient({
     }
   }, [battle.rounds]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Abandon logic ────────────────────────────────────────────────────────────
+  const router = useRouter()
+  const [confirmAbandon, setConfirmAbandon] = useState(false)
+  const [abandonLoading, setAbandonLoading] = useState(false)
+
+  async function handleAbandon() {
+    setAbandonLoading(true)
+    try {
+      await fetch(`/api/penalty/${battle.id}/cancel`, { method: 'POST' })
+      setBattle((prev) => ({ ...prev, status: 'cancelled' }))
+    } catch {
+      toast.error('Erreur réseau')
+      setAbandonLoading(false)
+      setConfirmAbandon(false)
+    }
+  }
+
   // Realtime subscription
   useEffect(() => {
     const ch = supabase
@@ -1268,10 +1306,14 @@ export function PenaltyClient({
         event: 'UPDATE', schema: 'public', table: 'penalty_battles', filter: `id=eq.${battle.id}`,
       }, ({ new: updated }) => {
         setBattle((prev) => ({ ...prev, ...(updated as Partial<PenaltyBattle>) }))
+        if ((updated as PenaltyBattle).status === 'cancelled') {
+          toast('Match annulé', { icon: '❌' })
+          setTimeout(() => router.push('/battles'), 1800)
+        }
       })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [battle.id, supabase])
+  }, [battle.id, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback polling
   useEffect(() => {
@@ -1280,11 +1322,18 @@ export function PenaltyClient({
         const r = await fetch(`/api/penalty/${battle.id}/state`)
         if (!r.ok) return
         const data = await r.json() as { battle?: PenaltyBattle }
-        if (data.battle) setBattle((prev) => ({ ...prev, ...data.battle }))
+        if (data.battle) {
+          setBattle((prev) => ({ ...prev, ...data.battle }))
+          if (data.battle.status === 'cancelled') {
+            clearInterval(poll)
+            toast('Match annulé', { icon: '❌' })
+            setTimeout(() => router.push('/battles'), 1800)
+          }
+        }
       } catch {}
     }, 4000)
     return () => clearInterval(poll)
-  }, [battle.id])
+  }, [battle.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute updated scores for GoalAnimation
   const newCScore = pendingResult
@@ -1299,6 +1348,58 @@ export function PenaltyClient({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black to-gray-950">
+      {/* Abandon button — active & stealing only */}
+      {(battle.status === 'active' || battle.status === 'stealing') && !confirmAbandon && (
+        <button
+          onClick={() => setConfirmAbandon(true)}
+          className="fixed top-4 left-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
+        >
+          <LogOut size={12} /> Abandonner
+        </button>
+      )}
+
+      {/* Abandon confirmation modal */}
+      <AnimatePresence>
+        {confirmAbandon && (
+          <motion.div
+            key="abandon-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+            onClick={() => { if (!abandonLoading) setConfirmAbandon(false) }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#0f0f1a] border border-red-500/30 rounded-2xl p-6 space-y-4 w-full max-w-xs"
+            >
+              <div className="text-center">
+                <p className="text-white font-black text-xl" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                  ABANDONNER ?
+                </p>
+                <p className="text-white/40 text-sm mt-1">L'adversaire sera averti et redirigé vers les battles</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmAbandon(false)} className="flex-1 py-3 rounded-xl bg-white/5 text-white/50 font-bold text-sm hover:bg-white/10 transition-colors">
+                  Continuer
+                </button>
+                <button
+                  onClick={handleAbandon}
+                  disabled={abandonLoading}
+                  className="flex-1 py-3 rounded-xl bg-red-500 text-white font-black text-sm disabled:opacity-50 hover:bg-red-600 transition-colors"
+                >
+                  {abandonLoading ? '…' : 'Abandonner'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ScoreBoard (always visible when active/stealing) */}
       {(battle.status === 'active' || battle.status === 'stealing') && (
         <ScoreBoard
@@ -1355,10 +1456,7 @@ export function PenaltyClient({
           />
         )}
         {battle.status === 'cancelled' && (
-          <motion.div key="cancelled" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="min-h-screen flex items-center justify-center text-white/40 text-lg">
-            Battle annulée
-          </motion.div>
+          <CancelledView key="cancelled" onBack={() => router.push('/battles')} />
         )}
       </AnimatePresence>
 

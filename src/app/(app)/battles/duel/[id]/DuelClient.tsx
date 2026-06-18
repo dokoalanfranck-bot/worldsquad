@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, ArrowDownRight, Star, Gift } from 'lucide-react'
+import { Swords, Clock, Check, Share2, RotateCcw, Zap, Shield, Trophy, TrendingDown, Minus, ArrowDownRight, Star, Gift, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GameCard } from '@/components/ui/Card'
 import { computePower } from '@/lib/duel-engine'
@@ -140,8 +140,76 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
     }
   }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Abandon logic ──────────────────────────────────────────────────────────
+  const [confirmAbandon, setConfirmAbandon] = useState(false)
+  const [abandonLoading, setAbandonLoading] = useState(false)
+
+  async function handleAbandon() {
+    setAbandonLoading(true)
+    try {
+      await fetch(`/api/duels/${duel.id}/cancel`, { method: 'POST' })
+      setView('cancelled')
+    } catch {
+      toast.error('Erreur réseau')
+      setAbandonLoading(false)
+      setConfirmAbandon(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#07070f]">
+      {/* Abandon button — picking & stealing only */}
+      {(view === 'picking' || view === 'stealing') && !confirmAbandon && (
+        <button
+          onClick={() => setConfirmAbandon(true)}
+          className="fixed top-4 left-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
+        >
+          <LogOut size={12} /> Abandonner
+        </button>
+      )}
+
+      {/* Abandon confirmation modal */}
+      <AnimatePresence>
+        {confirmAbandon && (
+          <motion.div
+            key="abandon-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+            onClick={() => { if (!abandonLoading) setConfirmAbandon(false) }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#0f0f1a] border border-red-500/30 rounded-2xl p-6 space-y-4 w-full max-w-xs"
+            >
+              <div className="text-center">
+                <p className="text-white font-black text-xl" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                  ABANDONNER LE MATCH ?
+                </p>
+                <p className="text-white/40 text-sm mt-1">L'adversaire sera averti et redirigé vers les battles</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmAbandon(false)} className="flex-1 py-3 rounded-xl bg-white/5 text-white/50 font-bold text-sm hover:bg-white/10 transition-colors">
+                  Continuer
+                </button>
+                <button
+                  onClick={handleAbandon}
+                  disabled={abandonLoading}
+                  className="flex-1 py-3 rounded-xl bg-red-500 text-white font-black text-sm disabled:opacity-50 hover:bg-red-600 transition-colors"
+                >
+                  {abandonLoading ? '…' : 'Abandonner'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
         {view === 'cancelled' && (
           <motion.div key="cancelled" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

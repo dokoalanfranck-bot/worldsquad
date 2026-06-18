@@ -22,7 +22,7 @@ export async function POST(
   if (battle.challenger_id !== user.id && battle.opponent_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
-  if (!['waiting', 'picking', 'active'].includes(battle.status)) {
+  if (!['waiting', 'picking', 'active', 'stealing'].includes(battle.status)) {
     return NextResponse.json({ error: 'Impossible d\'annuler' }, { status: 400 })
   }
 
