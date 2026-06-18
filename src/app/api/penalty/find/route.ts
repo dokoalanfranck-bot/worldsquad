@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+
+  if (!await isFeatureEnabled('penalty_battles_enabled')) {
+    return NextResponse.json({ error: 'Le mode Tirs au but est temporairement désactivé' }, { status: 503 })
+  }
 
   const admin = createAdminClient()
 
