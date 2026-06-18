@@ -11,12 +11,25 @@ const isGK    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === '
 async function buildBotPicks(admin: ReturnType<typeof createAdminClient>, duelId: string): Promise<Card[]> {
   const { data: cards } = await admin.from('cards')
     .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
+    .eq('type', 'player')
     .limit(200)
   const pool        = seededShuffle((cards ?? []) as unknown as Card[], duelId)
   const coach       = pool.find(isCoach)  ?? pool[pool.length - 1]
   const gk          = pool.find(isGK)     ?? pool[pool.length - 2]
   const fieldCards  = pool.filter((c) => !isCoach(c) && !isGK(c))
   return [...fieldCards.slice(0, 4), gk, coach].filter(Boolean).slice(0, 6)
+}
+
+// Penalty format: [shooter0, shooter1, shooter2, gk] — 4 cards only
+async function buildBotPenaltyPicks(admin: ReturnType<typeof createAdminClient>, battleId: string): Promise<Card[]> {
+  const { data: cards } = await admin.from('cards')
+    .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
+    .eq('type', 'player')
+    .limit(200)
+  const pool     = seededShuffle((cards ?? []) as unknown as Card[], battleId)
+  const gk       = pool.find(isGK) ?? pool[pool.length - 1]
+  const shooters = pool.filter((c) => !isCoach(c) && !isGK(c))
+  return [...shooters.slice(0, 3), gk].filter(Boolean)
 }
 
 export async function POST(req: NextRequest) {
@@ -75,8 +88,8 @@ export async function POST(req: NextRequest) {
 
       if (!battle) return NextResponse.json({ error: 'Erreur création penalty bot' }, { status: 500 })
 
-      // Add bot picks immediately
-      const botPicks = await buildBotPicks(admin, battle.id)
+      // Add bot picks immediately (penalty format: 3 shooters + 1 GK)
+      const botPicks = await buildBotPenaltyPicks(admin, battle.id)
       await admin.from('penalty_battles').update({
         opponent_picks: botPicks,
       }).eq('id', battle.id)

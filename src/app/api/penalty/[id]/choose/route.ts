@@ -104,6 +104,75 @@ export async function POST(
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }
 
+  // ── BOT BATTLE: résolution immédiate sans attendre de second joueur ──────────
+  if ((battle as Record<string, unknown>).is_bot) {
+    const botChoice = (['left', 'center', 'right'] as const)[Math.floor(Math.random() * 3)]
+    // Odd rounds → challenger (user) shoots, bot is GK; Even rounds → bot shoots, user is GK
+    const userShoots = battle.current_round % 2 === 1
+    const shooterChoice: Direction = userShoots ? choice : botChoice
+    const gkChoice: Direction      = userShoots ? botChoice : choice
+
+    const shooterPickIdx = Math.floor((battle.current_round - 1) / 2) % 3
+    const gkPickIdx = 3
+    const shooterPicks = (userShoots ? battle.challenger_picks : battle.opponent_picks) as PickEntry[] | null
+    const gkPicks      = (userShoots ? battle.opponent_picks : battle.challenger_picks) as PickEntry[] | null
+
+    const shooterPower = getPickPower(shooterPicks, shooterPickIdx)
+    const gkPower      = getPickPower(gkPicks, gkPickIdx)
+    const isGoal = resolveShot(shooterChoice, gkChoice, shooterPower, gkPower)
+
+    const newCScore = battle.challenger_score + (isGoal && userShoots ? 1 : 0)
+    const newOScore = battle.opponent_score   + (isGoal && !userShoots ? 1 : 0)
+
+    const roundResult = {
+      round: battle.current_round,
+      shooter_id: userShoots ? battle.challenger_id : null,
+      gk_id: userShoots ? null : battle.challenger_id,
+      shooter_choice: shooterChoice, gk_choice: gkChoice,
+      is_goal: isGoal,
+      shooter_power: Math.round(shooterPower), gk_power: Math.round(gkPower),
+    }
+    const newRounds = [...((battle.rounds as unknown[]) ?? []), roundResult]
+
+    const { over, winnerId: rawWinner } = checkGameOver(
+      battle.current_round, newCScore, newOScore, battle.challenger_id, '__bot__'
+    )
+    const winnerId = over ? (rawWinner === '__bot__' ? null : rawWinner) : null
+
+    const panenkaUpdate: Record<string, boolean> = {}
+    if (choice === 'panenka') panenkaUpdate.challenger_used_panenka = true
+
+    await admin.from('penalty_battles').update({
+      current_round: battle.current_round + 1,
+      challenger_score: newCScore,
+      opponent_score: newOScore,
+      rounds: newRounds,
+      round_deadline: over ? null : new Date(Date.now() + 15000).toISOString(),
+      winner_id: winnerId,
+      status: over ? 'finished' : 'active',
+      ...panenkaUpdate,
+      updated_at: new Date().toISOString(),
+    }).eq('id', battleId).eq('current_round', battle.current_round)
+
+    // Update user stats when game ends
+    if (over) {
+      const userWon = winnerId === user.id
+      const { data: p } = await admin.from('users')
+        .select('battles_won, battles_played, battle_streak, best_streak')
+        .eq('id', user.id).single()
+      const newStreak = userWon ? (p?.battle_streak ?? 0) + 1 : 0
+      await admin.from('users').update({
+        battles_played: (p?.battles_played ?? 0) + 1,
+        battles_won:    (p?.battles_won    ?? 0) + (userWon ? 1 : 0),
+        battle_streak:  newStreak,
+        best_streak:    Math.max(p?.best_streak ?? 0, newStreak),
+      }).eq('id', user.id)
+    }
+
+    return NextResponse.json({ submitted: true, resolved: true, isGoal, roundResult })
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const { data: allChoices } = await admin
     .from('penalty_choices')
     .select('player_id, choice')
