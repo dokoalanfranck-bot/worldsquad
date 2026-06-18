@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { randomBotName, botNation } from '@/lib/duel-engine'
-import { launchSemis } from '@/app/api/tournament/find/route'
+import { launchSemis } from '@/lib/launch-semis'
 
 export const dynamic = 'force-dynamic'
 
