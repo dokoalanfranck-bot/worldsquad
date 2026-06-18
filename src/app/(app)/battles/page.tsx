@@ -60,11 +60,18 @@ export default async function BattlesPage() {
     }
   }))
 
+  const { data: profile } = await admin
+    .from('users')
+    .select('id, pseudo, nation, photo_url')
+    .eq('id', user.id)
+    .single()
+
   return (
     <BattlesHub
       duels={enriched}
       currentUserId={user.id}
       penaltyBattles={enrichedPenalty}
+      currentUser={profile ?? { id: user.id, pseudo: '?', nation: '', photo_url: null }}
     />
   )
 }

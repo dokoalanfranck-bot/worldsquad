@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Swords, ChevronRight, Layers, Radio, Gift,
-  TrendingUp, TrendingDown, Minus, Check, X, Clock,
-  Users, Shield, LogOut,
+  Swords, ChevronRight, Gift,
+  TrendingUp, TrendingDown, Minus, Check, X,
+  Users,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -49,6 +49,31 @@ const NATION_FLAGS: Record<string, string> = {
   Norway:'🇳🇴', Croatia:'🇭🇷',
 }
 const flag = (n: string) => NATION_FLAGS[n] ?? '🌍'
+
+// ── Bot pool (mirrors server) ──────────────────────────────────────────────────
+const BOT_POOL = [
+  { pseudo: 'Shadow_X42', nation: 'France' }, { pseudo: 'NightWolf7', nation: 'Brazil' },
+  { pseudo: 'CobraZone', nation: 'Argentina' }, { pseudo: 'GhostV10', nation: 'Portugal' },
+  { pseudo: 'BlueStar22', nation: 'Morocco' }, { pseudo: 'TigerBoy33', nation: 'Senegal' },
+  { pseudo: 'FlashZero', nation: 'England' }, { pseudo: 'DarkFox21', nation: 'Spain' },
+  { pseudo: 'CometXI', nation: 'Germany' }, { pseudo: 'AceFire99', nation: 'Netherlands' },
+  { pseudo: 'KingSolo88', nation: 'Ivory Coast' }, { pseudo: 'ProZone_55', nation: 'Japan' },
+  { pseudo: 'NovaStar3', nation: 'USA' }, { pseudo: 'CrownKing77', nation: 'Belgium' },
+  { pseudo: 'SpeedForce', nation: 'Colombia' }, { pseudo: 'IronWave_9', nation: 'Croatia' },
+  { pseudo: 'StormBolt', nation: 'Mexico' }, { pseudo: 'RedPhoenix', nation: 'Poland' },
+  { pseudo: 'ZeroGravX', nation: 'South Korea' }, { pseudo: 'LegendOf7', nation: 'Cameroon' },
+]
+function getBotsForMode(m: Mode): LobbyPlayer[] {
+  const seed = Math.floor(Date.now() / 120000)
+  const start = seed % BOT_POOL.length
+  const count = m === 'penalty' ? 2 : 3
+  const bots: LobbyPlayer[] = []
+  for (let i = 0; i < count; i++) {
+    const b = BOT_POOL[(start + i) % BOT_POOL.length]
+    bots.push({ userId: null, pseudo: b.pseudo, nation: b.nation, photo_url: null, isBot: true, botName: b.pseudo, entered_at: new Date(0).toISOString(), isSelf: false })
+  }
+  return bots
+}
 
 // ── Challenge Modal ────────────────────────────────────────────────────────────
 function ChallengeModal({
@@ -204,19 +229,17 @@ function LobbyCard({ player, mode, onChallenge }: {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
+export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentUser }: {
   duels: Duel[]
   currentUserId: string
   penaltyBattles?: PenaltyBattle[]
-  initialLobby?: { players: LobbyPlayer[]; inLobby: boolean; myMode: Mode | null }
+  currentUser: { id: string; pseudo: string; nation: string; photo_url: string | null }
 }) {
   const router = useRouter()
   const supabase = createClient()
 
   const [mode, setMode] = useState<Mode>('duel')
-  const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([])
-  const [inLobby, setInLobby] = useState(false)
-  const [lobbyLoading, setLobbyLoading] = useState(false)
+  const [onlinePlayers, setOnlinePlayers] = useState<LobbyPlayer[]>([])
   const [challengeTarget, setChallengeTarget] = useState<LobbyPlayer | null>(null)
   const [challenging, setChallenging] = useState(false)
 
@@ -224,35 +247,43 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [cancellingPenalty, setCancellingPenalty] = useState<string | null>(null)
 
-  const inLobbyRef = useRef(inLobby)
-  useEffect(() => { inLobbyRef.current = inLobby }, [inLobby])
-
-  // ── Fetch lobby ───────────────────────────────────────────────────────────
-  const fetchLobby = useCallback(async (m: Mode) => {
-    try {
-      const res = await fetch(`/api/lobby?mode=${m}`)
-      if (!res.ok) return
-      const data = await res.json() as { players: LobbyPlayer[]; inLobby: boolean }
-      setLobbyPlayers(data.players)
-      setInLobby(data.inLobby)
-    } catch { /* ignore */ }
-  }, [])
-
+  // ── Supabase Presence — auto-join quand la page est ouverte ───────────────
   useEffect(() => {
-    fetchLobby(mode)
-  }, [mode, fetchLobby])
+    const channel = supabase.channel('battles-presence', {
+      config: { presence: { key: currentUserId } },
+    })
 
-  // ── Realtime lobby subscription ───────────────────────────────────────────
-  useEffect(() => {
-    const ch = supabase
-      .channel('battle-lobby-watch')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'battle_lobby' }, () => {
-        fetchLobby(mode)
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<{
+          userId: string; pseudo: string; nation: string; photo_url: string | null; joinedAt: string
+        }>()
+        const players: LobbyPlayer[] = []
+        for (const presences of Object.values(state)) {
+          const p = presences[0]
+          if (p && p.userId !== currentUserId) {
+            players.push({ userId: p.userId, pseudo: p.pseudo, nation: p.nation, photo_url: p.photo_url, isBot: false, entered_at: p.joinedAt, isSelf: false })
+          }
+        }
+        setOnlinePlayers(players)
       })
-      .subscribe()
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            userId: currentUserId,
+            pseudo: currentUser.pseudo,
+            nation: currentUser.nation,
+            photo_url: currentUser.photo_url,
+            joinedAt: new Date().toISOString(),
+          })
+        }
+      })
 
-    return () => { supabase.removeChannel(ch) }
-  }, [mode, fetchLobby]) // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      void channel.untrack()
+      supabase.removeChannel(channel)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Realtime incoming invites ─────────────────────────────────────────────
   useEffect(() => {
@@ -274,40 +305,6 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
     return () => { supabase.removeChannel(ch) }
   }, [currentUserId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Leave lobby on unmount ────────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      if (inLobbyRef.current) {
-        fetch('/api/lobby', { method: 'DELETE' }).catch(() => {})
-      }
-    }
-  }, [])
-
-  // ── Join / Leave lobby ────────────────────────────────────────────────────
-  async function joinLobby() {
-    setLobbyLoading(true)
-    try {
-      await fetch('/api/lobby', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
-      })
-      setInLobby(true)
-      await fetchLobby(mode)
-    } catch { toast.error('Erreur réseau') }
-    finally { setLobbyLoading(false) }
-  }
-
-  async function leaveLobby() {
-    setLobbyLoading(true)
-    try {
-      await fetch('/api/lobby', { method: 'DELETE' })
-      setInLobby(false)
-      await fetchLobby(mode)
-    } catch { toast.error('Erreur réseau') }
-    finally { setLobbyLoading(false) }
-  }
-
   // ── Challenge ─────────────────────────────────────────────────────────────
   async function sendChallenge(stakeCount: number) {
     if (!challengeTarget) return
@@ -326,12 +323,6 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
       if (!res.ok) { toast.error(data.error ?? 'Erreur'); return }
 
       setChallengeTarget(null)
-
-      // Leave lobby when we send a challenge
-      if (inLobby) {
-        await fetch('/api/lobby', { method: 'DELETE' })
-        setInLobby(false)
-      }
 
       if (data.duelId) router.push(`/battles/duel/${data.duelId}`)
       else if (data.battleId) router.push(`/battles/penalty/${data.battleId}`)
@@ -396,7 +387,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
   const finished        = duels.filter((d) => d.status === 'finished')
   const finishedPenalty = penaltyBattles.filter((p) => p.status === 'finished')
 
-  const visibleLobby = lobbyPlayers.filter((p) => !p.isSelf)
+  const visibleLobby = [...onlinePlayers, ...getBotsForMode(mode)]
 
   return (
     <div className="min-h-screen px-4 lg:px-8 py-6 max-w-2xl lg:max-w-5xl mx-auto pb-28">
@@ -556,59 +547,22 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
                   {mode === 'duel' ? '⚔️ Joueurs disponibles' : '⚽ Joueurs disponibles'}
                 </p>
               </div>
-              <span className="text-white/30 text-xs">{visibleLobby.length} en ligne</span>
-            </div>
-
-            {/* Lobby join/leave */}
-            <div className="px-4 py-3 border-b border-white/5">
-              {inLobby ? (
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-green-500/8 border border-green-500/20">
-                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
-                  <p className="text-green-400 text-sm font-bold flex-1">Tu es visible dans le lobby</p>
-                  <button onClick={leaveLobby} disabled={lobbyLoading}
-                    className="flex items-center gap-1 text-white/30 hover:text-red-400 text-xs transition-colors disabled:opacity-50">
-                    <LogOut size={12} /> Sortir
-                  </button>
-                </div>
-              ) : (
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={joinLobby}
-                  disabled={lobbyLoading}
-                  className="w-full py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-                  style={{
-                    fontFamily: 'Bebas Neue, sans-serif',
-                    background: mode === 'duel' ? '#F5C518' : '#22c55e',
-                    color: '#000',
-                    boxShadow: mode === 'duel' ? '0 0 20px rgba(245,197,24,0.2)' : '0 0 20px rgba(34,197,94,0.2)',
-                  }}
-                >
-                  {lobbyLoading
-                    ? <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    : <><Shield size={16} /> REJOINDRE LE LOBBY</>
-                  }
-                </motion.button>
-              )}
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-green-400 text-xs font-bold">{onlinePlayers.length} en ligne</span>
+              </div>
             </div>
 
             {/* Player list */}
             <div className="p-3 space-y-2">
-              {visibleLobby.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users size={24} className="text-white/15 mx-auto mb-2" />
-                  <p className="text-white/20 text-sm">Aucun joueur disponible</p>
-                  <p className="text-white/10 text-xs mt-1">Rejoins le lobby pour être visible</p>
-                </div>
-              ) : (
-                visibleLobby.map((p, i) => (
-                  <LobbyCard
-                    key={p.userId ?? p.pseudo}
-                    player={p}
-                    mode={mode}
-                    onChallenge={setChallengeTarget}
-                  />
-                ))
-              )}
+              {visibleLobby.map((p) => (
+                <LobbyCard
+                  key={p.userId ?? p.pseudo}
+                  player={p}
+                  mode={mode}
+                  onChallenge={setChallengeTarget}
+                />
+              ))}
             </div>
           </div>
 
@@ -617,7 +571,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
             <p className="text-white/30 text-[10px] uppercase tracking-widest mb-4">Comment ça marche</p>
             <div className="space-y-3">
               {[
-                { n: '1', label: 'Rejoins le lobby', desc: 'Tu deviens visible par les autres joueurs', color: 'text-blue-400 bg-blue-500/10' },
+                { n: '1', label: 'Ouvre la page', desc: 'Tu es visible instantanément par les autres', color: 'text-blue-400 bg-blue-500/10' },
                 { n: '2', label: 'Choisis un adversaire', desc: 'Humain ou bot, et envoie le défi', color: 'text-purple-400 bg-purple-500/10' },
                 { n: '3', label: 'Battle !', desc: 'Sélection de cartes → match animé → vol de carte', color: mode === 'duel' ? 'text-[#F5C518] bg-[#F5C518]/10' : 'text-green-400 bg-green-500/10' },
               ].map(({ n, label, desc, color }) => (
