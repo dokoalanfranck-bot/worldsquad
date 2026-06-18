@@ -47,12 +47,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     )
   }
 
-  // Add cards to winner's collection
-  const { error: insertErr } = await admin.from('user_cards').insert(
-    cardIds.map((cardId) => ({ user_id: user.id, card_id: cardId, obtained_via: 'battle' }))
+  // Add cards to winner's collection (upsert in case winner already owns the card)
+  const { error: insertErr } = await admin.from('user_cards').upsert(
+    cardIds.map((cardId) => ({ user_id: user.id, card_id: cardId, obtained_via: 'battle' })),
+    { onConflict: 'user_id,card_id', ignoreDuplicates: true }
   )
   if (insertErr) {
-    console.error('[steal] insert user_cards failed:', insertErr)
+    console.error('[steal] upsert user_cards failed:', insertErr)
     return NextResponse.json({ error: 'Erreur lors du transfert des cartes' }, { status: 500 })
   }
 

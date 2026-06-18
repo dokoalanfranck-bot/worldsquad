@@ -1078,6 +1078,8 @@ function StealingView({ duel, currentUserId, onDone }: { duel: Duel; currentUser
 function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: {
   duel: Duel; currentUserId: string; me: Profile; them: Profile; onReplay: () => void; replayLoading?: boolean
 }) {
+  const router = useRouter()
+  const tournamentId = duel.tournament_id as string | null
   const isChallenger = duel.challenger_id === currentUserId
   const winnerId = duel.winner_id as string | null
   const iWon = winnerId === currentUserId
@@ -1162,27 +1164,39 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
       )}
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="flex gap-3 w-full">
-        <button
-          onClick={onReplay}
-          disabled={replayLoading}
-          className="flex-1 bg-[#F5C518] disabled:opacity-60 text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
-          style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-        >
-          {replayLoading
-            ? <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> RECHERCHE…</>
-            : <><RotateCcw size={16} /> REJOUER</>
-          }
-        </button>
-        <button
-          onClick={() => {
-            if (navigator.share) {
-              navigator.share({ title: iWon ? `Victoire ${myScore}-${theirScore} !` : `Défaite ${myScore}-${theirScore}`, text: 'Je viens de jouer un duel sur WorldSquad !' }).catch(() => {})
-            }
-          }}
-          className="px-4 py-3.5 rounded-xl border border-white/10 text-gray-400 hover:text-white transition-colors"
-        >
-          <Share2 size={16} />
-        </button>
+        {tournamentId ? (
+          <button
+            onClick={() => router.push(`/battles/tournament/${tournamentId}`)}
+            className="flex-1 bg-[#F5C518] text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+          >
+            <Trophy size={16} /> RETOUR AU TOURNOI
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={onReplay}
+              disabled={replayLoading}
+              className="flex-1 bg-[#F5C518] disabled:opacity-60 text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
+              {replayLoading
+                ? <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> RECHERCHE…</>
+                : <><RotateCcw size={16} /> REJOUER</>
+              }
+            </button>
+            <button
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({ title: iWon ? `Victoire ${myScore}-${theirScore} !` : `Défaite ${myScore}-${theirScore}`, text: 'Je viens de jouer un duel sur WorldSquad !' }).catch(() => {})
+                }
+              }}
+              className="px-4 py-3.5 rounded-xl border border-white/10 text-gray-400 hover:text-white transition-colors"
+            >
+              <Share2 size={16} />
+            </button>
+          </>
+        )}
       </motion.div>
 
       <div className="flex gap-4 text-center text-xs text-gray-700">
