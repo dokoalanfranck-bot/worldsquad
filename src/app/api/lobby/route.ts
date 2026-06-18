@@ -3,16 +3,26 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const BOT_POOL = [
-  { botName: 'Karim_77',    nation: 'France'    },
-  { botName: 'DiazXI',      nation: 'Brazil'    },
-  { botName: 'Haaland_9',   nation: 'Germany'   },
-  { botName: 'Torres_FC',   nation: 'Spain'     },
-  { botName: 'KDB_Eight',   nation: 'Belgium'   },
-  { botName: 'VinJr_7',     nation: 'Brazil'    },
-  { botName: 'LukaM_10',    nation: 'Croatia'   },
-  { botName: 'Bellingham8', nation: 'England'   },
-  { botName: 'SalahEG',     nation: 'Morocco'   },
-  { botName: 'Pedri6',      nation: 'Spain'     },
+  { botName: 'Shadow_X42',   nation: 'France'       },
+  { botName: 'NightWolf7',   nation: 'Brazil'       },
+  { botName: 'CobraZone',    nation: 'Argentina'    },
+  { botName: 'GhostV10',     nation: 'Portugal'     },
+  { botName: 'BlueStar22',   nation: 'Morocco'      },
+  { botName: 'TigerBoy33',   nation: 'Senegal'      },
+  { botName: 'FlashZero',    nation: 'England'      },
+  { botName: 'DarkFox21',    nation: 'Spain'        },
+  { botName: 'CometXI',      nation: 'Germany'      },
+  { botName: 'AceFire99',    nation: 'Netherlands'  },
+  { botName: 'KingSolo88',   nation: 'Ivory Coast'  },
+  { botName: 'ProZone_55',   nation: 'Japan'        },
+  { botName: 'NovaStar3',    nation: 'USA'          },
+  { botName: 'CrownKing77',  nation: 'Belgium'      },
+  { botName: 'SpeedForce',   nation: 'Colombia'     },
+  { botName: 'IronWave_9',   nation: 'Croatia'      },
+  { botName: 'StormBolt',    nation: 'Mexico'       },
+  { botName: 'RedPhoenix',   nation: 'Poland'       },
+  { botName: 'ZeroGravX',    nation: 'South Korea'  },
+  { botName: 'LegendOf7',    nation: 'Cameroon'     },
 ]
 
 function getBotsForMode(mode: string): typeof BOT_POOL {

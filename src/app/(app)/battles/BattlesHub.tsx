@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Swords, ChevronRight, Layers, Radio, Gift,
   TrendingUp, TrendingDown, Minus, Check, X, Clock,
-  Users, Bot, Shield, Zap, LogOut,
+  Users, Shield, LogOut,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -87,21 +87,13 @@ function ChallengeModal({
       >
         {/* Header */}
         <div className="flex items-center gap-4">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${target.isBot ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-[#F5C518]/15 border border-[#F5C518]/30'}`}>
-            {target.isBot
-              ? <Bot size={26} className="text-purple-400" />
-              : <span className="text-2xl font-black text-[#F5C518]">{target.pseudo[0]?.toUpperCase()}</span>
-            }
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[#F5C518]/15 border border-[#F5C518]/30">
+            <span className="text-2xl font-black text-[#F5C518]">{target.pseudo[0]?.toUpperCase()}</span>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <p className="text-white font-black text-xl" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                {target.pseudo}
-              </p>
-              {target.isBot && (
-                <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 text-[9px] font-bold uppercase">BOT</span>
-              )}
-            </div>
+            <p className="text-white font-black text-xl" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              {target.pseudo}
+            </p>
             <p className="text-white/40 text-sm">{flag(target.nation)} {target.nation}</p>
           </div>
         </div>
@@ -159,9 +151,7 @@ function ChallengeModal({
           >
             {loading
               ? <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-              : target.isBot
-                ? <><Zap size={16} /> JOUER</>
-                : <><Swords size={16} /> DÉFIER</>
+              : <><Swords size={16} /> DÉFIER</>
             }
           </motion.button>
         </div>
@@ -183,26 +173,18 @@ function LobbyCard({ player, mode, onChallenge }: {
       className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-colors ${
         player.isSelf
           ? 'border-[#F5C518]/30 bg-[#F5C518]/8'
-          : player.isBot
-            ? 'border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10'
-            : 'border-white/8 bg-white/3 hover:bg-white/6'
+          : 'border-white/8 bg-white/3 hover:bg-white/6'
       }`}
     >
       {/* Avatar */}
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-        player.isBot ? 'bg-purple-500/20' : 'bg-white/10'
-      }`}>
-        {player.isBot
-          ? <Bot size={18} className="text-purple-400" />
-          : <span className="text-white font-black text-sm">{player.pseudo[0]?.toUpperCase()}</span>
-        }
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/10">
+        <span className="text-white font-black text-sm">{player.pseudo[0]?.toUpperCase()}</span>
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-white font-bold text-sm truncate">{player.pseudo}</p>
-          {player.isBot && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 font-bold uppercase flex-shrink-0">BOT</span>}
           {player.isSelf && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[#F5C518]/20 text-[#F5C518] font-bold uppercase flex-shrink-0">TOI</span>}
         </div>
         <p className="text-white/30 text-xs">{flag(player.nation)} {player.nation}</p>
@@ -212,13 +194,9 @@ function LobbyCard({ player, mode, onChallenge }: {
       {!player.isSelf && (
         <button
           onClick={() => onChallenge(player)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-            player.isBot
-              ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
-              : 'bg-[#F5C518]/15 text-[#F5C518] hover:bg-[#F5C518]/25'
-          }`}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all bg-[#F5C518]/15 text-[#F5C518] hover:bg-[#F5C518]/25"
         >
-          {player.isBot ? <><Zap size={11} /> Jouer</> : <><Swords size={11} /> Défier</>}
+          <><Swords size={11} /> Défier</>
         </button>
       )}
     </motion.div>
@@ -617,7 +595,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [] }: {
             <div className="p-3 space-y-2">
               {visibleLobby.length === 0 ? (
                 <div className="text-center py-8">
-                  <Bot size={24} className="text-white/15 mx-auto mb-2" />
+                  <Users size={24} className="text-white/15 mx-auto mb-2" />
                   <p className="text-white/20 text-sm">Aucun joueur disponible</p>
                   <p className="text-white/10 text-xs mt-1">Rejoins le lobby pour être visible</p>
                 </div>
