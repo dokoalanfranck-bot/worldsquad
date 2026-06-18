@@ -50,10 +50,11 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
   const duelRef = useRef(duel)
   useEffect(() => { duelRef.current = duel }, [duel])
 
-  const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'stealing' | 'result' | 'cancelled'>(() => {
+  const [view, setView] = useState<'waiting' | 'picking' | 'animation' | 'stealing' | 'tiebreak' | 'result' | 'cancelled'>(() => {
     if (initialDuel.status === 'cancelled') return 'cancelled'
     if (initialDuel.status === 'finished') return 'result'
     if (initialDuel.status === 'stealing') return 'stealing'
+    if (initialDuel.status === 'tiebreak') return 'tiebreak'
     if (initialDuel.status === 'picking') return 'picking'
     return 'waiting'
   })
@@ -92,8 +93,7 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
             return
           }
           if (s === 'picking' && v === 'waiting') setView('picking')
-          if ((s === 'stealing' || s === 'finished') && v === 'picking') {
-            // Forfeit: status jumped to stealing, current user is winner, no score (no simulation ran)
+          if ((s === 'stealing' || s === 'finished' || s === 'tiebreak') && v === 'picking') {
             const isForfeitWin = s === 'stealing' && (updated as Duel).winner_id === currentUserId && (updated as Duel).challenger_score == null
             if (isForfeitWin) {
               toast('Victoire ! L\'adversaire a abandonné', { icon: '🏆' })
@@ -102,6 +102,7 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
               setView('animation')
             }
           }
+          if (s === 'tiebreak' && v === 'animation') setView('tiebreak')
           if (s === 'finished' && v === 'stealing') setView('result')
         })
       .subscribe()
@@ -123,18 +124,20 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
           return
         }
         if (data.status === 'picking'  && view === 'waiting')  setView('picking')
-        if ((data.status === 'stealing' || data.status === 'finished') && view === 'picking') setView('animation')
+        if ((data.status === 'stealing' || data.status === 'finished' || data.status === 'tiebreak') && view === 'picking') setView('animation')
+        if (data.status === 'tiebreak' && view === 'animation') setView('tiebreak')
         if (data.status === 'finished' && view === 'stealing') setView('result')
       } catch { /* réseau */ }
     }, 3000)
     return () => clearInterval(poll)
   }, [duel.id, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // animation → stealing/result after 32s (30s match + 2s buffer)
+  // animation → stealing/tiebreak/result after 32s (30s match + 2s buffer)
   useEffect(() => {
     if (view !== 'animation') return
     const t = setTimeout(() => {
       if (duelRef.current.status === 'stealing') setView('stealing')
+      else if (duelRef.current.status === 'tiebreak') setView('tiebreak')
       else setView('result')
     }, 32000)
     return () => clearTimeout(t)
@@ -243,6 +246,9 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
         )}
         {view === 'animation' && (
           <AnimationView key="animation" duel={duel} isChallenger={isChallenger} me={me} them={them} />
+        )}
+        {view === 'tiebreak' && (
+          <TiebreakView key="tiebreak" duel={duel} />
         )}
         {view === 'stealing' && (
           <StealingView key="stealing" duel={duel} currentUserId={currentUserId} onDone={() => setView('result')} />
@@ -834,6 +840,94 @@ function MatchPitch({ ballPos, challengerPseudo, opponentPseudo }: {
         style={{ width: 14, height: 14, background: 'radial-gradient(circle at 35% 35%, #ffffff, #cccccc)', boxShadow: '0 0 10px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.5)', zIndex: 20 }}
       />
     </div>
+  )
+}
+
+// ── TiebreakView ─────────────────────────────────────────────────────────────
+
+function TiebreakView({ duel }: { duel: Duel }) {
+  const router = useRouter()
+  const penaltyId = duel.tiebreak_battle_id as string | null
+
+  useEffect(() => {
+    if (penaltyId) {
+      const t = setTimeout(() => router.push(`/battles/penalty/${penaltyId}`), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [penaltyId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 22 }}
+      className="min-h-screen flex flex-col items-center justify-center px-4 gap-6 max-w-sm mx-auto"
+    >
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.1 }}
+        className="w-24 h-24 rounded-3xl bg-orange-500/10 flex items-center justify-center"
+        style={{ boxShadow: '0 0 40px rgba(249,115,22,0.25)' }}
+      >
+        <span className="text-5xl">⚽</span>
+      </motion.div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="text-5xl font-black text-orange-400 text-center"
+        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+      >
+        ÉGALITÉ !
+      </motion.h2>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="text-white/60 text-sm text-center"
+      >
+        Scores identiques — départage aux tirs au but
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, type: 'spring' }}
+        className="glass rounded-2xl p-4 flex items-center gap-3 w-full border border-orange-500/20"
+      >
+        <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+          <Zap size={20} className="text-orange-400" />
+        </div>
+        <div>
+          <p className="text-white font-bold text-sm">Tirs au but</p>
+          <p className="text-white/50 text-xs">Tes 3 tireurs et ton gardien ont été sélectionnés automatiquement</p>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="w-full"
+      >
+        {penaltyId ? (
+          <button
+            onClick={() => router.push(`/battles/penalty/${penaltyId}`)}
+            className="w-full bg-orange-500 text-white font-black py-4 rounded-xl text-lg flex items-center justify-center gap-2"
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+          >
+            <Zap size={20} /> JOUER LES TIRS AU BUT
+          </button>
+        ) : (
+          <div className="flex justify-center">
+            <div className="w-8 h-8 border-2 border-orange-400/40 border-t-orange-400 rounded-full animate-spin" />
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   )
 }
 

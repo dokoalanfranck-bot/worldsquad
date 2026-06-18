@@ -42,6 +42,8 @@ interface PenaltyBattle {
   winner_id: string | null
   stake_count: number
   stolen_card_ids: string[] | null
+  tournament_id?: string | null
+  tournament_duel_id?: string | null
 }
 
 interface Props {
@@ -1143,12 +1145,20 @@ function FinishedView({
   const theirScore = isChallenger ? battle.opponent_score : battle.challenger_score
   const them = isChallenger ? opponent : challenger
   const stolenIds = battle.stolen_card_ids ?? []
+  const isTiebreak = !!battle.tournament_id
 
   const relevantPicks = (battle.winner_id === battle.challenger_id
     ? battle.opponent_picks : battle.challenger_picks) as PickEntry[] | null
   const stolenCards = (relevantPicks ?? []).filter((c) => stolenIds.includes(c.id))
 
   const [revengeLoading, setRevengeLoading] = useState(false)
+
+  useEffect(() => {
+    if (isTiebreak) {
+      const t = setTimeout(() => router.push(`/battles/tournament/${battle.tournament_id}`), 2500)
+      return () => clearTimeout(t)
+    }
+  }, [isTiebreak]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function startRevenge() {
     setRevengeLoading(true)
@@ -1202,15 +1212,25 @@ function FinishedView({
       )}
 
       <div className="flex gap-3 w-full max-w-sm">
-        <button onClick={() => router.push('/battles')}
-          className="flex-1 py-3 rounded-xl bg-white/5 text-white/60 font-bold text-sm">
-          Retour
-        </button>
-        <button onClick={startRevenge} disabled={revengeLoading}
-          className="flex-1 py-3 rounded-xl bg-green-500 text-black font-black text-sm disabled:opacity-50"
-          style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-          {revengeLoading ? '…' : '⚽ REVANCHE'}
-        </button>
+        {isTiebreak ? (
+          <button onClick={() => router.push(`/battles/tournament/${battle.tournament_id}`)}
+            className="flex-1 py-3 rounded-xl bg-orange-500 text-white font-black text-sm"
+            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+            🏆 RETOUR AU TOURNOI
+          </button>
+        ) : (
+          <>
+            <button onClick={() => router.push('/battles')}
+              className="flex-1 py-3 rounded-xl bg-white/5 text-white/60 font-bold text-sm">
+              Retour
+            </button>
+            <button onClick={startRevenge} disabled={revengeLoading}
+              className="flex-1 py-3 rounded-xl bg-green-500 text-black font-black text-sm disabled:opacity-50"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              {revengeLoading ? '…' : '⚽ REVANCHE'}
+            </button>
+          </>
+        )}
       </div>
     </motion.div>
   )

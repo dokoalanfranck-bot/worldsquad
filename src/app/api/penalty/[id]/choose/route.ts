@@ -142,6 +142,7 @@ export async function POST(
     const panenkaUpdate: Record<string, boolean> = {}
     if (choice === 'panenka') panenkaUpdate.challenger_used_panenka = true
 
+    const isTiebreakBot = !!(battle as Record<string, unknown>).tournament_duel_id
     await admin.from('penalty_battles').update({
       current_round: battle.current_round + 1,
       challenger_score: newCScore,
@@ -149,10 +150,15 @@ export async function POST(
       rounds: newRounds,
       round_deadline: over ? null : new Date(Date.now() + 15000).toISOString(),
       winner_id: winnerId,
-      status: over ? 'stealing' : 'active',
+      status: over ? (isTiebreakBot ? 'finished' : 'stealing') : 'active',
       ...panenkaUpdate,
       updated_at: new Date().toISOString(),
     }).eq('id', battleId).eq('current_round', battle.current_round)
+
+    if (over && isTiebreakBot && winnerId) {
+      const tdId = (battle as Record<string, unknown>).tournament_duel_id as string
+      await admin.from('duels').update({ winner_id: winnerId, status: 'finished' }).eq('id', tdId)
+    }
 
     return NextResponse.json({ submitted: true, resolved: true, isGoal, roundResult })
   }
@@ -234,6 +240,7 @@ export async function POST(
   const nextRound = battle.current_round + 1
   const nextDeadline = over ? null : new Date(Date.now() + 15000).toISOString()
 
+  const isTiebreak = !!(battle as Record<string, unknown>).tournament_duel_id
   const { data: updated } = await admin
     .from('penalty_battles')
     .update({
@@ -243,7 +250,7 @@ export async function POST(
       rounds: newRounds,
       round_deadline: nextDeadline,
       winner_id: winnerId ?? null,
-      status: over ? 'stealing' : 'active',
+      status: over ? (isTiebreak ? 'finished' : 'stealing') : 'active',
       ...panenkaUpdate,
       updated_at: new Date().toISOString(),
     })
@@ -253,6 +260,11 @@ export async function POST(
 
   if (!updated || updated.length === 0) {
     return NextResponse.json({ submitted: true, resolved: false })
+  }
+
+  if (over && isTiebreak && winnerId) {
+    const tdId = (battle as Record<string, unknown>).tournament_duel_id as string
+    await admin.from('duels').update({ winner_id: winnerId, status: 'finished' }).eq('id', tdId)
   }
 
   return NextResponse.json({ submitted: true, resolved: true, isGoal, roundResult })

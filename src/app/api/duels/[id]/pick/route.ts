@@ -84,11 +84,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const oppId   = duel.opponent_id as string | null
     const botWon  = !!duel.is_bot && opponentScore > challengerScore
 
-    const winnerId: string | null = challengerScore > opponentScore
+    let winnerId: string | null = challengerScore > opponentScore
       ? challId
       : opponentScore > challengerScore && oppId
         ? oppId
         : null
+
+    // Tournoi + égalité → tirs au but automatiques
+    if (!winnerId && !botWon && duel.tournament_id) {
+      if (duel.is_bot) {
+        winnerId = challId
+      } else if (duel.opponent_id) {
+        const challPenPicks = [challengerPicks[0], challengerPicks[1], challengerPicks[2], challengerPicks[4]]
+        const oppPenPicks   = [opponentPicks[0],   opponentPicks[1],   opponentPicks[2],   opponentPicks[4]]
+        const { data: pb } = await admin.from('penalty_battles').insert({
+          challenger_id:      duel.challenger_id,
+          opponent_id:        duel.opponent_id,
+          status:             'active',
+          challenger_picks:   challPenPicks,
+          opponent_picks:     oppPenPicks,
+          round_deadline:     new Date(Date.now() + 15000).toISOString(),
+          stake_count:        0,
+          tournament_duel_id: duelId,
+          tournament_id:      duel.tournament_id,
+        }).select('id').single()
+        if (pb) {
+          await admin.from('duels').update({
+            match_events:       events,
+            challenger_score:   challengerScore,
+            opponent_score:     opponentScore,
+            winner_id:          null,
+            stolen_card_ids:    [],
+            status:             'tiebreak',
+            tiebreak_battle_id: pb.id,
+          }).eq('id', duelId)
+          return NextResponse.json({ success: true })
+        }
+      }
+    }
 
     // Cards the winner can steal = loser's played cards
     const loserPicks = winnerId === challId ? opponentPicks : challengerPicks
