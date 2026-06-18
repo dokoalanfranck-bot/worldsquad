@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload, Users, Tv } from 'lucide-react'
+import { Play, Square, Plus, Zap, Bell, Clock, RotateCcw, ChevronDown, ChevronUp, Video, Save, Loader2, Eye, Monitor, ExternalLink, RefreshCw, Upload, Users, Tv, Search, Check } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -466,6 +467,194 @@ function StreamPanel() {
   )
 }
 
+// ── Player picker ─────────────────────────────────────────────────────────────
+
+interface PlayerOption {
+  id: string
+  name: string
+  rarity: string
+  nation: string
+  stats: Record<string, number | string>
+}
+
+const RARITY_COLOR: Record<string, string> = {
+  Legend: '#F5C518',
+  Epic:   '#A855F7',
+  Rare:   '#00D4FF',
+  Common: '#9CA3AF',
+}
+const RARITY_ORDER: Record<string, number> = { Legend: 4, Epic: 3, Rare: 2, Common: 1 }
+
+function FallbackScorerInput({ team: _team, onConfirm, onCancel }: {
+  team: 'a' | 'b'; onConfirm: (name: string) => void; onCancel: () => void
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => { ref.current?.focus() }, [])
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+      className="mx-5 mb-3 flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-[#F5C518]/30"
+    >
+      <span className="text-lg">⚽</span>
+      <input
+        ref={ref}
+        onKeyDown={(e) => { if (e.key === 'Enter') onConfirm((e.target as HTMLInputElement).value.trim()) }}
+        placeholder="Nom du buteur (facultatif)"
+        className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/30"
+      />
+      <button
+        onClick={() => onConfirm(ref.current?.value.trim() ?? '')}
+        className="px-3 py-1 rounded-lg bg-[#F5C518] text-black text-xs font-black"
+      >✓ Confirmer</button>
+      <button onClick={onCancel} className="text-white/30 hover:text-white/60 text-xs px-2">✕</button>
+    </motion.div>
+  )
+}
+
+function ScorerPicker({
+  teamA, teamB, flagA, flagB, defaultTeam, players, onConfirm, onCancel,
+}: {
+  teamA: string; teamB: string; flagA: string | null; flagB: string | null
+  defaultTeam: 'a' | 'b'
+  players: PlayerOption[]
+  onConfirm: (name: string) => void
+  onCancel: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const [tab, setTab] = useState<'all' | 'a' | 'b'>(defaultTeam)
+
+  const sorted = [...players]
+    .filter((p) => String(p.stats?.position ?? '').toUpperCase() !== 'COACH')
+    .sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0) || a.name.localeCompare(b.name))
+
+  const filtered = sorted
+    .filter((p) => tab === 'all' ? true : tab === 'a' ? p.nation === teamA : p.nation === teamB)
+    .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+
+  const listA = filtered.filter((p) => p.nation === teamA)
+  const listB = filtered.filter((p) => p.nation === teamB)
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl border-t border-white/10 flex flex-col"
+        style={{ background: 'var(--bg-elevated)', maxHeight: '78vh', paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+
+        {/* Header */}
+        <div className="px-5 pt-1 pb-3 flex-shrink-0 flex items-start justify-between">
+          <div>
+            <p className="text-[10px] text-white/25 uppercase tracking-widest mb-0.5">⚽ Enregistrer le but</p>
+            <h3 className="text-2xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+              QUI A MARQUÉ ?
+            </h3>
+          </div>
+          <button
+            onClick={() => onConfirm('')}
+            className="mt-1 px-3 py-1.5 rounded-lg bg-white/5 text-white/40 text-xs hover:text-white/60 transition-colors"
+          >
+            Inconnu
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 pb-2 flex-shrink-0">
+          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8 focus-within:border-white/20 transition-colors">
+            <Search size={13} className="text-white/30 flex-shrink-0" />
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un joueur…"
+              className="flex-1 bg-transparent text-white placeholder-white/25 text-sm focus:outline-none"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="text-white/30 hover:text-white/50 text-sm leading-none">×</button>
+            )}
+          </div>
+        </div>
+
+        {/* Team tabs */}
+        <div className="px-4 pb-3 flex gap-2 flex-shrink-0">
+          {([
+            { id: 'all', label: 'Tous' },
+            { id: 'a',   label: `${flagA ?? '🏳'} ${teamA}` },
+            { id: 'b',   label: `${flagB ?? '🏳'} ${teamB}` },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                tab === t.id ? 'bg-[#F5C518] text-black' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Player list */}
+        <div className="overflow-y-auto px-4 pb-2 space-y-4">
+          {filtered.length === 0 ? (
+            <p className="text-white/20 text-sm text-center py-10">Aucun joueur trouvé</p>
+          ) : (
+            [
+              { team: teamA, flag: flagA ?? '🏳', list: listA },
+              { team: teamB, flag: flagB ?? '🏳', list: listB },
+            ]
+              .filter((g) => g.list.length > 0)
+              .map(({ team, flag, list }) => (
+                <div key={team}>
+                  <p className="text-white/20 text-[10px] uppercase tracking-widest mb-2 font-bold">{flag} {team}</p>
+                  <div className="space-y-0.5">
+                    {list.map((p) => {
+                      const pos = String(p.stats?.position ?? '').toUpperCase()
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => onConfirm(p.name)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:bg-white/5 transition-all text-left"
+                        >
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: RARITY_COLOR[p.rarity] ?? '#9CA3AF' }}
+                          />
+                          <span className="flex-1 text-sm font-semibold truncate text-white">{p.name}</span>
+                          {pos && pos !== 'COACH' && (
+                            <span className="text-white/20 text-[10px] font-mono tabular-nums flex-shrink-0">{pos}</span>
+                          )}
+                          <Check size={14} className="text-white/10 flex-shrink-0" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
+// ── Match types ───────────────────────────────────────────────────────────────
+
 interface Match {
   id: string
   team_a: string
@@ -496,6 +685,7 @@ interface Props {
   initialLive: Match[]
   initialUpcoming: Match[]
   cronEnabled: boolean
+  players: PlayerOption[]
 }
 
 const LS_KEY = (id: string) => `live_ctrl_${id}`
@@ -531,22 +721,19 @@ function useMatchMinute(state: MatchState): number {
 function LiveMatchCard({
   match,
   onFinish,
+  allPlayers,
 }: {
   match: Match
   onFinish: (id: string) => void
+  allPlayers: PlayerOption[]
 }) {
   const [pending, setPending] = useState(false)
   const [scores, setScores] = useState({ a: match.score_a ?? 0, b: match.score_b ?? 0 })
   const [scorerInput, setScorerInput] = useState<{ team: 'a' | 'b' } | null>(null)
-  const [scorerName, setScorerName] = useState('')
   const [matchState, setMatchState] = useState<MatchState>(() => loadMatchState(match.id, Date.now()))
   const [showEvents, setShowEvents] = useState(false)
   const minute = useMatchMinute(matchState)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (scorerInput && inputRef.current) inputRef.current.focus()
-  }, [scorerInput])
+  const matchPlayers = allPlayers.filter((p) => p.nation === match.team_a || p.nation === match.team_b)
 
   function updateState(updater: (s: MatchState) => MatchState) {
     setMatchState((prev) => {
@@ -572,10 +759,10 @@ function LiveMatchCard({
     }
   }
 
-  async function confirmGoal(team: 'a' | 'b') {
-    const scorer = scorerName.trim() || 'Inconnu'
+  async function confirmGoal(team: 'a' | 'b', pickedName?: string) {
+    const scorerRaw = pickedName ?? ''
+    const scorer = scorerRaw || 'Inconnu'
     setScorerInput(null)
-    setScorerName('')
 
     const newA = team === 'a' ? scores.a + 1 : scores.a
     const newB = team === 'b' ? scores.b + 1 : scores.b
@@ -583,7 +770,7 @@ function LiveMatchCard({
 
     updateState((s) => ({
       ...s,
-      events: [...s.events, { minute, team, scorer: scorerName.trim() || '' }],
+      events: [...s.events, { minute, team, scorer: scorerRaw }],
     }))
 
     toast.success(`⚽ But de ${scorer} (${minute}')`, { icon: '⚽' })
@@ -591,7 +778,7 @@ function LiveMatchCard({
     await patchMatch({
       score_a: newA,
       score_b: newB,
-      _scorer: scorerName.trim() || undefined,
+      _scorer: scorerRaw || undefined,
     })
   }
 
@@ -660,32 +847,29 @@ function LiveMatchCard({
         </div>
       </div>
 
-      {/* Scorer input */}
-      {scorerInput && (
-        <div className="mx-5 mb-3 flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-[#F5C518]/30">
-          <span className="text-lg">⚽</span>
-          <input
-            ref={inputRef}
-            value={scorerName}
-            onChange={(e) => setScorerName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && confirmGoal(scorerInput.team)}
-            placeholder="Nom du buteur (facultatif)"
-            className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/30"
+      {/* Scorer picker */}
+      <AnimatePresence>
+        {scorerInput && matchPlayers.length > 0 && (
+          <ScorerPicker
+            key={scorerInput.team}
+            teamA={match.team_a}
+            teamB={match.team_b}
+            flagA={match.flag_a}
+            flagB={match.flag_b}
+            defaultTeam={scorerInput.team}
+            players={matchPlayers}
+            onConfirm={(name) => confirmGoal(scorerInput.team, name)}
+            onCancel={() => setScorerInput(null)}
           />
-          <button
-            onClick={() => confirmGoal(scorerInput.team)}
-            className="px-3 py-1 rounded-lg bg-[#F5C518] text-black text-xs font-black"
-          >
-            ✓ Confirmer
-          </button>
-          <button
-            onClick={() => { setScorerInput(null); setScorerName('') }}
-            className="text-white/30 hover:text-white/60 text-xs px-2"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+        )}
+        {scorerInput && matchPlayers.length === 0 && (
+          <FallbackScorerInput
+            team={scorerInput.team}
+            onConfirm={(name) => confirmGoal(scorerInput!.team, name)}
+            onCancel={() => setScorerInput(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Score controls */}
       <div className="grid grid-cols-3 gap-3 px-5 pb-3">
@@ -783,7 +967,7 @@ function LiveMatchCard({
   )
 }
 
-export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled }: Props) {
+export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled, players }: Props) {
   const supabase = createClient()
   const [live, setLive] = useState<Match[]>(initialLive)
   const [upcoming, setUpcoming] = useState<Match[]>(initialUpcoming)
@@ -872,7 +1056,7 @@ export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled }:
         ) : (
           <div className="space-y-4">
             {live.map((match) => (
-              <LiveMatchCard key={match.id} match={match} onFinish={handleFinish} />
+              <LiveMatchCard key={match.id} match={match} onFinish={handleFinish} allPlayers={players} />
             ))}
           </div>
         )}

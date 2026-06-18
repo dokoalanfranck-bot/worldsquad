@@ -30,6 +30,17 @@ export default async function LiveControlPage() {
     .order('match_date', { ascending: true })
     .limit(10)
 
+  // Joueurs des matchs en direct (pour le picker de buteur)
+  const liveNations = Array.from(new Set((liveMatches ?? []).flatMap((m) => [m.team_a, m.team_b])))
+  const { data: players } = liveNations.length > 0
+    ? await admin
+        .from('cards')
+        .select('id, name, rarity, stats, nation')
+        .eq('type', 'player')
+        .in('nation', liveNations)
+        .order('name')
+    : { data: [] }
+
   const cronEnabled = !!process.env.RAPIDAPI_KEY
 
   return (
@@ -38,6 +49,7 @@ export default async function LiveControlPage() {
         initialLive={liveMatches ?? []}
         initialUpcoming={upcomingMatches ?? []}
         cronEnabled={cronEnabled}
+        players={players ?? []}
       />
     </div>
   )

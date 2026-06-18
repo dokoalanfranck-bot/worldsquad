@@ -8,7 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 interface PendingChallenge {
-  duelId: string
+  id: string
+  mode: 'duel' | 'penalty'
   challengerPseudo: string
   challengerNation: string
   stakeCount: number
@@ -27,18 +28,29 @@ export function ChallengeListener({ userId }: { userId: string }) {
   const [challenge, setChallenge] = useState<PendingChallenge | null>(null)
   const [loading, setLoading] = useState<'accept' | 'decline' | null>(null)
 
-  async function resolveChallenge(duelId: string, challengerId: string, stakeCount: number) {
+  async function resolveDuel(duelId: string, challengerId: string, stakeCount: number) {
     const { data } = await supabase
       .from('users')
       .select('pseudo, nation')
       .eq('id', challengerId)
       .single()
     if (data) {
-      setChallenge({ duelId, challengerPseudo: data.pseudo, challengerNation: data.nation, stakeCount: stakeCount ?? 1 })
+      setChallenge({ id: duelId, mode: 'duel', challengerPseudo: data.pseudo, challengerNation: data.nation, stakeCount: stakeCount ?? 1 })
     }
   }
 
-  // Check for pending invites on mount (user opened app while challenge was waiting)
+  async function resolvePenalty(battleId: string, challengerId: string, stakeCount: number) {
+    const { data } = await supabase
+      .from('users')
+      .select('pseudo, nation')
+      .eq('id', challengerId)
+      .single()
+    if (data) {
+      setChallenge({ id: battleId, mode: 'penalty', challengerPseudo: data.pseudo, challengerNation: data.nation, stakeCount: stakeCount ?? 1 })
+    }
+  }
+
+  // Vérifier les duels en attente au chargement
   useEffect(() => {
     let cancelled = false
     async function checkPending() {
@@ -51,23 +63,59 @@ export function ChallengeListener({ userId }: { userId: string }) {
         .limit(1)
         .maybeSingle()
       if (!cancelled && data) {
-        await resolveChallenge(data.id, data.challenger_id, data.stake_count ?? 1)
+        await resolveDuel(data.id, data.challenger_id, data.stake_count ?? 1)
       }
     }
     checkPending()
     return () => { cancelled = true }
   }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Realtime: new invited duel where I'm the opponent
+  // Vérifier les penalty battles en attente au chargement
+  useEffect(() => {
+    let cancelled = false
+    async function checkPendingPenalty() {
+      const { data } = await supabase
+        .from('penalty_battles')
+        .select('id, challenger_id, stake_count')
+        .eq('opponent_id', userId)
+        .eq('status', 'invited')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!cancelled && data && !challenge) {
+        await resolvePenalty(data.id, data.challenger_id, data.stake_count ?? 1)
+      }
+    }
+    checkPendingPenalty()
+    return () => { cancelled = true }
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime : nouveau défi duel
   useEffect(() => {
     const ch = supabase
-      .channel(`challenge-listener-${userId}`)
+      .channel(`challenge-listener-duel-${userId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'duels', filter: `opponent_id=eq.${userId}` },
         async ({ new: row }) => {
           if (row.status !== 'invited') return
-          await resolveChallenge(row.id, row.challenger_id, row.stake_count ?? 1)
+          await resolveDuel(row.id, row.challenger_id, row.stake_count ?? 1)
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime : nouveau défi penalty
+  useEffect(() => {
+    const ch = supabase
+      .channel(`challenge-listener-penalty-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'penalty_battles', filter: `opponent_id=eq.${userId}` },
+        async ({ new: row }) => {
+          if (row.status !== 'invited') return
+          await resolvePenalty(row.id, row.challenger_id, row.stake_count ?? 1)
         }
       )
       .subscribe()
@@ -78,10 +126,16 @@ export function ChallengeListener({ userId }: { userId: string }) {
     if (!challenge || loading) return
     setLoading('accept')
     try {
-      const res = await fetch(`/api/duels/${challenge.duelId}/accept-invite`, { method: 'POST' })
+      const url = challenge.mode === 'penalty'
+        ? `/api/penalty/${challenge.id}/accept-invite`
+        : `/api/duels/${challenge.id}/accept-invite`
+      const res = await fetch(url, { method: 'POST' })
       if (!res.ok) { toast.error('Invitation expirée'); setChallenge(null); return }
       setChallenge(null)
-      router.push(`/battles/duel/${challenge.duelId}`)
+      const dest = challenge.mode === 'penalty'
+        ? `/battles/penalty/${challenge.id}`
+        : `/battles/duel/${challenge.id}`
+      router.push(dest)
     } catch {
       toast.error('Erreur réseau')
     } finally {
@@ -93,11 +147,16 @@ export function ChallengeListener({ userId }: { userId: string }) {
     if (!challenge || loading) return
     setLoading('decline')
     try {
-      await fetch(`/api/duels/${challenge.duelId}/decline-invite`, { method: 'POST' })
+      const url = challenge.mode === 'penalty'
+        ? `/api/penalty/${challenge.id}/decline-invite`
+        : `/api/duels/${challenge.id}/decline-invite`
+      await fetch(url, { method: 'POST' })
       setChallenge(null)
     } catch { /* ignore */ }
     finally { setLoading(null) }
   }
+
+  const isPenalty = challenge?.mode === 'penalty'
 
   return (
     <AnimatePresence>
@@ -133,12 +192,14 @@ export function ChallengeListener({ userId }: { userId: string }) {
                     transition={{ duration: 1.8, delay: i * 0.55, repeat: Infinity }}
                   />
                 ))}
-                <div className="absolute inset-0 rounded-full bg-[#F5C518]/10 border border-[#F5C518]/30 flex items-center justify-center">
-                  <Swords size={32} className="text-[#F5C518]" />
+                <div className="absolute inset-0 rounded-full bg-[#F5C518]/10 border border-[#F5C518]/30 flex items-center justify-center text-3xl">
+                  {isPenalty ? '⚽' : <Swords size={32} className="text-[#F5C518]" />}
                 </div>
               </div>
 
-              <p className="text-center text-xs text-gray-500 uppercase tracking-widest mb-1">Défi reçu ⚔️</p>
+              <p className="text-center text-xs text-gray-500 uppercase tracking-widest mb-1">
+                {isPenalty ? 'Défi Tirs au but ⚽' : 'Défi Battle reçu ⚔️'}
+              </p>
               <h2
                 className="text-center text-3xl font-black text-white mb-1"
                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}
@@ -146,10 +207,10 @@ export function ChallengeListener({ userId }: { userId: string }) {
                 {NATION_FLAGS[challenge.challengerNation] ?? '🌍'} {challenge.challengerPseudo}
               </h2>
               <p className="text-center text-gray-400 text-sm mb-6">
-                te défie pour{' '}
-                <span className="text-[#F5C518] font-bold">
-                  {challenge.stakeCount} carte{challenge.stakeCount > 1 ? 's' : ''}
-                </span>
+                {isPenalty
+                  ? 'te défie aux tirs au but !'
+                  : <>te défie pour{' '}<span className="text-[#F5C518] font-bold">{challenge.stakeCount} carte{challenge.stakeCount > 1 ? 's' : ''}</span></>
+                }
               </p>
 
               <div className="flex gap-3">

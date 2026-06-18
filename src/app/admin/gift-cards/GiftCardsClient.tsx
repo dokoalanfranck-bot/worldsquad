@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Send, Gift, CheckCircle, ChevronDown } from 'lucide-react'
+import { Search, X, Send, Gift, CheckCircle, ChevronDown, History, RefreshCw } from 'lucide-react'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
 
@@ -11,6 +11,14 @@ interface UserResult {
 }
 interface CardResult {
   id: string; name: string; rarity: string; image_url: string | null; nation: string | null; type: string
+}
+interface GiftRecord {
+  id: string
+  recipient: { id: string; pseudo: string; nation: string }
+  admin: { id: string; pseudo: string; nation: string }
+  cards: { id: string; name: string; rarity: string }[]
+  reason: string | null
+  created_at: string
 }
 
 const RARITY_STYLE: Record<string, { border: string; glow: string; badge: string; dot: string }> = {
@@ -37,6 +45,19 @@ function useDebounce<T>(value: T, delay = 300): T {
 }
 
 export function GiftCardsClient() {
+  const [history, setHistory] = useState<GiftRecord[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    try {
+      const res = await fetch('/api/admin/gift-cards?type=history')
+      if (res.ok) setHistory(await res.json())
+    } finally { setHistoryLoading(false) }
+  }, [])
+
+  useEffect(() => { loadHistory() }, [loadHistory])
+
   const [userQuery, setUserQuery] = useState('')
   const [userResults, setUserResults] = useState<UserResult[]>([])
   const [selectedUser, setSelectedUser] = useState<UserResult | null>(null)
@@ -95,6 +116,7 @@ export function GiftCardsClient() {
       toast.success(`${selectedCards.length} carte${selectedCards.length > 1 ? 's' : ''} envoyée${selectedCards.length > 1 ? 's' : ''} à ${selectedUser.pseudo} !`)
       setSelectedCards([])
       setReason('')
+      loadHistory()
     } catch { toast.error('Erreur réseau') }
     finally { setSending(false) }
   }
@@ -364,6 +386,72 @@ export function GiftCardsClient() {
             </motion.button>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Section historique */}
+      <div className="glass rounded-2xl border border-white/5 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400">
+              <History size={13} />
+            </div>
+            <p className="text-white font-bold">Historique des envois</p>
+          </div>
+          <button
+            onClick={loadHistory}
+            disabled={historyLoading}
+            className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={12} className={historyLoading ? 'animate-spin' : ''} />
+            Actualiser
+          </button>
+        </div>
+
+        {historyLoading && history.length === 0 ? (
+          <div className="flex justify-center py-8">
+            <div className="w-5 h-5 border border-white/20 border-t-white/60 rounded-full animate-spin" />
+          </div>
+        ) : history.length === 0 ? (
+          <p className="text-center text-white/20 text-sm py-8">Aucun envoi pour l&apos;instant</p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {history.map((g) => (
+              <div key={g.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/3 border border-white/5 hover:bg-white/5 transition-colors">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500/30 to-purple-500/20 flex items-center justify-center text-xs font-bold text-pink-300 flex-shrink-0 mt-0.5">
+                  {g.recipient.pseudo[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white text-sm font-semibold">{flag(g.recipient.nation)} {g.recipient.pseudo}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 font-medium border border-pink-500/15">
+                      {g.cards.length} carte{g.cards.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {g.cards.map((c) => {
+                      const color = c.rarity === 'Legend' ? '#F5C518' : c.rarity === 'Epic' ? '#A855F7' : c.rarity === 'Rare' ? '#00D4FF' : '#9CA3AF'
+                      return (
+                        <span
+                          key={c.id}
+                          className="text-[10px] px-1.5 py-0.5 rounded-full border font-medium"
+                          style={{ borderColor: `${color}40`, color, background: 'rgba(255,255,255,0.04)' }}
+                        >
+                          {c.name}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  {g.reason && <p className="text-white/30 text-xs mt-1 italic">{g.reason}</p>}
+                </div>
+                <span className="text-white/20 text-[10px] whitespace-nowrap flex-shrink-0 mt-0.5">
+                  {new Date(g.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                  {' '}
+                  {new Date(g.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
     </div>

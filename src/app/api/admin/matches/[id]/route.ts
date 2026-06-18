@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendPushToAll } from '@/lib/push'
+import { sendPushToAll, sendPushToUser } from '@/lib/push'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +84,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     } catch (e) {
       console.warn('[push auto]', e)
+    }
+
+    // Distribuer 150 coins aux utilisateurs qui ont prédit le bon buteur
+    if (_scorer && (goalA || goalB)) {
+      try {
+        const { data: scorerPreds } = await admin
+          .from('predictions')
+          .select('id, user_id')
+          .eq('match_id', matchId)
+          .eq('pred_scorer', _scorer)
+        if (scorerPreds?.length) {
+          await Promise.allSettled(
+            scorerPreds.map((pred) =>
+              Promise.all([
+                admin.rpc('increment_coins', { user_id: pred.user_id, delta: 150 }),
+                admin.from('coin_transactions').insert({
+                  user_id: pred.user_id,
+                  amount: 150,
+                  reason: `Buteur ⚽ ${_scorer} — match ${matchId.slice(0, 8)}`,
+                }),
+                sendPushToUser(pred.user_id, {
+                  title: `⚽ ${_scorer} a marqué ! +150 coins`,
+                  body: 'Tu avais prédit le bon buteur !',
+                  tag: `scorer-${matchId}`,
+                  url: '/matches',
+                }),
+              ])
+            )
+          )
+        }
+      } catch (e) {
+        console.warn('[scorer-coins]', e)
+      }
     }
   }
 

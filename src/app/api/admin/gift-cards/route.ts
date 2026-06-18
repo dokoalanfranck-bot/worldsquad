@@ -125,5 +125,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data ?? [])
   }
 
-  return NextResponse.json({ error: 'type requis: users | cards' }, { status: 400 })
+  if (type === 'history') {
+    const { data: gifts } = await admin
+      .from('admin_gifts')
+      .select('id, admin_id, recipient_id, card_ids, reason, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (!gifts?.length) return NextResponse.json([])
+
+    // Enrich with user details
+    const userIds = Array.from(new Set([...gifts.map((g) => g.recipient_id), ...gifts.map((g) => g.admin_id)]))
+    const { data: users } = await admin.from('users').select('id, pseudo, nation').in('id', userIds)
+    const usersMap = new Map((users ?? []).map((u) => [u.id, u]))
+
+    // Enrich with card names
+    const allCardIds = Array.from(new Set(gifts.flatMap((g) => g.card_ids as string[])))
+    const { data: cards } = allCardIds.length > 0
+      ? await admin.from('cards').select('id, name, rarity').in('id', allCardIds)
+      : { data: [] }
+    const cardsMap = new Map((cards ?? []).map((c) => [c.id, c]))
+
+    const enriched = gifts.map((g) => ({
+      ...g,
+      recipient: usersMap.get(g.recipient_id) ?? { id: g.recipient_id, pseudo: '?', nation: '' },
+      admin: usersMap.get(g.admin_id) ?? { id: g.admin_id, pseudo: 'Admin', nation: '' },
+      cards: (g.card_ids as string[]).map((id) => cardsMap.get(id) ?? { id, name: '?', rarity: 'Common' }),
+    }))
+
+    return NextResponse.json(enriched)
+  }
+
+  return NextResponse.json({ error: 'type requis: users | cards | history' }, { status: 400 })
 }
