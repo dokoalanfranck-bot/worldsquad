@@ -22,11 +22,11 @@ export async function POST() {
   if (!profile)     return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 })
   if (profile.is_admin) return NextResponse.json({ error: 'Les comptes admin ne peuvent pas participer' }, { status: 403 })
 
-  // Empêcher de rejoindre si déjà dans un tournoi en attente
+  // Empêcher de rejoindre un nouveau tournoi si déjà dans un tournoi actif
   const { data: alreadyIn } = await admin
     .from('tournaments')
     .select('id')
-    .eq('status', 'waiting')
+    .in('status', ['waiting', 'semi_active', 'final_active'])
     .or(`p0_id.eq.${user.id},p1_id.eq.${user.id},p2_id.eq.${user.id},p3_id.eq.${user.id}`)
     .maybeSingle()
   if (alreadyIn) return NextResponse.json({ tournamentId: alreadyIn.id })

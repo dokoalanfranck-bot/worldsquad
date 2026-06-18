@@ -113,6 +113,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  // Cas bot-vs-bot : semi2 JSONB déjà set par launchSemis mais winner_slot jamais stocké
+  if (semi2Done && semi2WinnerSlot === null && t.semi2) {
+    semi2WinnerSlot = (t.semi2 as { winner: number }).winner
+    await admin.from('tournaments').update({ semi2_winner_slot: semi2WinnerSlot }).eq('id', id)
+  }
+
   if (!semi1Done || !semi2Done) return NextResponse.json({ status: 'semi_active' })
 
   // ── Les deux semis sont terminées — créer la FINALE ───────────────────────

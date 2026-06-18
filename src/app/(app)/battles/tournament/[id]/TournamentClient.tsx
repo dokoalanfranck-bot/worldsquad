@@ -376,8 +376,10 @@ function FinalView({ t, currentUserId }: { t: TournamentData; currentUserId: str
     { id: t.p3_id,  pseudo: t.p3_pseudo, nation: t.p3_nation },
   ]
 
-  const finalist1 = t.semi1_winner_slot !== null ? players[t.semi1_winner_slot] : null
-  const finalist2 = t.semi2_winner_slot !== null ? players[t.semi2_winner_slot] : null
+  const s1slot    = t.semi1_winner_slot ?? (t.semi1?.winner ?? null)
+  const s2slot    = t.semi2_winner_slot ?? (t.semi2?.winner ?? null)
+  const finalist1 = s1slot !== null ? players[s1slot] : null
+  const finalist2 = s2slot !== null ? players[s2slot] : null
   const isFinalist = currentUserId === t.semi1_winner_id || currentUserId === t.semi2_winner_id
   const canPlay    = isFinalist && !!t.final_duel_id && !t.final
 

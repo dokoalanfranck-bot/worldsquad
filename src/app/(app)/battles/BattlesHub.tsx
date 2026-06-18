@@ -231,15 +231,15 @@ function LobbyCard({ player, mode, onChallenge }: {
 // ── Main Component ─────────────────────────────────────────────────────────────
 interface TournamentRecord {
   id: string
-  winner_slot: number
+  winner_slot: number | null
   coins_won: number
   p0_pseudo: string; p0_nation: string
   p1_pseudo: string; p1_nation: string
   p2_pseudo: string; p2_nation: string
   p3_pseudo: string; p3_nation: string
-  semi1: { scoreA: number; scoreB: number; winner: number }
-  semi2: { scoreA: number; scoreB: number; winner: number }
-  final: { scoreA: number; scoreB: number; winner: number }
+  semi1: { scoreA: number; scoreB: number; winner: number } | null
+  semi2: { scoreA: number; scoreB: number; winner: number } | null
+  final: { scoreA: number; scoreB: number; winner: number } | null
   created_at: string
 }
 
@@ -743,9 +743,9 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
             <div>
               <p className="text-white/30 text-[10px] uppercase tracking-widest mb-3">🏆 Historique Tournois</p>
               <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
-                {tournaments.slice(0, 10).map((t) => {
+                {tournaments.slice(0, 10).filter((t) => t.semi1 && t.final).map((t) => {
                   const iWon = t.winner_slot === 0
-                  const isFinalist = t.semi1.winner === 0 && t.final.winner !== 0
+                  const isFinalist = t.semi1!.winner === 0 && t.final!.winner !== 0
                   return (
                     <motion.div key={t.id} whileTap={{ scale: 0.99 }}
                       onClick={() => router.push(`/battles/tournament/${t.id}`)}

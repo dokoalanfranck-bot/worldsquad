@@ -32,6 +32,7 @@ export default async function BattlesPage() {
       .from('tournaments')
       .select('id, winner_slot, coins_won, p0_pseudo, p0_nation, p1_pseudo, p1_nation, p2_pseudo, p2_nation, p3_pseudo, p3_nation, semi1, semi2, final, created_at')
       .eq('p0_id', user.id)
+      .eq('status', 'finished')
       .order('created_at', { ascending: false })
       .limit(10),
   ])
