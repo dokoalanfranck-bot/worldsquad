@@ -15,7 +15,7 @@ export default async function LeaderboardPage() {
   const [
     { data: topPredictionsRaw },
     { data: rawBattles },
-    { data: cardCountsRaw },
+    { data: allUserCards },
     { data: predStats },
   ] = await Promise.all([
     admin
@@ -31,10 +31,9 @@ export default async function LeaderboardPage() {
       .gt('battles_won', 0)
       .limit(200),
     admin
-      .from('user_card_counts')
-      .select('user_id, total_cards, unique_cards')
-      .order('total_cards', { ascending: false })
-      .limit(100),
+      .from('user_cards')
+      .select('user_id, card_id')
+      .limit(50000),
     admin
       .from('predictions')
       .select('user_id, status')
@@ -68,18 +67,30 @@ export default async function LeaderboardPage() {
     predictions_total: predTotalMap.get(u.id) ?? u.predictions_correct,
   }))
 
-  // Cards — aggregated via view (total_cards = classement, unique_cards = affichage)
-  const topCardUserIds = (cardCountsRaw ?? []).map((r) => r.user_id)
+  // Cards — total (copies incluses) pour le classement + unique pour l'affichage
+  const cardTotalMap = new Map<string, number>()
+  const cardUniqueMap = new Map<string, Set<string>>()
+  for (const uc of allUserCards ?? []) {
+    cardTotalMap.set(uc.user_id, (cardTotalMap.get(uc.user_id) ?? 0) + 1)
+    if (!cardUniqueMap.has(uc.user_id)) cardUniqueMap.set(uc.user_id, new Set())
+    cardUniqueMap.get(uc.user_id)!.add(uc.card_id)
+  }
+
+  const sortedCardEntries = Array.from(cardTotalMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 100)
+
+  const topCardUserIds = sortedCardEntries.map(([id]) => id)
   const { data: cardUsers } = topCardUserIds.length > 0
-    ? await admin.from('users').select('id, pseudo, photo_url, nation').in('id', topCardUserIds)
+    ? await admin.from('users').select('id, pseudo, photo_url, nation').eq('is_admin', false).in('id', topCardUserIds)
     : { data: [] }
 
   const cardUsersMap = new Map((cardUsers ?? []).map((u) => [u.id, u]))
-  const topCards = (cardCountsRaw ?? [])
-    .map((row) => {
-      const u = cardUsersMap.get(row.user_id)
+  const topCards = sortedCardEntries
+    .map(([userId, totalCards]) => {
+      const u = cardUsersMap.get(userId)
       if (!u) return null
-      return { ...u, total_cards: row.total_cards as number, unique_cards: row.unique_cards as number }
+      return { ...u, total_cards: totalCards, unique_cards: cardUniqueMap.get(userId)?.size ?? 0 }
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
 
