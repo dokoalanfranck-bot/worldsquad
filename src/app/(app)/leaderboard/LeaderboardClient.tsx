@@ -15,7 +15,7 @@ interface PredRow {
 }
 interface CardRow {
   id: string; pseudo: string; photo_url: string | null; nation: string
-  unique_cards: number
+  total_cards: number; unique_cards: number
 }
 interface Props {
   topPredictions: PredRow[]
@@ -181,9 +181,9 @@ function CardPlayerRow({ player, rank, isCurrentUser }: { player: CardRow; rank:
       </div>
       <div className="text-right">
         <div className="font-black text-lg tabular-nums text-[#F5C518]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-          {player.unique_cards} <span className="text-xs text-white/30 font-normal">cartes</span>
+          {player.total_cards} <span className="text-xs text-white/30 font-normal">cartes</span>
         </div>
-        <div className="text-white/20 text-[10px] mt-0.5">uniques</div>
+        <div className="text-white/20 text-[10px] mt-0.5">{player.unique_cards} uniques</div>
       </div>
     </motion.div>
   )
