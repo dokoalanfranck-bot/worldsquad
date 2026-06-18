@@ -171,7 +171,8 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
       {(view === 'picking' || view === 'stealing') && !confirmAbandon && (
         <button
           onClick={() => setConfirmAbandon(true)}
-          className="fixed top-4 left-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
+          className="fixed left-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
+          style={{ top: 'max(1rem, calc(env(safe-area-inset-top) + 0.5rem))' }}
         >
           <LogOut size={12} /> Abandonner
         </button>

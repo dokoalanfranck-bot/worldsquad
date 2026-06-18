@@ -182,6 +182,8 @@ body {
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .dashboard-content {
   padding-left: 0;
+  /* Push content below status bar / notch on iOS and Android */
+  padding-top: env(safe-area-inset-top);
   /* Safe-area-aware bottom padding so content clears the bottom nav + home indicator */
   padding-bottom: max(5.5rem, calc(4rem + env(safe-area-inset-bottom)));
 }
