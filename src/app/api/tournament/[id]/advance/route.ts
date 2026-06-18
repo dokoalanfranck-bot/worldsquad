@@ -151,7 +151,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }).select('id').single()
     if (fd) {
       const botPicks = await buildBotPicks(admin, id + '_final_bot')
-      await admin.from('duels').update({ opponent_picks: botPicks, status: 'picking', picks_deadline: new Date(Date.now() + 45000).toISOString() }).eq('id', fd.id)
+      await admin.from('duels').update({ opponent_picks: botPicks, status: 'picking', picks_deadline: new Date(Date.now() + 40000).toISOString() }).eq('id', fd.id)
       finalDuelId = fd.id
     }
     if (semi1WinnerId) {

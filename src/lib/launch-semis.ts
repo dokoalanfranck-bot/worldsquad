@@ -59,7 +59,7 @@ export async function launchSemis(
       await admin.from('duels').update({
         opponent_picks: botPicks,
         status: 'picking',
-        picks_deadline: new Date(Date.now() + 45000).toISOString(),
+        picks_deadline: new Date(Date.now() + 40000).toISOString(),
       }).eq('id', d.id)
       semi1DuelId = d.id
     }
@@ -103,7 +103,7 @@ export async function launchSemis(
       await admin.from('duels').update({
         opponent_picks: botPicks,
         status: 'picking',
-        picks_deadline: new Date(Date.now() + 45000).toISOString(),
+        picks_deadline: new Date(Date.now() + 40000).toISOString(),
       }).eq('id', d.id)
       semi2DuelId = d.id
     }

@@ -1099,6 +1099,13 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
 
   const flag = (nation: string) => NATION_FLAGS[nation] ?? '🌍'
 
+  useEffect(() => {
+    if (!tournamentId) return
+    const dest = iWon ? `/battles/tournament/${tournamentId}` : '/battles'
+    const t = setTimeout(() => router.push(dest), 1000)
+    return () => clearTimeout(t)
+  }, [tournamentId, iWon, router])
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
