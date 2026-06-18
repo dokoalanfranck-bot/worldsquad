@@ -60,6 +60,16 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
   const viewRef = useRef(view)
   useEffect(() => { viewRef.current = view }, [view])
 
+  // Cancel open/invited duels when user navigates away (fixes queue bug)
+  useEffect(() => {
+    return () => {
+      const s = duelRef.current.status
+      if (s === 'open' || s === 'invited') {
+        fetch(`/api/duels/${duelRef.current.id}/cancel`, { method: 'POST' }).catch(() => {})
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const isChallenger = duel.challenger_id === currentUserId
   const me    = (isChallenger ? duel.challenger : duel.opponent) as Profile
   const them  = (isChallenger ? duel.opponent  : duel.challenger) as Profile

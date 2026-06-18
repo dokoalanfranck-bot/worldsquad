@@ -28,7 +28,7 @@ interface PenaltyBattle {
   id: string
   challenger_id: string
   opponent_id: string | null
-  status: 'waiting' | 'picking' | 'active' | 'stealing' | 'finished' | 'cancelled'
+  status: 'invited' | 'waiting' | 'picking' | 'active' | 'stealing' | 'finished' | 'cancelled'
   challenger_picks: PickEntry[] | null
   opponent_picks: PickEntry[] | null
   picks_deadline: string | null
@@ -1222,6 +1222,18 @@ export function PenaltyClient({
   const supabase = useMemo(() => createClient(), [])
   const [battle, setBattle] = useState<PenaltyBattle>(initialBattle)
   const [pendingResult, setPendingResult] = useState<RoundResult | null>(null)
+  const battleRef = useRef(battle)
+  useEffect(() => { battleRef.current = battle }, [battle])
+
+  // Cancel waiting/invited battles when user navigates away (fixes queue bug)
+  useEffect(() => {
+    return () => {
+      const s = battleRef.current.status
+      if (s === 'waiting' || s === 'invited') {
+        fetch(`/api/penalty/${battleRef.current.id}/cancel`, { method: 'POST' }).catch(() => {})
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isChallenger = battle.challenger_id === currentUserId
   const myPicksSubmitted = isChallenger ? !!battle.challenger_picks : !!battle.opponent_picks
