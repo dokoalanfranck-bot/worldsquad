@@ -97,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } else if (duel.opponent_id) {
         const challPenPicks = [challengerPicks[0], challengerPicks[1], challengerPicks[2], challengerPicks[4]]
         const oppPenPicks   = [opponentPicks[0],   opponentPicks[1],   opponentPicks[2],   opponentPicks[4]]
-        const { data: pb } = await admin.from('penalty_battles').insert({
+        const { data: pb, error: pbErr } = await admin.from('penalty_battles').insert({
           challenger_id:      duel.challenger_id,
           opponent_id:        duel.opponent_id,
           status:             'active',
@@ -108,6 +108,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           tournament_duel_id: duelId,
           tournament_id:      duel.tournament_id,
         }).select('id').single()
+        if (pbErr) {
+          console.error('[tiebreak] penalty_battles insert failed:', pbErr.message, pbErr.details)
+          return NextResponse.json({ error: `Tiebreak init failed: ${pbErr.message}` }, { status: 500 })
+        }
         if (pb) {
           await admin.from('duels').update({
             match_events:       events,
