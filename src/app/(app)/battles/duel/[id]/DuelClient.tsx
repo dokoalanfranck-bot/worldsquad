@@ -92,7 +92,16 @@ export function DuelClient({ initialDuel, currentUserId, myCards }: Props) {
             return
           }
           if (s === 'picking' && v === 'waiting') setView('picking')
-          if ((s === 'stealing' || s === 'finished') && v === 'picking') setView('animation')
+          if ((s === 'stealing' || s === 'finished') && v === 'picking') {
+            // Forfeit: status jumped to stealing, current user is winner, no score (no simulation ran)
+            const isForfeitWin = s === 'stealing' && (updated as Duel).winner_id === currentUserId && (updated as Duel).challenger_score == null
+            if (isForfeitWin) {
+              toast('Victoire ! L\'adversaire a abandonné', { icon: '🏆' })
+              setView('stealing')
+            } else {
+              setView('animation')
+            }
+          }
           if (s === 'finished' && v === 'stealing') setView('result')
         })
       .subscribe()

@@ -1245,6 +1245,7 @@ export function PenaltyClient({
   const [pendingResult, setPendingResult] = useState<RoundResult | null>(null)
   const battleRef = useRef(battle)
   useEffect(() => { battleRef.current = battle }, [battle])
+  const hasAbandonedRef = useRef(false)
 
   // Cancel waiting/invited battles when user navigates away (fixes queue bug)
   useEffect(() => {
@@ -1289,9 +1290,11 @@ export function PenaltyClient({
   async function handleAbandon() {
     setAbandonLoading(true)
     try {
+      hasAbandonedRef.current = true
       await fetch(`/api/penalty/${battle.id}/cancel`, { method: 'POST' })
       setBattle((prev) => ({ ...prev, status: 'cancelled' }))
     } catch {
+      hasAbandonedRef.current = false
       toast.error('Erreur réseau')
       setAbandonLoading(false)
       setConfirmAbandon(false)
@@ -1305,10 +1308,18 @@ export function PenaltyClient({
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'penalty_battles', filter: `id=eq.${battle.id}`,
       }, ({ new: updated }) => {
-        setBattle((prev) => ({ ...prev, ...(updated as Partial<PenaltyBattle>) }))
-        if ((updated as PenaltyBattle).status === 'cancelled') {
+        if (hasAbandonedRef.current) return // quitter ignores realtime after abandoning
+        const upd = updated as PenaltyBattle
+        const prevStatus = battleRef.current.status
+        setBattle((prev) => ({ ...prev, ...upd }))
+        if (upd.status === 'cancelled') {
           toast('Match annulé', { icon: '❌' })
           setTimeout(() => router.push('/battles'), 1800)
+        }
+        // Forfait: opponent jumped us to stealing while we were in picking/active
+        if (upd.status === 'stealing' && upd.winner_id === currentUserId && (prevStatus === 'picking' || prevStatus === 'active')) {
+          const allRoundsDone = battleRef.current.current_round > 6
+          if (!allRoundsDone) toast('Victoire ! L\'adversaire a abandonné', { icon: '🏆' })
         }
       })
       .subscribe()
