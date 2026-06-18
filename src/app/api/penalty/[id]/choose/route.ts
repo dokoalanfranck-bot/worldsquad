@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 type Direction = 'left' | 'center' | 'right' | 'panenka'
-type PickEntry = { id: string; stats: Record<string, number | string> }
+type PickEntry = { id: string; rarity?: string; stats: Record<string, number | string> }
 
 function getCardPower(stats: Record<string, number | string>): number {
   const nums = Object.values(stats).filter((v): v is number => typeof v === 'number')
@@ -143,6 +143,24 @@ export async function POST(
     if (choice === 'panenka') panenkaUpdate.challenger_used_panenka = true
 
     const isTiebreakBot = !!(battle as Record<string, unknown>).tournament_duel_id
+    const botWins = over && rawWinner === '__bot__' && !isTiebreakBot
+
+    // Bot wins regular penalty → auto-steal stake_count best cards, go directly to finished
+    let botStolenIds: string[] = []
+    if (botWins) {
+      const rarityOrder: Record<string, number> = { Legend: 4, Epic: 3, Rare: 2, Common: 1 }
+      const userPicks = (battle.challenger_picks ?? []) as PickEntry[]
+      const stakeCount = ((battle as Record<string, unknown>).stake_count as number | null) ?? 1
+      const sorted = [...userPicks].sort((a, b) => (rarityOrder[b.rarity ?? ''] ?? 0) - (rarityOrder[a.rarity ?? ''] ?? 0))
+      const toSteal = sorted.slice(0, Math.min(stakeCount, sorted.length))
+      await Promise.all(
+        toSteal.map((card) =>
+          admin.from('user_cards').delete().eq('user_id', battle.challenger_id).eq('card_id', card.id)
+        )
+      )
+      botStolenIds = toSteal.map((c) => c.id)
+    }
+
     await admin.from('penalty_battles').update({
       current_round: battle.current_round + 1,
       challenger_score: newCScore,
@@ -150,7 +168,8 @@ export async function POST(
       rounds: newRounds,
       round_deadline: over ? null : new Date(Date.now() + 15000).toISOString(),
       winner_id: winnerId,
-      status: over ? (isTiebreakBot ? 'finished' : 'stealing') : 'active',
+      status: over ? (botWins || isTiebreakBot ? 'finished' : 'stealing') : 'active',
+      ...(botStolenIds.length > 0 ? { stolen_card_ids: botStolenIds } : {}),
       ...panenkaUpdate,
       updated_at: new Date().toISOString(),
     }).eq('id', battleId).eq('current_round', battle.current_round)
