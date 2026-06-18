@@ -1,41 +1,25 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { simulateDuel, seededShuffle, randomBotName, botNation } from '@/lib/duel-engine'
+import { randomBotName, botNation, seededShuffle } from '@/lib/duel-engine'
+import { simulateTournament, getBotPicksFromPool } from '@/lib/tournament-engine'
 import type { Card } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
-const isCoach = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
-const isGK    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'GK'
+const JOIN_WINDOW_SECONDS = 60
 
-const RARITY_ORDER: Record<string, number> = { Legend: 4, Epic: 3, Rare: 2, Common: 1 }
-
-function selectBestSix(cards: Card[]): Card[] {
-  const sorted = [...cards].sort((a, b) => (RARITY_ORDER[b.rarity] ?? 0) - (RARITY_ORDER[a.rarity] ?? 0))
-  const coach = sorted.find(isCoach)
-  const gk    = sorted.find(isGK)
-  const field = sorted.filter((c) => !isCoach(c) && !isGK(c))
-  const picks: Card[] = []
-  if (gk) picks.push(gk)
-  if (coach) picks.push(coach)
-  picks.push(...field.slice(0, 6 - picks.length))
-  const used = new Set(picks.map((p) => p.id))
-  const rest = sorted.filter((c) => !used.has(c.id))
-  picks.push(...rest.slice(0, 6 - picks.length))
-  return picks.slice(0, 6)
-}
-
-async function getBotPicks(admin: ReturnType<typeof createAdminClient>, seed: string, pool: Card[]): Promise<Card[]> {
-  const shuffled = seededShuffle(pool, seed)
-  const coach = shuffled.find(isCoach)
-  const gk    = shuffled.find(isGK)
-  const field = shuffled.filter((c) => !isCoach(c) && !isGK(c))
-  const picks: Card[] = []
-  if (gk) picks.push(gk)
-  if (coach) picks.push(coach)
-  picks.push(...field.slice(0, 6 - picks.length))
-  return picks.slice(0, 6)
+async function buildBotPicks(
+  admin: ReturnType<typeof createAdminClient>,
+  seed: string,
+): Promise<Card[]> {
+  const { data } = await admin
+    .from('cards')
+    .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
+    .eq('type', 'player')
+    .limit(200)
+  const pool = seededShuffle((data ?? []) as Card[], seed)
+  return getBotPicksFromPool(pool, seed)
 }
 
 export async function POST() {
@@ -45,95 +29,172 @@ export async function POST() {
 
   const admin = createAdminClient()
 
-  const [{ data: profile }, { data: cardPool }] = await Promise.all([
-    admin.from('users').select('pseudo, nation, is_admin').eq('id', user.id).single(),
-    admin.from('cards').select('id, name, rarity, image_url, stats, type, nation, description, created_at').eq('type', 'player').limit(200),
-  ])
+  const { data: profile } = await admin
+    .from('users')
+    .select('pseudo, nation, is_admin')
+    .eq('id', user.id)
+    .single()
+  if (!profile)     return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 })
+  if (profile.is_admin) return NextResponse.json({ error: 'Les comptes admin ne peuvent pas participer' }, { status: 403 })
 
-  if (!profile) return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 })
-  if (profile.is_admin) return NextResponse.json({ error: 'Les comptes admin ne peuvent pas participer aux battles' }, { status: 403 })
+  // Empêcher de rejoindre si déjà dans un tournoi en attente
+  const { data: alreadyIn } = await admin
+    .from('tournaments')
+    .select('id')
+    .eq('status', 'waiting')
+    .or(`p0_id.eq.${user.id},p1_id.eq.${user.id},p2_id.eq.${user.id},p3_id.eq.${user.id}`)
+    .maybeSingle()
+  if (alreadyIn) return NextResponse.json({ tournamentId: alreadyIn.id })
 
-  const pool = (cardPool ?? []) as Card[]
-  const seed = crypto.randomUUID()
+  // Chercher un tournoi en attente avec une place libre
+  const now = new Date().toISOString()
+  const { data: openList } = await admin
+    .from('tournaments')
+    .select('id, p0_id, p0_pseudo, p0_nation, p1_id, p1_pseudo, p1_nation, p2_id, p2_pseudo, p2_nation, p3_id, p3_pseudo, p3_nation')
+    .eq('status', 'waiting')
+    .gt('join_deadline', now)
+    .limit(5)
 
-  // Picks for user
-  let userPicks: Card[] = []
-  const { data: userCardRefs } = await admin.from('user_cards').select('card_id').eq('user_id', user.id)
-  if (userCardRefs?.length) {
-    const ids = userCardRefs.map((r) => r.card_id)
-    const { data: owned } = await admin
-      .from('cards').select('id, name, rarity, image_url, stats, type, nation, description, created_at')
-      .eq('type', 'player').in('id', ids)
-    if ((owned?.length ?? 0) >= 3) userPicks = selectBestSix(owned as Card[])
+  for (const t of openList ?? []) {
+    for (const slot of [1, 2, 3] as const) {
+      const idKey     = `p${slot}_id`     as keyof typeof t
+      const pseudoKey = `p${slot}_pseudo` as keyof typeof t
+      const nationKey = `p${slot}_nation` as keyof typeof t
+      if (t[idKey] !== null) continue
+
+      // Claim atomique : échoue si un autre joueur a pris le slot
+      const { data: claimed } = await admin
+        .from('tournaments')
+        .update({ [idKey]: user.id, [pseudoKey]: profile.pseudo, [nationKey]: profile.nation })
+        .eq('id', t.id)
+        .is(idKey, null)
+        .eq('status', 'waiting')
+        .select('id, p0_id, p0_pseudo, p0_nation, p1_id, p1_pseudo, p1_nation, p2_id, p2_pseudo, p2_nation, p3_id, p3_pseudo, p3_nation')
+        .maybeSingle()
+
+      if (!claimed) continue
+
+      // Vérifier si les 4 slots sont remplis → lancer les demi-finales
+      if (claimed.p0_id && claimed.p1_id && claimed.p2_id && claimed.p3_id) {
+        await launchSemis(admin, claimed)
+      }
+      return NextResponse.json({ tournamentId: t.id })
+    }
   }
-  if (userPicks.length < 3) userPicks = await getBotPicks(admin, seed + '_p0', pool)
 
-  // Bots info
-  const bots = [
-    { pseudo: randomBotName(), nation: botNation(seed + '1') },
-    { pseudo: randomBotName(), nation: botNation(seed + '2') },
-    { pseudo: randomBotName(), nation: botNation(seed + '3') },
-  ]
-
-  // Picks for bots
-  const [picks1, picks2, picks3] = await Promise.all([
-    getBotPicks(admin, seed + '_p1', pool),
-    getBotPicks(admin, seed + '_p2', pool),
-    getBotPicks(admin, seed + '_p3', pool),
-  ])
-
-  // Semi 1: p0 vs p1
-  const s1 = simulateDuel(userPicks, picks1, seed + '_semi1')
-  const semi1Winner = s1.challengerScore >= s1.opponentScore ? 0 : 1
-
-  // Semi 2: p2 vs p3
-  const s2 = simulateDuel(picks2, picks3, seed + '_semi2')
-  const semi2Winner = s2.challengerScore >= s2.opponentScore ? 2 : 3
-
-  // Final
-  const finalPicksA = semi1Winner === 0 ? userPicks : picks1
-  const finalPicksB = semi2Winner === 2 ? picks2 : picks3
-  const sf = simulateDuel(finalPicksA, finalPicksB, seed + '_final')
-  const finalWinnerSlot = sf.challengerScore >= sf.opponentScore ? semi1Winner : semi2Winner
-
-  const isUserWinner   = finalWinnerSlot === 0
-  const isUserFinalist = semi1Winner === 0 && finalWinnerSlot !== 0
-  const coinsWon       = isUserWinner ? 300 : isUserFinalist ? 100 : 0
-
-  const { data: tournament, error } = await admin.from('tournaments').insert({
-    p0_id:     user.id,
-    p0_pseudo: profile.pseudo,
-    p0_nation: profile.nation,
-    p1_pseudo: bots[0].pseudo,
-    p1_nation: bots[0].nation,
-    p2_pseudo: bots[1].pseudo,
-    p2_nation: bots[1].nation,
-    p3_pseudo: bots[2].pseudo,
-    p3_nation: bots[2].nation,
-    semi1:     { scoreA: s1.challengerScore, scoreB: s1.opponentScore, events: s1.events, winner: semi1Winner },
-    semi2:     { scoreA: s2.challengerScore, scoreB: s2.opponentScore, events: s2.events, winner: semi2Winner },
-    final:     { scoreA: sf.challengerScore, scoreB: sf.opponentScore, events: sf.events, winner: finalWinnerSlot },
-    winner_slot: finalWinnerSlot,
-    winner_id:   isUserWinner ? user.id : null,
-    coins_won:   coinsWon,
-    status:      'finished',
+  // Créer un nouveau tournoi
+  const deadline = new Date(Date.now() + JOIN_WINDOW_SECONDS * 1000).toISOString()
+  const { data: newT, error } = await admin.from('tournaments').insert({
+    p0_id:         user.id,
+    p0_pseudo:     profile.pseudo,
+    p0_nation:     profile.nation,
+    status:        'waiting',
+    join_deadline: deadline,
+    coins_won:     0,
   }).select('id').single()
 
-  if (error || !tournament) {
-    console.error('[tournament/find]', error)
-    return NextResponse.json({ error: 'Erreur création tournoi' }, { status: 500 })
+  if (error || !newT) return NextResponse.json({ error: 'Erreur création tournoi' }, { status: 500 })
+  return NextResponse.json({ tournamentId: newT.id })
+}
+
+// ── Launch semi-final duels ────────────────────────────────────────────────────
+export async function launchSemis(
+  admin: ReturnType<typeof createAdminClient>,
+  t: {
+    id: string
+    p0_id: string; p0_pseudo: string; p0_nation: string
+    p1_id: string | null; p1_pseudo: string; p1_nation: string
+    p2_id: string | null; p2_pseudo: string; p2_nation: string
+    p3_id: string | null; p3_pseudo: string; p3_nation: string
+  },
+) {
+  const seed = t.id
+
+  // ── Semi1: p0 vs p1 ────────────────────────────────────────────────────────
+  let semi1DuelId: string | null = null
+
+  if (t.p1_id) {
+    // Vrai joueur vs vrai joueur
+    const { data: d } = await admin.from('duels').insert({
+      challenger_id:    t.p0_id,
+      opponent_id:      t.p1_id,
+      is_bot:           false,
+      status:           'open',
+      stake_count:      1,
+      coins_stake:      0,
+      tournament_id:    t.id,
+      tournament_round: 'semi1',
+    }).select('id').single()
+    semi1DuelId = d?.id ?? null
+  } else {
+    // Joueur vs bot
+    const { data: d } = await admin.from('duels').insert({
+      challenger_id:    t.p0_id,
+      is_bot:           true,
+      bot_name:         t.p1_pseudo,
+      status:           'open',
+      stake_count:      1,
+      coins_stake:      0,
+      tournament_id:    t.id,
+      tournament_round: 'semi1',
+    }).select('id').single()
+    if (d) {
+      const botPicks = await buildBotPicks(admin, seed + '_p1')
+      await admin.from('duels').update({ opponent_picks: botPicks, status: 'picking', picks_deadline: new Date(Date.now() + 45000).toISOString() }).eq('id', d.id)
+      semi1DuelId = d.id
+    }
   }
 
-  if (coinsWon > 0) {
-    await Promise.allSettled([
-      admin.rpc('increment_coins', { user_id: user.id, delta: coinsWon }),
-      admin.from('coin_transactions').insert({
-        user_id: user.id,
-        amount:  coinsWon,
-        reason:  `Tournoi ${isUserWinner ? '🏆 1ère place' : '🥈 2ème place'} — ${tournament.id.slice(0, 8)}`,
-      }),
-    ])
+  // ── Semi2: p2 vs p3 ────────────────────────────────────────────────────────
+  let semi2DuelId: string | null = null
+  let semi2Result: Record<string, unknown> | null = null
+
+  if (!t.p2_id && !t.p3_id) {
+    // Bot vs Bot — simuler immédiatement, pas de duel créé
+    const { data: cardPool } = await admin.from('cards').select('id, name, rarity, image_url, stats, type, nation, description, created_at').eq('type', 'player').limit(200)
+    const pool = (cardPool ?? []) as Card[]
+    const p2picks = getBotPicksFromPool(pool, seed + '_p2')
+    const p3picks = getBotPicksFromPool(pool, seed + '_p3')
+    const sim = simulateTournament([p2picks, p3picks, p2picks, p3picks], seed + '_semi2only')
+    const semi2Winner = sim.semi1.winner // reuse semi1 from sub-simulation (p2 vs p3)
+    semi2Result = { scoreA: sim.semi1.scoreA, scoreB: sim.semi1.scoreB, events: sim.semi1.events, winner: semi2Winner + 2 }
+  } else if (t.p2_id && !t.p3_id) {
+    // Joueur vs bot
+    const { data: d } = await admin.from('duels').insert({
+      challenger_id:    t.p2_id,
+      is_bot:           true,
+      bot_name:         t.p3_pseudo,
+      status:           'open',
+      stake_count:      1,
+      coins_stake:      0,
+      tournament_id:    t.id,
+      tournament_round: 'semi2',
+    }).select('id').single()
+    if (d) {
+      const botPicks = await buildBotPicks(admin, seed + '_p3')
+      await admin.from('duels').update({ opponent_picks: botPicks, status: 'picking', picks_deadline: new Date(Date.now() + 45000).toISOString() }).eq('id', d.id)
+      semi2DuelId = d.id
+    }
+  } else if (t.p2_id && t.p3_id) {
+    // Vrai joueur vs vrai joueur
+    const { data: d } = await admin.from('duels').insert({
+      challenger_id:    t.p2_id,
+      opponent_id:      t.p3_id,
+      is_bot:           false,
+      status:           'open',
+      stake_count:      1,
+      coins_stake:      0,
+      tournament_id:    t.id,
+      tournament_round: 'semi2',
+    }).select('id').single()
+    semi2DuelId = d?.id ?? null
   }
 
-  return NextResponse.json({ tournamentId: tournament.id })
+  // Mise à jour du tournoi
+  await admin.from('tournaments').update({
+    status:        'semi_active',
+    semi1_duel_id: semi1DuelId,
+    semi2_duel_id: semi2DuelId,
+    ...(semi2Result ? { semi2: semi2Result } : {}),
+  }).eq('id', t.id)
 }
