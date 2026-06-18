@@ -68,9 +68,26 @@ export default async function BattlesPage() {
 
   const { data: profile } = await admin
     .from('users')
-    .select('id, pseudo, nation, photo_url')
+    .select('id, pseudo, nation, photo_url, is_admin')
     .eq('id', user.id)
     .single()
+
+  if (profile?.is_admin) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-4">
+        <div className="w-16 h-16 rounded-3xl bg-red-500/10 flex items-center justify-center mb-2">
+          <span className="text-3xl">🚫</span>
+        </div>
+        <h1 className="text-3xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+          Accès restreint
+        </h1>
+        <p className="text-white/40 text-sm max-w-xs">
+          Les comptes administrateurs ne peuvent pas participer aux battles.
+          Utilise un compte joueur pour accéder à ce mode.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <BattlesHub

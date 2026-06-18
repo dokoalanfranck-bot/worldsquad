@@ -48,8 +48,9 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Fetch challenger profile for push notification
-  const { data: me } = await admin.from('users').select('pseudo').eq('id', user.id).single()
+  // Admins cannot participate in battles
+  const { data: me } = await admin.from('users').select('pseudo, is_admin').eq('id', user.id).single()
+  if (me?.is_admin) return NextResponse.json({ error: 'Les comptes admin ne peuvent pas participer aux battles' }, { status: 403 })
 
   // ── BOT CHALLENGE ─────────────────────────────────────────────────────────
   if (isBot) {

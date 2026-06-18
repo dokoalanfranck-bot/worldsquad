@@ -46,11 +46,12 @@ export async function POST() {
   const admin = createAdminClient()
 
   const [{ data: profile }, { data: cardPool }] = await Promise.all([
-    admin.from('users').select('pseudo, nation').eq('id', user.id).single(),
+    admin.from('users').select('pseudo, nation, is_admin').eq('id', user.id).single(),
     admin.from('cards').select('id, name, rarity, image_url, stats, type, nation, description, created_at').eq('type', 'player').limit(200),
   ])
 
   if (!profile) return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 })
+  if (profile.is_admin) return NextResponse.json({ error: 'Les comptes admin ne peuvent pas participer aux battles' }, { status: 403 })
 
   const pool = (cardPool ?? []) as Card[]
   const seed = crypto.randomUUID()
