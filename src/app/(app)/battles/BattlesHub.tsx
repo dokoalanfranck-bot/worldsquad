@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Swords, ChevronRight, Gift,
   TrendingUp, TrendingDown, Minus, Check, X,
-  Users,
+  Users, Trophy,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -40,7 +40,7 @@ interface LobbyPlayer {
   isSelf: boolean
 }
 
-type Mode = 'duel' | 'penalty'
+type Mode = 'duel' | 'penalty' | 'tournament'
 
 const NATION_FLAGS: Record<string, string> = {
   France:'🇫🇷', Brazil:'🇧🇷', Argentina:'🇦🇷', England:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
@@ -229,16 +229,32 @@ function LobbyCard({ player, mode, onChallenge }: {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentUser }: {
+interface TournamentRecord {
+  id: string
+  winner_slot: number
+  coins_won: number
+  p0_pseudo: string; p0_nation: string
+  p1_pseudo: string; p1_nation: string
+  p2_pseudo: string; p2_nation: string
+  p3_pseudo: string; p3_nation: string
+  semi1: { scoreA: number; scoreB: number; winner: number }
+  semi2: { scoreA: number; scoreB: number; winner: number }
+  final: { scoreA: number; scoreB: number; winner: number }
+  created_at: string
+}
+
+export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tournaments = [], currentUser }: {
   duels: Duel[]
   currentUserId: string
   penaltyBattles?: PenaltyBattle[]
+  tournaments?: TournamentRecord[]
   currentUser: { id: string; pseudo: string; nation: string; photo_url: string | null }
 }) {
   const router = useRouter()
   const supabase = createClient()
 
   const [mode, setMode] = useState<Mode>('duel')
+  const [launchingTournament, setLaunchingTournament] = useState(false)
   const [onlinePlayers, setOnlinePlayers] = useState<LobbyPlayer[]>([])
   const [challengeTarget, setChallengeTarget] = useState<LobbyPlayer | null>(null)
   const [challenging, setChallenging] = useState(false)
@@ -379,6 +395,18 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentU
     finally { setCancellingPenalty(null) }
   }
 
+  // ── Tournament ───────────────────────────────────────────────────────────
+  async function launchTournament() {
+    setLaunchingTournament(true)
+    try {
+      const res = await fetch('/api/tournament/find', { method: 'POST' })
+      const data = await res.json() as { tournamentId?: string; error?: string }
+      if (!res.ok) { toast.error(data.error ?? 'Erreur'); return }
+      if (data.tournamentId) router.push(`/battles/tournament/${data.tournamentId}`)
+    } catch { toast.error('Erreur réseau') }
+    finally { setLaunchingTournament(false) }
+  }
+
   // ── Derived state ─────────────────────────────────────────────────────────
   const invitedDuels    = duels.filter((d) => d.status === 'invited' && d.opponent_id === currentUserId)
   const invitedPenalties = penaltyBattles.filter((p) => p.status === 'invited' && p.opponent_id === currentUserId)
@@ -404,15 +432,17 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentU
       </div>
 
       {/* Mode tabs */}
-      <div className="flex gap-2 mb-6">
-        {([['duel', '⚔️', 'Classique'], ['penalty', '⚽', 'Tirs au but']] as const).map(([m, emoji, label]) => (
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {([
+          ['duel',       '⚔️', 'Classique',   'bg-[#F5C518] text-black'],
+          ['penalty',    '⚽', 'Tirs au but',  'bg-green-500 text-black'],
+          ['tournament', '🏆', 'Tournoi',      'bg-orange-500 text-black'],
+        ] as const).map(([m, emoji, label, activeCls]) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
-              mode === m
-                ? m === 'duel' ? 'bg-[#F5C518] text-black' : 'bg-green-500 text-black'
-                : 'bg-white/5 text-white/40 hover:bg-white/10 border border-white/5'
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              mode === m ? activeCls : 'bg-white/5 text-white/40 hover:bg-white/10 border border-white/5'
             }`}
           >
             <span>{emoji}</span> {label}
@@ -537,8 +567,62 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentU
             </div>
           )}
 
-          {/* Lobby */}
-          <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+          {/* ── Tournament mode UI ── */}
+          {mode === 'tournament' && (
+            <div className="space-y-4">
+              {/* Info card */}
+              <div className="glass rounded-2xl border border-orange-500/20 p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-orange-500/15 flex items-center justify-center flex-shrink-0">
+                    <Trophy size={22} className="text-orange-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>MODE TOURNOI</h2>
+                    <p className="text-white/40 text-xs">4 joueurs · Bracket éliminatoire</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { icon: '⚔️', label: '2 Demi-finales', desc: 'Toi vs bot · bot vs bot' },
+                    { icon: '🏆', label: 'Finale',         desc: "Les 2 vainqueurs s'affrontent" },
+                    { icon: '🪙', label: 'Récompenses',    desc: '1ère place +300 coins · 2ème place +100 coins' },
+                  ].map(({ icon, label, desc }) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="text-lg flex-shrink-0">{icon}</span>
+                      <div>
+                        <p className="text-white font-bold text-sm">{label}</p>
+                        <p className="text-white/35 text-xs">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Launch button */}
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={launchTournament}
+                disabled={launchingTournament}
+                className="w-full py-5 rounded-2xl font-black text-black disabled:opacity-60 transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, #f97316 0%, #F5C518 100%)',
+                  fontFamily: 'Bebas Neue, sans-serif',
+                  fontSize: '1.15rem',
+                  boxShadow: '0 0 30px rgba(249,115,22,0.35)',
+                }}
+              >
+                {launchingTournament
+                  ? <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                  : '🏆 LANCER UN TOURNOI'
+                }
+              </motion.button>
+
+              <p className="text-white/25 text-xs text-center">Résultat instantané · bracket animé</p>
+            </div>
+          )}
+
+          {/* Lobby (hidden in tournament mode) */}
+          {mode !== 'tournament' && <div className="glass rounded-2xl border border-white/5 overflow-hidden">
             {/* Lobby header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
               <div className="flex items-center gap-2">
@@ -564,27 +648,29 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentU
                 />
               ))}
             </div>
-          </div>
+          </div>}
 
-          {/* How it works */}
-          <div className="glass rounded-2xl p-5 border border-white/5">
-            <p className="text-white/30 text-[10px] uppercase tracking-widest mb-4">Comment ça marche</p>
-            <div className="space-y-3">
-              {[
-                { n: '1', label: 'Ouvre la page', desc: 'Tu es visible instantanément par les autres', color: 'text-blue-400 bg-blue-500/10' },
-                { n: '2', label: 'Choisis un adversaire', desc: 'Humain ou bot, et envoie le défi', color: 'text-purple-400 bg-purple-500/10' },
-                { n: '3', label: 'Battle !', desc: 'Sélection de cartes → match animé → vol de carte', color: mode === 'duel' ? 'text-[#F5C518] bg-[#F5C518]/10' : 'text-green-400 bg-green-500/10' },
-              ].map(({ n, label, desc, color }) => (
-                <div key={n} className="flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${color}`}>{n}</div>
-                  <div>
-                    <p className="text-white font-bold text-xs">{label}</p>
-                    <p className="text-white/30 text-[11px]">{desc}</p>
+          {/* How it works (hidden in tournament mode) */}
+          {mode !== 'tournament' && (
+            <div className="glass rounded-2xl p-5 border border-white/5">
+              <p className="text-white/30 text-[10px] uppercase tracking-widest mb-4">Comment ça marche</p>
+              <div className="space-y-3">
+                {[
+                  { n: '1', label: 'Ouvre la page', desc: 'Tu es visible instantanément par les autres', color: 'text-blue-400 bg-blue-500/10' },
+                  { n: '2', label: 'Choisis un adversaire', desc: 'Humain ou bot, et envoie le défi', color: 'text-purple-400 bg-purple-500/10' },
+                  { n: '3', label: 'Battle !', desc: 'Sélection de cartes → match animé → vol de carte', color: mode === 'duel' ? 'text-[#F5C518] bg-[#F5C518]/10' : 'text-green-400 bg-green-500/10' },
+                ].map(({ n, label, desc, color }) => (
+                  <div key={n} className="flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${color}`}>{n}</div>
+                    <div>
+                      <p className="text-white font-bold text-xs">{label}</p>
+                      <p className="text-white/30 text-[11px]">{desc}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ── Right column: History ─────────────────────────────────────── */}
@@ -652,7 +738,41 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentU
             </div>
           )}
 
-          {finished.length === 0 && finishedPenalty.length === 0 && (
+          {/* Tournament history */}
+          {tournaments.length > 0 && (
+            <div>
+              <p className="text-white/30 text-[10px] uppercase tracking-widest mb-3">🏆 Historique Tournois</p>
+              <div className="glass rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+                {tournaments.slice(0, 10).map((t) => {
+                  const iWon = t.winner_slot === 0
+                  const isFinalist = t.semi1.winner === 0 && t.final.winner !== 0
+                  return (
+                    <motion.div key={t.id} whileTap={{ scale: 0.99 }}
+                      onClick={() => router.push(`/battles/tournament/${t.id}`)}
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/3 transition-colors">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm ${iWon ? 'bg-yellow-500/15' : isFinalist ? 'bg-orange-500/10' : 'bg-red-500/10'}`}>
+                        {iWon ? '🏆' : isFinalist ? '🥈' : '❌'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm">
+                          {iWon ? '1ère place' : isFinalist ? '2ème place' : 'Éliminé'}
+                        </p>
+                        <p className="text-white/30 text-xs tabular-nums">
+                          {t.p1_pseudo} · {t.p2_pseudo} · {t.p3_pseudo}
+                        </p>
+                      </div>
+                      {t.coins_won > 0 && (
+                        <span className="text-yellow-400 text-xs font-bold flex-shrink-0">+{t.coins_won}🪙</span>
+                      )}
+                      <ChevronRight size={13} className="text-white/15 flex-shrink-0" />
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {finished.length === 0 && finishedPenalty.length === 0 && tournaments.length === 0 && (
             <div className="text-center py-20 lg:py-32">
               <div className="w-16 h-16 rounded-3xl bg-orange-500/10 flex items-center justify-center mx-auto mb-4">
                 <Swords size={30} className="text-orange-400/50" />

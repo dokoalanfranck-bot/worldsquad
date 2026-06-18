@@ -13,7 +13,7 @@ export default async function BattlesPage() {
 
   const admin = createAdminClient()
 
-  const [{ data: duels }, { data: penaltyBattles }] = await Promise.all([
+  const [{ data: duels }, { data: penaltyBattles }, { data: tournaments }] = await Promise.all([
     admin
       .from('duels')
       .select('*')
@@ -28,6 +28,12 @@ export default async function BattlesPage() {
       .in('status', ['waiting', 'picking', 'active', 'stealing', 'finished'])
       .order('created_at', { ascending: false })
       .limit(20),
+    admin
+      .from('tournaments')
+      .select('id, winner_slot, coins_won, p0_pseudo, p0_nation, p1_pseudo, p1_nation, p2_pseudo, p2_nation, p3_pseudo, p3_nation, semi1, semi2, final, created_at')
+      .eq('p0_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
   ])
 
   // Enrich duels with profiles
@@ -71,6 +77,7 @@ export default async function BattlesPage() {
       duels={enriched}
       currentUserId={user.id}
       penaltyBattles={enrichedPenalty}
+      tournaments={tournaments ?? []}
       currentUser={profile ?? { id: user.id, pseudo: '?', nation: '', photo_url: null }}
     />
   )
