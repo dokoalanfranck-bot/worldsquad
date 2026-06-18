@@ -47,14 +47,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     )
   }
 
-  // Add cards to winner's collection (upsert in case winner already owns the card)
-  const { error: insertErr } = await admin.from('user_cards').upsert(
-    cardIds.map((cardId) => ({ user_id: user.id, card_id: cardId, obtained_via: 'battle' })),
-    { onConflict: 'user_id,card_id', ignoreDuplicates: true }
-  )
-  if (insertErr) {
-    console.error('[steal] upsert user_cards failed:', insertErr)
-    return NextResponse.json({ error: 'Erreur lors du transfert des cartes' }, { status: 500 })
+  // Add cards to winner's collection — skip cards already owned (avoids unique constraint errors)
+  for (const cardId of cardIds) {
+    const { data: existing } = await admin.from('user_cards')
+      .select('card_id').eq('user_id', user.id).eq('card_id', cardId).maybeSingle()
+    if (!existing) {
+      const { error: insErr } = await admin.from('user_cards').insert({
+        user_id: user.id, card_id: cardId, obtained_via: 'battle',
+      })
+      if (insErr && insErr.code !== '23505') {
+        console.error('[steal] insert user_cards failed:', insErr)
+        return NextResponse.json({ error: 'Erreur lors du transfert des cartes' }, { status: 500 })
+      }
+    }
   }
 
   // Mark duel finished
