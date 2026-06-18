@@ -8,6 +8,7 @@ import { InstallPrompt } from '@/components/InstallPrompt'
 import { ChallengeListener } from '@/components/ChallengeListener'
 import { FriendRequestListener } from '@/components/FriendRequestListener'
 import { RefreshButton } from '@/components/RefreshButton'
+import { PresenceTracker } from '@/components/PresenceTracker'
 import type { User } from '@/types'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <PingProvider />
         <ChallengeListener userId={authUser.id} />
         <FriendRequestListener userId={authUser.id} />
+        <PresenceTracker userId={authUser.id} pseudo={(profile as User).pseudo} nation={(profile as User).nation} photoUrl={(profile as User).photo_url ?? null} />
         <RefreshButton />
         <MusicProvider>
           {children}

@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: profile } = await supabase
     .from('users')
-    .select('is_admin, pseudo')
+    .select('is_admin, is_super_admin, pseudo')
     .eq('id', authUser.id)
     .single()
 
@@ -25,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-[#0A0A0F]">
       <PingProvider />
       <PaymentNotifier />
-      <AdminSidebar pseudo={profile.pseudo} />
+      <AdminSidebar pseudo={profile.pseudo} isSuperAdmin={!!profile.is_super_admin} />
       <main className="lg:pl-64 min-h-screen">
         <div className="p-4 lg:p-8">
           {children}

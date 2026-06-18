@@ -25,6 +25,7 @@ import {
   Target,
   Gift,
   Settings,
+  Crown,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -58,9 +59,10 @@ const NAV_ITEMS: NavItem[] = [
 
 interface AdminSidebarProps {
   pseudo: string
+  isSuperAdmin?: boolean
 }
 
-export function AdminSidebar({ pseudo }: AdminSidebarProps) {
+export function AdminSidebar({ pseudo, isSuperAdmin }: AdminSidebarProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -108,6 +110,20 @@ export function AdminSidebar({ pseudo }: AdminSidebarProps) {
             </Link>
           )
         })}
+        {isSuperAdmin && (
+          <Link
+            href="/admin/super"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 mt-2 ${
+              isActive('/admin/super')
+                ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25'
+                : 'text-yellow-500/60 hover:text-yellow-400 hover:bg-yellow-500/8'
+            }`}
+          >
+            <Crown className="w-4 h-4 flex-shrink-0" />
+            <span>Super Admin</span>
+          </Link>
+        )}
       </nav>
 
       {/* Footer */}
