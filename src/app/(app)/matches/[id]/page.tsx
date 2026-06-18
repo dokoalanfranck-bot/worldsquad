@@ -11,8 +11,11 @@ export default async function MatchDetailPage({ params }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: match }, { data: prediction }, { data: groupPredictions }, flashChallenge] = await Promise.all([
-    supabase.from('matches').select('*').eq('id', params.id).single(),
+  // Fetch match first to know the teams
+  const { data: match } = await supabase.from('matches').select('*').eq('id', params.id).single()
+  if (!match) notFound()
+
+  const [{ data: prediction }, { data: groupPredictions }, flashChallenge, { data: players }] = await Promise.all([
     supabase
       .from('predictions')
       .select('*')
@@ -24,9 +27,13 @@ export default async function MatchDetailPage({ params }: Props) {
       .select('*, user:users(pseudo, photo_url, nation)')
       .eq('match_id', params.id),
     getFlashChallengeForMatch(params.id),
+    supabase
+      .from('cards')
+      .select('id, name, rarity, image_url, stats, nation')
+      .eq('type', 'player')
+      .in('nation', [match.team_a, match.team_b])
+      .order('name'),
   ])
-
-  if (!match) notFound()
 
   // Only show others' predictions after match starts
   const visibleGroupPredictions =
@@ -39,6 +46,7 @@ export default async function MatchDetailPage({ params }: Props) {
       groupPredictions={visibleGroupPredictions}
       userId={user!.id}
       flashChallenge={flashChallenge}
+      players={players ?? []}
     />
   )
 }
