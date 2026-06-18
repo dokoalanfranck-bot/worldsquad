@@ -390,6 +390,7 @@ function GoalAnimation({
 function WaitingView({ battle, isChallenger }: { battle: PenaltyBattle; isChallenger: boolean }) {
   const router = useRouter()
   const [cancelling, setCancelling] = useState(false)
+  const isInvite = battle.status === 'invited'
 
   async function cancel() {
     setCancelling(true)
@@ -402,9 +403,11 @@ function WaitingView({ battle, isChallenger }: { battle: PenaltyBattle; isChalle
       <div className="text-center">
         <p className="text-white/30 text-xs uppercase tracking-widest mb-3">⚽ Tirs au but</p>
         <h1 className="text-5xl font-black text-white mb-3" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-          RECHERCHE EN COURS
+          {isInvite ? 'DÉFI ENVOYÉ' : 'RECHERCHE EN COURS'}
         </h1>
-        <p className="text-white/40 text-sm">En attente d'un adversaire…</p>
+        <p className="text-white/40 text-sm">
+          {isInvite ? 'En attente que l\'adversaire accepte…' : 'En attente d\'un adversaire…'}
+        </p>
       </div>
       <motion.div
         animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
@@ -1423,7 +1426,7 @@ export function PenaltyClient({
       )}
 
       <AnimatePresence mode="wait">
-        {battle.status === 'waiting' && (
+        {(battle.status === 'waiting' || battle.status === 'invited') && (
           <WaitingView key="waiting" battle={battle} isChallenger={isChallenger} />
         )}
         {battle.status === 'picking' && (

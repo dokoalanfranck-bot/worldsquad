@@ -549,7 +549,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], currentU
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-green-400 text-xs font-bold">{onlinePlayers.length} en ligne</span>
+                <span className="text-green-400 text-xs font-bold">{visibleLobby.length} disponible{visibleLobby.length > 1 ? 's' : ''}</span>
               </div>
             </div>
 
