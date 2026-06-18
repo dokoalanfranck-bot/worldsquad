@@ -7,7 +7,8 @@ const PRIZES = [300, 200, 100] as const
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = (process.env.CRON_SECRET ?? '').trim()
+  if (authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
