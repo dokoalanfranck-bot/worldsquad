@@ -676,6 +676,7 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
   }, [events, isChallenger])
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -761,50 +762,6 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
         )}
       </AnimatePresence>
 
-      {/* Chat messages bubbles */}
-      <AnimatePresence>
-        {chatMsgs.map((msg) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, y: 10, scale: 0.85 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-            className={`fixed z-40 px-3 py-1.5 rounded-full text-sm font-bold shadow-lg pointer-events-none ${
-              msg.isMine
-                ? 'bg-[#F5C518] text-black right-4'
-                : 'bg-white/15 text-white left-4 backdrop-blur-sm border border-white/10'
-            }`}
-            style={{ bottom: `${140 + chatMsgs.indexOf(msg) * 44}px` }}
-          >
-            {!msg.isMine && <span className="text-white/50 text-xs mr-1">{them?.pseudo?.split(' ')[0]} ·</span>}
-            {msg.text}
-          </motion.div>
-        ))}
-      </AnimatePresence>
-
-      {/* Quick chat bar (only during match, not for bots) */}
-      {!duel.is_bot && !isFinished && (
-        <div
-          className="fixed left-0 right-0 z-[60] px-3 py-2 flex gap-2 overflow-x-auto no-scrollbar"
-          style={{
-            bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
-            background: 'linear-gradient(0deg, rgba(3,8,16,0.97) 0%, rgba(3,8,16,0.0) 100%)',
-          }}
-        >
-          {QUICK_MSGS.map((qm) => (
-            <button
-              key={qm.id}
-              onClick={() => sendMsg(qm.text)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border border-white/15 text-white/80 active:scale-95 transition-transform"
-              style={{ background: 'rgba(255,255,255,0.09)' }}
-            >
-              {qm.text}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Card flash overlay (goal/save) */}
       <AnimatePresence>
         {cardFlash && (
@@ -859,6 +816,51 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
         )}
       </AnimatePresence>
     </motion.div>
+
+    {/* Chat messages bubbles — en dehors de motion.div pour éviter le stacking context opacity */}
+    <AnimatePresence>
+      {chatMsgs.map((msg) => (
+        <motion.div
+          key={msg.id}
+          initial={{ opacity: 0, y: 10, scale: 0.85 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -10, scale: 0.9 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+          className={`fixed z-[70] px-3 py-1.5 rounded-full text-sm font-bold shadow-lg pointer-events-none ${
+            msg.isMine
+              ? 'bg-[#F5C518] text-black right-4'
+              : 'bg-white/15 text-white left-4 backdrop-blur-sm border border-white/10'
+          }`}
+          style={{ bottom: `${140 + chatMsgs.indexOf(msg) * 44}px` }}
+        >
+          {!msg.isMine && <span className="text-white/50 text-xs mr-1">{them?.pseudo?.split(' ')[0]} ·</span>}
+          {msg.text}
+        </motion.div>
+      ))}
+    </AnimatePresence>
+
+    {/* Quick chat bar — en dehors de motion.div */}
+    {!duel.is_bot && !isFinished && (
+      <div
+        className="fixed left-0 right-0 z-[70] px-3 py-2 flex gap-2 overflow-x-auto no-scrollbar"
+        style={{
+          bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          background: 'linear-gradient(0deg, rgba(3,8,16,0.97) 0%, rgba(3,8,16,0.0) 100%)',
+        }}
+      >
+        {QUICK_MSGS.map((qm) => (
+          <button
+            key={qm.id}
+            onClick={() => sendMsg(qm.text)}
+            className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border border-white/15 text-white/80 active:scale-95 transition-transform"
+            style={{ background: 'rgba(255,255,255,0.09)' }}
+          >
+            {qm.text}
+          </button>
+        ))}
+      </div>
+    )}
+    </>
   )
 }
 

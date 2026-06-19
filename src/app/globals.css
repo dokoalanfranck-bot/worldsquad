@@ -270,6 +270,10 @@ body {
 }
 .float-up { animation: float-up 1s ease-out forwards; }
 
+/* ── No scrollbar ────────────────────────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* ── World Cup 2026 hero gradient background ─────────────────────────────── */
 .wc26-hero {
   background: linear-gradient(160deg, #0A1F3D 0%, #091524 50%, #06111E 100%);
