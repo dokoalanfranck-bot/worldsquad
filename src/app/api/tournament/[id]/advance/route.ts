@@ -42,16 +42,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     if (fdErr) console.error('[advance] select final duel failed:', fdErr)
 
     if (fd?.winner_id) {
-      const challWon   = fd.winner_id === fd.challenger_id
-      const winnerSlot = challWon ? t.semi1_winner_slot : t.semi2_winner_slot
-      const winnerId   = fd.winner_id
+      const challWon    = fd.winner_id === fd.challenger_id
+      const winnerSlot  = challWon ? t.semi1_winner_slot : t.semi2_winner_slot
+      const loserSlot   = challWon ? t.semi2_winner_slot : t.semi1_winner_slot
+      const winnerId    = fd.winner_id
+      const finalLoserIdKey = `p${loserSlot}_id`
 
       await admin.from('tournaments').update({
-        final:       { scoreA: fd.challenger_score, scoreB: fd.opponent_score, events: fd.match_events, winner: winnerSlot },
-        winner_slot: winnerSlot,
-        winner_id:   winnerId,
-        status:      'finished',
-        coins_won:   WINNER_COINS,
+        final:              { scoreA: fd.challenger_score, scoreB: fd.opponent_score, events: fd.match_events, winner: winnerSlot },
+        winner_slot:        winnerSlot,
+        winner_id:          winnerId,
+        status:             'finished',
+        coins_won:          WINNER_COINS,
+        [finalLoserIdKey]:  null,
       }).eq('id', id)
 
       await Promise.allSettled([
@@ -94,10 +97,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     semi1Done       = true
     semi1WinnerId   = d1.winner_id
     semi1WinnerSlot = challWon1 ? 0 : 1
+    const semi1LoserSlot = semi1WinnerSlot === 0 ? 'p1_id' : 'p0_id'
     await admin.from('tournaments').update({
       semi1: { scoreA: d1.challenger_score, scoreB: d1.opponent_score, events: d1.match_events, winner: semi1WinnerSlot },
       semi1_winner_id:   semi1WinnerId,
       semi1_winner_slot: semi1WinnerSlot,
+      [semi1LoserSlot]:  null,
     }).eq('id', id)
   }
 
@@ -106,10 +111,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     semi2Done       = true
     semi2WinnerId   = d2.winner_id
     semi2WinnerSlot = challWon2 ? 2 : 3
+    const semi2LoserSlot = semi2WinnerSlot === 2 ? 'p3_id' : 'p2_id'
     await admin.from('tournaments').update({
       semi2: { scoreA: d2.challenger_score, scoreB: d2.opponent_score, events: d2.match_events, winner: semi2WinnerSlot },
       semi2_winner_id:   semi2WinnerId,
       semi2_winner_slot: semi2WinnerSlot,
+      [semi2LoserSlot]:  null,
     }).eq('id', id)
   }
 
