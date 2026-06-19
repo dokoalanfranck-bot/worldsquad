@@ -775,7 +775,7 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
                 ? 'bg-[#F5C518] text-black right-4'
                 : 'bg-white/15 text-white left-4 backdrop-blur-sm border border-white/10'
             }`}
-            style={{ bottom: `${80 + chatMsgs.indexOf(msg) * 44}px` }}
+            style={{ bottom: `${140 + chatMsgs.indexOf(msg) * 44}px` }}
           >
             {!msg.isMine && <span className="text-white/50 text-xs mr-1">{them?.pseudo?.split(' ')[0]} ·</span>}
             {msg.text}
@@ -785,15 +785,19 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
 
       {/* Quick chat bar (only during match, not for bots) */}
       {!duel.is_bot && !isFinished && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 py-2.5 flex gap-2 overflow-x-auto no-scrollbar"
-          style={{ background: 'linear-gradient(0deg, rgba(3,8,16,0.95) 0%, transparent 100%)' }}
+        <div
+          className="fixed left-0 right-0 z-[60] px-3 py-2 flex gap-2 overflow-x-auto no-scrollbar"
+          style={{
+            bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+            background: 'linear-gradient(0deg, rgba(3,8,16,0.97) 0%, rgba(3,8,16,0.0) 100%)',
+          }}
         >
           {QUICK_MSGS.map((qm) => (
             <button
               key={qm.id}
               onClick={() => sendMsg(qm.text)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border border-white/10 bg-white/8 text-white/80 active:scale-95 transition-transform"
-              style={{ background: 'rgba(255,255,255,0.07)' }}
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border border-white/15 text-white/80 active:scale-95 transition-transform"
+              style={{ background: 'rgba(255,255,255,0.09)' }}
             >
               {qm.text}
             </button>
