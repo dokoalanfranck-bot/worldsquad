@@ -104,7 +104,7 @@ export async function openPack(
     // Legends verrouillées sous 70% de progression globale
     if (rarity === 'Legend' && globalProgression < 70) rarity = 'Epic'
 
-    const excludeIds = new Set([...ownedIds, ...packCardIds])
+    const excludeIds = new Set(Array.from(ownedIds).concat(Array.from(packCardIds)))
     const card = await pickCard(supabase, rarity, excludeIds, todayNations)
     if (card) {
       cards.push(card)

@@ -575,6 +575,19 @@ function PickingView({
 
 const MATCH_MS = 30000
 
+const QUICK_MSGS = [
+  { id: 'goal',   text: 'BUT !!! ⚽' },
+  { id: 'lucky',  text: 'Chanceux 😤' },
+  { id: 'gg',     text: 'GG 👏' },
+  { id: 'noo',    text: 'Noooon 😱' },
+  { id: 'fire',   text: '🔥' },
+  { id: 'laugh',  text: '😂' },
+  { id: 'skull',  text: '💀' },
+  { id: 'crown',  text: '👑' },
+]
+
+interface ChatMsg { id: string; text: string; isMine: boolean }
+
 function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallenger: boolean; me: Profile; them: Profile }) {
   const [elapsed, setElapsed] = useState(0)
   const [visibleEvents, setVisibleEvents] = useState<DuelEvent[]>([])
@@ -582,8 +595,36 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
   const [theirGoals, setTheirGoals] = useState(0)
   const [ballPos, setBallPos] = useState({ x: 50, y: 50 })
   const [cardFlash, setCardFlash] = useState<{ name: string; isMine: boolean; cardImageUrl: string | null; cardRarity: string; type: 'goal' | 'save' } | null>(null)
+  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([])
   const startRef = useRef(Date.now())
   const lastCountRef = useRef(0)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const channelRef = useRef<any>(null)
+  const sentIds = useRef(new Set<string>())
+
+  // Realtime broadcast chat (skip for bot duels)
+  useEffect(() => {
+    if (duel.is_bot || !me.id) return
+    const supabase = createClient()
+    const ch = supabase.channel(`duel-chat-${duel.id}`)
+    ch.on('broadcast', { event: 'msg' }, ({ payload }: { payload: { text: string; senderId: string; msgId: string } }) => {
+      if (sentIds.current.has(payload.msgId)) return
+      const msg: ChatMsg = { id: payload.msgId, text: payload.text, isMine: false }
+      setChatMsgs((prev) => [...prev.slice(-4), msg])
+      setTimeout(() => setChatMsgs((prev) => prev.filter((m) => m.id !== msg.id)), 3500)
+    }).subscribe()
+    channelRef.current = ch
+    return () => { supabase.removeChannel(ch) }
+  }, [duel.id, duel.is_bot, me.id])
+
+  const sendMsg = (text: string) => {
+    const msgId = `${me.id}-${Date.now()}`
+    sentIds.current.add(msgId)
+    channelRef.current?.send({ type: 'broadcast', event: 'msg', payload: { text, senderId: me.id, msgId } })
+    const msg: ChatMsg = { id: msgId, text, isMine: true }
+    setChatMsgs((prev) => [...prev.slice(-4), msg])
+    setTimeout(() => setChatMsgs((prev) => prev.filter((m) => m.id !== msgId)), 3500)
+  }
 
   const events = useMemo(() => {
     const raw = (duel.match_events ?? []) as DuelEvent[]
@@ -719,6 +760,46 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Chat messages bubbles */}
+      <AnimatePresence>
+        {chatMsgs.map((msg) => (
+          <motion.div
+            key={msg.id}
+            initial={{ opacity: 0, y: 10, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+            className={`fixed z-40 px-3 py-1.5 rounded-full text-sm font-bold shadow-lg pointer-events-none ${
+              msg.isMine
+                ? 'bg-[#F5C518] text-black right-4'
+                : 'bg-white/15 text-white left-4 backdrop-blur-sm border border-white/10'
+            }`}
+            style={{ bottom: `${80 + chatMsgs.indexOf(msg) * 44}px` }}
+          >
+            {!msg.isMine && <span className="text-white/50 text-xs mr-1">{them?.pseudo?.split(' ')[0]} ·</span>}
+            {msg.text}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Quick chat bar (only during match, not for bots) */}
+      {!duel.is_bot && !isFinished && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 py-2.5 flex gap-2 overflow-x-auto no-scrollbar"
+          style={{ background: 'linear-gradient(0deg, rgba(3,8,16,0.95) 0%, transparent 100%)' }}
+        >
+          {QUICK_MSGS.map((qm) => (
+            <button
+              key={qm.id}
+              onClick={() => sendMsg(qm.text)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border border-white/10 bg-white/8 text-white/80 active:scale-95 transition-transform"
+              style={{ background: 'rgba(255,255,255,0.07)' }}
+            >
+              {qm.text}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Card flash overlay (goal/save) */}
       <AnimatePresence>
