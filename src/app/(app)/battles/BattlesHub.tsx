@@ -603,7 +603,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
                   {[
                     { icon: '⚔️', label: '2 Demi-finales', desc: '2 matchs simultanés · résultat instantané' },
                     { icon: '🏆', label: 'Finale',         desc: "Les 2 vainqueurs s'affrontent" },
-                    { icon: '🪙', label: 'Récompenses',    desc: '1ère place +300 coins · 2ème place +100 coins' },
+                    { icon: '🪙', label: 'Récompenses',    desc: '1ère place +75 coins' },
                   ].map(({ icon, label, desc }) => (
                     <div key={label} className="flex items-center gap-3">
                       <span className="text-lg flex-shrink-0">{icon}</span>

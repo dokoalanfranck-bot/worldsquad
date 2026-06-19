@@ -7,8 +7,7 @@ import type { Card } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
-const WINNER_COINS  = 300
-const FINALIST_COINS = 100
+const WINNER_COINS  = 75
 
 async function buildBotPicks(
   admin: ReturnType<typeof createAdminClient>,
@@ -47,8 +46,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const challWon   = fd.winner_id === fd.challenger_id
       const winnerSlot = challWon ? t.semi1_winner_slot : t.semi2_winner_slot
       const winnerId   = fd.winner_id
-      // Le finaliste perdant : l'autre semi-vainqueur
-      const finalistId = challWon ? t.semi2_winner_id : t.semi1_winner_id
 
       await admin.from('tournaments').update({
         final:       { scoreA: fd.challenger_score, scoreB: fd.opponent_score, events: fd.match_events, winner: winnerSlot },
@@ -58,18 +55,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         coins_won:   WINNER_COINS,
       }).eq('id', id)
 
-      // Récompenses
       await Promise.allSettled([
         admin.rpc('increment_coins', { user_id: winnerId, delta: WINNER_COINS }),
         admin.from('coin_transactions').insert({ user_id: winnerId, amount: WINNER_COINS, reason: `🏆 Victoire tournoi — ${id.slice(0, 8)}` }),
       ])
-      // 2e place : le finaliste perdant (seulement si c'est un vrai joueur)
-      if (finalistId) {
-        await Promise.allSettled([
-          admin.rpc('increment_coins', { user_id: finalistId, delta: FINALIST_COINS }),
-          admin.from('coin_transactions').insert({ user_id: finalistId, amount: FINALIST_COINS, reason: `🥈 Finaliste tournoi — ${id.slice(0, 8)}` }),
-        ])
-      }
     }
     return NextResponse.json({ status: 'final_active' })
   }
