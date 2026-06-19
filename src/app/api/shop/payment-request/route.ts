@@ -52,12 +52,13 @@ export async function POST(req: Request) {
   }
 
   // Get pack price
-  const { data: config } = await admin.from('shop_config').select('prices_fcfa, prices_dt, is_active').limit(1).maybeSingle()
+  const { data: config } = await admin.from('shop_config').select('*').limit(1).maybeSingle()
   if (!config?.is_active) {
     return NextResponse.json({ error: 'Boutique temporairement fermée' }, { status: 503 })
   }
   const isD17 = paymentMethod === 'd17'
-  const prices = (isD17 ? config.prices_dt : config.prices_fcfa) as Record<string, number>
+  const pricesDt = (config as Record<string, unknown>).prices_dt as Record<string, number> | null
+  const prices = (isD17 ? (pricesDt ?? config.prices_fcfa) : config.prices_fcfa) as Record<string, number>
   const amountFcfa = prices?.[packType] ?? 0
 
   // Upload screenshot to Supabase Storage

@@ -20,12 +20,18 @@ export async function PUT(req: NextRequest) {
     is_active?: boolean
   }
 
+  // Only include d17/prices_dt if they are provided (columns may not exist before migration 032)
+  const { d17, prices_dt, ...baseBody } = body
+  const payload: Record<string, unknown> = { ...baseBody, updated_at: new Date().toISOString() }
+  if (d17     !== undefined) payload.d17       = d17
+  if (prices_dt !== undefined) payload.prices_dt = prices_dt
+
   const { data: existing } = await admin.from('shop_config').select('id').limit(1).maybeSingle()
 
   if (existing) {
     const { error } = await admin
       .from('shop_config')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update(payload)
       .eq('id', existing.id)
 
     if (error) {
@@ -33,7 +39,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
   } else {
-    const { error } = await admin.from('shop_config').insert({ ...body })
+    const { error } = await admin.from('shop_config').insert(payload)
     if (error) {
       console.error('[shop-config] insert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
