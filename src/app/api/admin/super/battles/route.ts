@@ -19,7 +19,7 @@ export async function GET() {
       .limit(50),
     admin.from('penalty_battles')
       .select('id, status, created_at, challenger_id, opponent_id')
-      .in('status', ['invited', 'waiting', 'picking'])
+      .in('status', ['invited', 'waiting', 'picking', 'active', 'stealing'])
       .order('created_at', { ascending: false })
       .limit(50),
   ])

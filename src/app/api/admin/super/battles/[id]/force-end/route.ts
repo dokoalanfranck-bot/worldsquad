@@ -16,14 +16,20 @@ export async function POST(
   const { data: me } = await admin.from('users').select('is_super_admin, pseudo').eq('id', user.id).single()
   if (!me?.is_super_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { type } = await req.json() as { type: 'duel' | 'penalty' }
+  const body = await req.json() as { type?: 'duel' | 'penalty' }
+  const type = body.type ?? 'duel'
 
   const table = type === 'penalty' ? 'penalty_battles' : 'duels'
+
+  // For penalty: also cover 'active' and 'stealing' statuses
+  const penaltyStatuses = ['invited', 'waiting', 'picking', 'active', 'stealing']
+  const duelStatuses    = ['open', 'invited', 'picking', 'stealing']
+
   const { error } = await admin
     .from(table)
     .update({ status: 'cancelled', updated_at: new Date().toISOString() })
     .eq('id', id)
-    .in('status', type === 'penalty' ? ['invited', 'waiting', 'picking'] : ['open', 'invited', 'picking', 'stealing'])
+    .in('status', type === 'penalty' ? penaltyStatuses : duelStatuses)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

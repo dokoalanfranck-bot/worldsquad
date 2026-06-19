@@ -10,13 +10,17 @@ interface AuditParams {
 }
 
 export async function logAudit(p: AuditParams): Promise<void> {
-  const admin = createAdminClient()
-  await admin.from('super_admin_audit_log').insert({
-    admin_id: p.adminId,
-    admin_pseudo: p.adminPseudo,
-    action: p.action,
-    target_user_id: p.targetUserId ?? null,
-    target_pseudo: p.targetPseudo ?? null,
-    metadata: p.metadata ?? {},
-  })
+  try {
+    const admin = createAdminClient()
+    await admin.from('super_admin_audit_log').insert({
+      admin_id: p.adminId,
+      admin_pseudo: p.adminPseudo,
+      action: p.action,
+      target_user_id: p.targetUserId ?? null,
+      target_pseudo: p.targetPseudo ?? null,
+      metadata: p.metadata ?? {},
+    })
+  } catch {
+    // Non-bloquant : l'audit ne doit jamais faire échouer l'action principale
+  }
 }
