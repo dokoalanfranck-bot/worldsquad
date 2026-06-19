@@ -1,8 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { SeedWorldCupButton } from './_components/SeedWorldCupButton'
-import { SeedPlayersButton } from './_components/SeedPlayersButton'
-import { ResetUsersButton } from './_components/ResetUsersButton'
 import {
   Users,
   Calendar,
@@ -93,11 +90,6 @@ export default async function AdminDashboardPage() {
         <div>
           <h1 className="font-bebas text-4xl text-white">VUE D&apos;ENSEMBLE</h1>
           <p className="text-white/50 text-sm mt-1">Tableau de bord administrateur WorldSquad</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <ResetUsersButton />
-          <SeedPlayersButton />
-          <SeedWorldCupButton />
         </div>
       </div>
 

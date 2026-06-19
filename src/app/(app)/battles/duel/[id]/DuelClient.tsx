@@ -1045,6 +1045,7 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
   duel: Duel; currentUserId: string; me: Profile; them: Profile; onReplay: () => void; replayLoading?: boolean
 }) {
   const router = useRouter()
+  const supabase = createClient()
   const tournamentId = duel.tournament_id as string | null
   const isChallenger = duel.challenger_id === currentUserId
   const winnerId = duel.winner_id as string | null
@@ -1052,6 +1053,79 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
   const myScore = isChallenger ? duel.challenger_score : duel.opponent_score
   const theirScore = isChallenger ? duel.opponent_score : duel.challenger_score
   const isDraw = !winnerId && (myScore ?? 0) === (theirScore ?? 0)
+  const isBot = !!(duel.is_bot)
+  const themId = them?.id as string | null
+
+  // Rematch state (challenger side)
+  const [rematchState, setRematchState] = useState<'idle' | 'sending' | 'waiting' | 'declined'>('idle')
+  const [rematchDuelId, setRematchDuelId] = useState<string | null>(null)
+  // Incoming rematch modal (opponent side)
+  const [incomingRematch, setIncomingRematch] = useState<{ duelId: string; fromPseudo: string } | null>(null)
+  const [acceptingRematch, setAcceptingRematch] = useState(false)
+
+  async function handleRematch() {
+    setRematchState('sending')
+    try {
+      const res = await fetch('/api/duels/rematch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalDuelId: duel.id }),
+      })
+      const data = await res.json() as { duelId?: string; error?: string }
+      if (!res.ok || !data.duelId) { toast.error(data.error ?? 'Erreur'); setRematchState('idle'); return }
+      setRematchDuelId(data.duelId)
+      setRematchState('waiting')
+    } catch { toast.error('Erreur réseau'); setRematchState('idle') }
+  }
+
+  async function acceptRematch() {
+    if (!incomingRematch) return
+    setAcceptingRematch(true)
+    const res = await fetch(`/api/duels/${incomingRematch.duelId}/accept-invite`, { method: 'POST' })
+    if (res.ok) { router.push(`/battles/duel/${incomingRematch.duelId}`) }
+    else { toast.error('Erreur'); setAcceptingRematch(false) }
+  }
+
+  async function declineRematch() {
+    if (!incomingRematch) return
+    await fetch(`/api/duels/${incomingRematch.duelId}/decline-invite`, { method: 'POST' })
+    setIncomingRematch(null)
+  }
+
+  // Subscribe to incoming rematch invites (opponent side)
+  useEffect(() => {
+    if (isBot || !themId || tournamentId) return
+    const ch = supabase
+      .channel(`rematch-incoming-${currentUserId}-${duel.id}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'duels', filter: `opponent_id=eq.${currentUserId}` },
+        ({ new: newDuel }) => {
+          const d = newDuel as Duel
+          if (d.challenger_id === themId && d.status === 'invited') {
+            setIncomingRematch({ duelId: d.id as string, fromPseudo: them?.pseudo ?? 'Adversaire' })
+          }
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [currentUserId, themId, isBot, tournamentId]) // eslint-disable-line
+
+  // Subscribe to rematch duel status (challenger waiting for response)
+  useEffect(() => {
+    if (!rematchDuelId) return
+    const ch = supabase
+      .channel(`rematch-status-${rematchDuelId}`)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${rematchDuelId}` },
+        ({ new: updated }) => {
+          const d = updated as Duel
+          if (d.status === 'picking') router.push(`/battles/duel/${rematchDuelId}`)
+          if (d.status === 'cancelled') { toast('Invitation refusée', { icon: '❌' }); setRematchState('declined') }
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [rematchDuelId]) // eslint-disable-line
   const stolenCards = useMemo(() => {
     if (!duel.stolen_card_ids?.length) return []
     // Winner → show loser's picks (cards stolen from opponent)
@@ -1073,6 +1147,7 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
   }, [tournamentId, iWon, router])
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -1147,17 +1222,34 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
           </button>
         ) : (
           <>
-            <button
-              onClick={onReplay}
-              disabled={replayLoading}
-              className="flex-1 bg-[#F5C518] disabled:opacity-60 text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
-              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-            >
-              {replayLoading
-                ? <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> RECHERCHE…</>
-                : <><RotateCcw size={16} /> REJOUER</>
-              }
-            </button>
+            {!isBot && rematchState === 'waiting' ? (
+              <button disabled className="flex-1 bg-white/5 border border-white/10 text-white/40 font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" />
+                EN ATTENTE…
+              </button>
+            ) : !isBot && rematchState === 'declined' ? (
+              <button onClick={onReplay} disabled={replayLoading}
+                className="flex-1 bg-white/10 disabled:opacity-60 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                {replayLoading
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> RECHERCHE…</>
+                  : <><RotateCcw size={16} /> MATCHMAKING</>
+                }
+              </button>
+            ) : (
+              <button
+                onClick={isBot ? onReplay : handleRematch}
+                disabled={replayLoading || rematchState === 'sending'}
+                className="flex-1 bg-[#F5C518] disabled:opacity-60 text-black font-black py-3.5 rounded-xl flex items-center justify-center gap-2"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+              >
+                {replayLoading || rematchState === 'sending'
+                  ? <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> {isBot ? 'RECHERCHE…' : 'ENVOI…'}</>
+                  : <><RotateCcw size={16} /> {isBot ? 'REJOUER' : 'REVANCHE'}</>
+                }
+              </button>
+            )}
             <button
               onClick={() => {
                 if (navigator.share) {
@@ -1177,5 +1269,47 @@ function ResultView({ duel, currentUserId, me, them, onReplay, replayLoading }: 
         <div className="flex items-center gap-1"><Shield size={10} /> Eux : {theirScore ?? 0}</div>
       </div>
     </motion.div>
+
+    {/* Incoming rematch modal */}
+    <AnimatePresence>
+      {incomingRematch && (
+        <motion.div
+          key="rematch-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm px-4 pb-10"
+        >
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className="w-full max-w-sm bg-[#13131f] border border-white/10 rounded-2xl p-5 space-y-4"
+          >
+            <div className="text-center space-y-1">
+              <p className="text-3xl">⚔️</p>
+              <p className="text-white font-black text-lg" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>REVANCHE PROPOSÉE</p>
+              <p className="text-white/50 text-sm">{incomingRematch.fromPseudo} te défie à une revanche !</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={declineRematch}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-white/50 font-bold text-sm hover:border-white/20 transition-colors">
+                Refuser
+              </button>
+              <button onClick={acceptRematch} disabled={acceptingRematch}
+                className="flex-1 py-3 rounded-xl bg-[#F5C518] text-black font-black text-sm disabled:opacity-60 flex items-center justify-center gap-2"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                {acceptingRematch
+                  ? <div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" />
+                  : <><Swords size={14} /> ACCEPTER</>
+                }
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   )
 }
