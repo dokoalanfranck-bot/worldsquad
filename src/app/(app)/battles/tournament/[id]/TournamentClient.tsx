@@ -571,14 +571,15 @@ function BracketView({ t, currentUserId }: { t: TournamentData; currentUserId: s
     { pseudo: t.p3_pseudo, nation: t.p3_nation, isUser: t.p3_id === currentUserId },
   ]
 
-  const s1w       = t.semi1.winner   // 0 or 1
-  const s2w       = t.semi2.winner   // 2 or 3
-  const fw        = t.final.winner   // 0–3
+  const s1w       = t.semi1_winner_slot ?? t.semi1.winner   // 0 or 1
+  const s2w       = t.semi2_winner_slot ?? t.semi2.winner   // 2 or 3
+  const fw        = t.winner_slot     ?? t.final.winner     // 0–3
   const finalist1 = players[s1w]
   const finalist2 = players[s2w]
   const champion  = players[fw]
-  const isUserChamp = champion.isUser
-  const coinsWon    = isUserChamp ? 75 : 0
+  const isUserChamp    = champion.isUser
+  const isUserFinalist = !isUserChamp && (finalist1.isUser || finalist2.isUser)
+  const coinsWon = isUserChamp ? 300 : isUserFinalist ? 100 : 0
 
   return (
     <div className="space-y-4">
@@ -684,7 +685,9 @@ function BracketView({ t, currentUserId }: { t: TournamentData; currentUserId: s
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>+{coinsWon} COINS</span>
                   <span className="text-xl">🪙</span>
                 </div>
-                <p className="text-white/30 text-xs mt-2">🏆 1ère place — vainqueur du tournoi</p>
+                <p className="text-white/30 text-xs mt-2">
+                  {isUserChamp ? '🏆 1ère place — vainqueur du tournoi' : '🥈 2ème place — finaliste'}
+                </p>
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}

@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { seededShuffle } from '@/lib/duel-engine'
+import { seededShuffle, isCoach, isGK } from '@/lib/duel-engine'
 import { simulateTournament, getBotPicksFromPool } from '@/lib/tournament-engine'
 import type { Card } from '@/types'
 

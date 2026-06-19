@@ -1,8 +1,5 @@
-import { simulateDuel, seededShuffle } from './duel-engine'
+import { simulateDuel, seededShuffle, isCoach, isGK } from './duel-engine'
 import type { Card } from '@/types'
-
-const isCoach = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
-const isGK    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'GK'
 const RARITY_ORDER: Record<string, number> = { Legend: 4, Epic: 3, Rare: 2, Common: 1 }
 
 export function selectBestSix(cards: Card[]): Card[] {
