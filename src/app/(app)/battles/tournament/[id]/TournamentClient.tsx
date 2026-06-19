@@ -203,12 +203,12 @@ function WaitingRoom({
               className="w-full py-3.5 rounded-xl font-black text-black transition-all"
               style={{ background: 'linear-gradient(135deg, #f97316 0%, #F5C518 100%)', fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem' }}
             >
-              LANCER AVEC DES BOTS
+              COMPLÉTER ET LANCER
             </motion.button>
           )}
           {!isCreator && (
             <p className="text-white/20 text-xs text-center">
-              Le créateur peut lancer avec des bots si le lobby n'est pas complet
+              Le créateur peut compléter et lancer si le lobby n'est pas complet
             </p>
           )}
         </div>

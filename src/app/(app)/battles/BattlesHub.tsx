@@ -583,7 +583,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
                 </div>
                 <div className="space-y-2">
                   {[
-                    { icon: '⚔️', label: '2 Demi-finales', desc: 'Toi vs bot · bot vs bot' },
+                    { icon: '⚔️', label: '2 Demi-finales', desc: '2 matchs simultanés · résultat instantané' },
                     { icon: '🏆', label: 'Finale',         desc: "Les 2 vainqueurs s'affrontent" },
                     { icon: '🪙', label: 'Récompenses',    desc: '1ère place +300 coins · 2ème place +100 coins' },
                   ].map(({ icon, label, desc }) => (
@@ -657,7 +657,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
               <div className="space-y-3">
                 {[
                   { n: '1', label: 'Ouvre la page', desc: 'Tu es visible instantanément par les autres', color: 'text-blue-400 bg-blue-500/10' },
-                  { n: '2', label: 'Choisis un adversaire', desc: 'Humain ou bot, et envoie le défi', color: 'text-purple-400 bg-purple-500/10' },
+                  { n: '2', label: 'Choisis un adversaire', desc: 'Sélectionne un joueur et envoie le défi', color: 'text-purple-400 bg-purple-500/10' },
                   { n: '3', label: 'Battle !', desc: 'Sélection de cartes → match animé → vol de carte', color: mode === 'duel' ? 'text-[#F5C518] bg-[#F5C518]/10' : 'text-green-400 bg-green-500/10' },
                 ].map(({ n, label, desc, color }) => (
                   <div key={n} className="flex items-center gap-3">

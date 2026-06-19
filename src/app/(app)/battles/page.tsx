@@ -48,7 +48,7 @@ export default async function BattlesPage() {
     return {
       ...d,
       challenger: challenger ?? { id: d.challenger_id, pseudo: '?', nation: '', photo_url: null },
-      opponent:   opponent   ?? { id: null, pseudo: d.bot_name ?? 'Bot', nation: botNation(d.bot_name ?? 'x'), photo_url: null },
+      opponent:   opponent   ?? { id: null, pseudo: d.bot_name ?? 'Adversaire', nation: botNation(d.bot_name ?? 'x'), photo_url: null },
     }
   }))
 
