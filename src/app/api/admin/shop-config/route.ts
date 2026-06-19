@@ -14,7 +14,9 @@ export async function PUT(req: NextRequest) {
   const body = await req.json() as {
     orange_money?: string
     mtn?: string
+    d17?: string
     prices_fcfa?: Record<string, number>
+    prices_dt?: Record<string, number>
     is_active?: boolean
   }
 

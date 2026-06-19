@@ -12,7 +12,9 @@ interface ShopConfig {
   id: string
   orange_money: string
   mtn: string
+  d17: string
   prices_fcfa: Record<string, number>
+  prices_dt: Record<string, number>
   is_active: boolean
 }
 
@@ -25,7 +27,7 @@ interface PaymentRequest {
   coins_to_credit: number
   phone_number: string
   screenshot_url: string
-  payment_method: 'orange_money' | 'mtn'
+  payment_method: 'orange_money' | 'mtn' | 'd17'
   status: 'pending' | 'approved' | 'rejected'
   admin_note: string | null
   created_at: string
@@ -33,6 +35,11 @@ interface PaymentRequest {
   user?: { pseudo: string; photo_url: string | null }
 }
 
+function formatAmount(n: number, method: string) {
+  return method === 'd17'
+    ? n.toLocaleString('fr-FR') + ' DT'
+    : n.toLocaleString('fr-FR') + ' FCFA'
+}
 function fcfa(n: number) {
   return n.toLocaleString('fr-FR') + ' FCFA'
 }
@@ -70,7 +77,9 @@ export default function AdminShopPage() {
     setConfigDraft({
       orange_money: cfg.orange_money,
       mtn: cfg.mtn,
+      d17: cfg.d17,
       prices_fcfa: { ...cfg.prices_fcfa },
+      prices_dt: { ...(cfg.prices_dt ?? { starter: 5, fan: 15, ultra: 35 }) },
       is_active: cfg.is_active,
     })
   }, [])
@@ -227,12 +236,12 @@ export default function AdminShopPage() {
                         <span className="text-white/20 text-xs">·</span>
                         <p className="text-white/50 text-xs">{timeAgo(r.created_at)}</p>
                       </div>
-                      <p className="text-white/50 text-xs">{r.pack_name} — {fcfa(r.amount_fcfa)}</p>
+                      <p className="text-white/50 text-xs">{r.pack_name} — {formatAmount(r.amount_fcfa, r.payment_method)}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-bold
-                        ${r.payment_method === 'orange_money' ? 'bg-orange-500/10 text-orange-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
-                        {r.payment_method === 'orange_money' ? 'Orange' : 'MTN'}
+                        ${r.payment_method === 'orange_money' ? 'bg-orange-500/10 text-orange-400' : r.payment_method === 'd17' ? 'bg-blue-500/10 text-blue-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                        {r.payment_method === 'orange_money' ? 'Orange' : r.payment_method === 'd17' ? 'D17' : 'MTN'}
                       </span>
                       <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
                         className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
@@ -337,7 +346,7 @@ export default function AdminShopPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold">{r.user?.pseudo ?? r.user_id.slice(0, 8)}</p>
                     <p className="text-white/30 text-xs truncate">
-                      {r.pack_name} · {fcfa(r.amount_fcfa)} · {r.payment_method === 'orange_money' ? 'Orange' : 'MTN'}
+                      {r.pack_name} · {formatAmount(r.amount_fcfa, r.payment_method)} · {r.payment_method === 'orange_money' ? 'Orange' : r.payment_method === 'd17' ? 'D17' : 'MTN'}
                       {r.admin_note && <span className="text-red-400"> · {r.admin_note}</span>}
                     </p>
                   </div>
@@ -406,6 +415,16 @@ export default function AdminShopPage() {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder-gray-600 focus:border-yellow-500/40 font-mono"
               />
             </div>
+            <div>
+              <label className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-1.5 block">D17 — Tunisie 🇹🇳</label>
+              <input
+                value={configDraft.d17 ?? ''}
+                onChange={(e) => setConfigDraft((d) => ({ ...d, d17: e.target.value }))}
+                placeholder="XX XXX XXX"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder-gray-600 focus:border-blue-500/40 font-mono"
+              />
+              <p className="text-white/20 text-xs mt-1">Numéro D17 affiché uniquement aux joueurs tunisiens</p>
+            </div>
           </div>
 
           {/* Prix FCFA */}
@@ -434,6 +453,37 @@ export default function AdminShopPage() {
                     className="w-28 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-white/30 text-right"
                   />
                   <span className="text-white/30 text-sm">FCFA</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Prix DT — D17 Tunisie */}
+          <div className="glass rounded-2xl border border-white/5 p-5 space-y-4">
+            <p className="text-white/40 text-xs uppercase tracking-wider flex items-center gap-2">
+              <CreditCard size={12} /> Prix en DT (D17 — Tunisie 🇹🇳)
+            </p>
+            {[
+              { key: 'starter', label: 'Pack Starter', coins: 1000, color: '#9CA3AF' },
+              { key: 'fan',     label: 'Pack Fan',     coins: 3000, color: '#00D4FF' },
+              { key: 'ultra',   label: 'Pack Ultra',   coins: 8000, color: '#F5C518' },
+            ].map((p) => (
+              <div key={p.key} className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="font-bold text-sm" style={{ color: p.color }}>{p.label}</p>
+                  <p className="text-white/30 text-xs">{p.coins.toLocaleString()} SquadCoins</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={configDraft.prices_dt?.[p.key] ?? ''}
+                    onChange={(e) => setConfigDraft((d) => ({
+                      ...d,
+                      prices_dt: { ...(d.prices_dt ?? {}), [p.key]: parseInt(e.target.value) || 0 },
+                    }))}
+                    className="w-28 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-blue-500/30 text-right"
+                  />
+                  <span className="text-white/30 text-sm">DT</span>
                 </div>
               </div>
             ))}

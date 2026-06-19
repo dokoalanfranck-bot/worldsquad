@@ -52,12 +52,13 @@ export async function POST(req: Request) {
   }
 
   // Get pack price
-  const { data: config } = await admin.from('shop_config').select('prices_fcfa, is_active').limit(1).maybeSingle()
+  const { data: config } = await admin.from('shop_config').select('prices_fcfa, prices_dt, is_active').limit(1).maybeSingle()
   if (!config?.is_active) {
     return NextResponse.json({ error: 'Boutique temporairement fermée' }, { status: 503 })
   }
-  const prices = config.prices_fcfa as Record<string, number>
-  const amountFcfa = prices[packType] ?? 0
+  const isD17 = paymentMethod === 'd17'
+  const prices = (isD17 ? config.prices_dt : config.prices_fcfa) as Record<string, number>
+  const amountFcfa = prices?.[packType] ?? 0
 
   // Upload screenshot to Supabase Storage
   const ext = file.name.split('.').pop() ?? 'jpg'
@@ -99,11 +100,15 @@ export async function POST(req: Request) {
   const { data: admins } = await admin.from('users').select('id').eq('is_admin', true)
   const { data: userInfo } = await admin.from('users').select('pseudo').eq('id', user.id).single()
 
+  const amountLabel = isD17
+    ? `${amountFcfa.toLocaleString('fr-FR')} DT`
+    : `${amountFcfa.toLocaleString('fr-FR')} FCFA`
+
   await Promise.allSettled(
     (admins ?? []).map((a) =>
       sendPushToUser(a.id, {
         title: '💳 Nouvelle demande de paiement',
-        body: `${userInfo?.pseudo ?? 'Un joueur'} a soumis un paiement pour ${pack.name} (${amountFcfa.toLocaleString('fr-FR')} FCFA)`,
+        body: `${userInfo?.pseudo ?? 'Un joueur'} a soumis un paiement pour ${pack.name} (${amountLabel})`,
         url: '/admin/shop',
         tag: 'payment-request',
       })

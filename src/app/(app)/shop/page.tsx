@@ -12,7 +12,9 @@ import { createClient } from '@/lib/supabase/client'
 interface ShopConfig {
   orange_money: string
   mtn: string
+  d17: string
   prices_fcfa: Record<string, number>
+  prices_dt: Record<string, number>
   is_active: boolean
 }
 
@@ -57,18 +59,21 @@ const PACKS = [
   },
 ]
 
-function fcfa(n: number) {
-  return n.toLocaleString('fr-FR') + ' FCFA'
+function fcfa(n: number) { return n.toLocaleString('fr-FR') + ' FCFA' }
+function dt(n: number)   { return n.toLocaleString('fr-FR') + ' DT' }
+function formatAmount(n: number, method: string) {
+  return method === 'd17' ? dt(n) : fcfa(n)
 }
 
 export default function ShopPage() {
   const supabase = createClient()
   const [config, setConfig] = useState<ShopConfig | null>(null)
   const [myRequests, setMyRequests] = useState<PaymentRequest[]>([])
+  const [isTunisian, setIsTunisian] = useState(false)
   const hasPending = myRequests.some((r) => r.status === 'pending')
   const [selected, setSelected] = useState<typeof PACKS[0] | null>(null)
   const [step, setStep] = useState<'method' | 'form'>('method')
-  const [payMethod, setPayMethod] = useState<'orange_money' | 'mtn'>('orange_money')
+  const [payMethod, setPayMethod] = useState<'orange_money' | 'mtn' | 'd17'>('orange_money')
   const [phone, setPhone] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -78,18 +83,27 @@ export default function ShopPage() {
   useEffect(() => {
     fetch('/api/shop/config', { cache: 'no-store' }).then((r) => r.json()).then(setConfig).catch(() => {})
 
-    const loadRequests = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase
-        .from('payment_requests')
-        .select('id, pack_name, amount_fcfa, coins_to_credit, payment_method, status, admin_note, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-      setMyRequests((data ?? []) as PaymentRequest[])
+
+      const [{ data: profile }, { data: reqs }] = await Promise.all([
+        supabase.from('users').select('nation').eq('id', user.id).single(),
+        supabase
+          .from('payment_requests')
+          .select('id, pack_name, amount_fcfa, coins_to_credit, payment_method, status, admin_note, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ])
+
+      if (profile?.nation === 'Tunisia') {
+        setIsTunisian(true)
+        setPayMethod('d17')
+      }
+      setMyRequests((reqs ?? []) as PaymentRequest[])
     }
-    loadRequests()
+    init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openModal(pack: typeof PACKS[0]) {
@@ -150,8 +164,11 @@ export default function ShopPage() {
     }
   }
 
-  const number = payMethod === 'orange_money' ? config?.orange_money : config?.mtn
-  const price = selected && config ? (config.prices_fcfa[selected.key] ?? 0) : 0
+  const number = payMethod === 'orange_money' ? config?.orange_money : payMethod === 'd17' ? config?.d17 : config?.mtn
+  const price = selected && config
+    ? (isTunisian ? (config.prices_dt?.[selected.key] ?? 0) : (config.prices_fcfa[selected.key] ?? 0))
+    : 0
+  const priceLabel = isTunisian ? dt(price) : fcfa(price)
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-2xl mx-auto pb-28">
@@ -164,7 +181,9 @@ export default function ShopPage() {
           </div>
           <h1 className="text-5xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>BOUTIQUE</h1>
         </div>
-        <p className="text-white/30 text-sm mt-2">Recharge via Orange Money ou MTN Mobile Money</p>
+        <p className="text-white/30 text-sm mt-2">
+          {isTunisian ? 'Recharge via D17 🇹🇳' : 'Recharge via Orange Money ou MTN Mobile Money'}
+        </p>
       </div>
 
       {/* Bandeau demande en attente */}
@@ -182,7 +201,9 @@ export default function ShopPage() {
       <div className="space-y-3 mb-8">
         {PACKS.map((pack) => {
           const Icon = pack.icon
-          const priceFcfa = config?.prices_fcfa[pack.key]
+          const packPrice = config
+            ? (isTunisian ? config.prices_dt?.[pack.key] : config.prices_fcfa[pack.key])
+            : undefined
           const blocked = hasPending || !config?.is_active
           return (
             <motion.div key={pack.key} whileTap={!blocked ? { scale: 0.98 } : undefined}
@@ -204,9 +225,9 @@ export default function ShopPage() {
                 <p className="text-white/40 text-sm">{pack.desc}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                {priceFcfa !== undefined ? (
+                {packPrice !== undefined ? (
                   <p className="font-black text-lg" style={{ color: pack.color, fontFamily: 'Bebas Neue, sans-serif' }}>
-                    {fcfa(priceFcfa)}
+                    {isTunisian ? dt(packPrice) : fcfa(packPrice)}
                   </p>
                 ) : (
                   <div className="w-20 h-5 bg-white/5 rounded animate-pulse" />
@@ -243,7 +264,7 @@ export default function ShopPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-bold text-sm truncate">{r.pack_name}</p>
                   <p className="text-white/30 text-xs">
-                    {fcfa(r.amount_fcfa)} · {r.payment_method === 'orange_money' ? 'Orange Money' : 'MTN'}
+                    {formatAmount(r.amount_fcfa, r.payment_method)} · {r.payment_method === 'orange_money' ? 'Orange Money' : r.payment_method === 'd17' ? 'D17' : 'MTN'}
                     {r.admin_note && <span className="text-red-400 ml-1">· {r.admin_note}</span>}
                   </p>
                 </div>
@@ -295,24 +316,43 @@ export default function ShopPage() {
                 <>
                   {/* Choix méthode */}
                   <p className="text-white/50 text-xs uppercase tracking-wider mb-3">Choisis ton opérateur</p>
-                  <div className="grid grid-cols-2 gap-3 mb-5">
-                    {[
-                      { key: 'orange_money' as const, label: 'Orange Money', color: '#FF6B00', num: config?.orange_money },
-                      { key: 'mtn' as const, label: 'MTN Mobile Money', color: '#FFC800', num: config?.mtn },
-                    ].map((m) => (
-                      <button key={m.key} onClick={() => setPayMethod(m.key)}
-                        disabled={!m.num}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all disabled:opacity-30 disabled:cursor-not-allowed
-                          ${payMethod === m.key ? 'border-white/30 bg-white/5' : 'border-white/10 hover:border-white/20'}`}>
-                        <Smartphone size={20} style={{ color: m.color }} className="mb-2" />
-                        <p className="text-white font-bold text-sm leading-tight">{m.label}</p>
-                        {m.num
-                          ? <p className="font-mono text-xs mt-1" style={{ color: m.color }}>{m.num}</p>
+
+                  {isTunisian ? (
+                    /* D17 only for Tunisian users */
+                    <div className="mb-5">
+                      <button onClick={() => setPayMethod('d17')}
+                        disabled={!config?.d17}
+                        className={`w-full p-4 rounded-2xl border-2 text-left transition-all disabled:opacity-30 disabled:cursor-not-allowed
+                          ${payMethod === 'd17' ? 'border-blue-400/50 bg-blue-500/5' : 'border-white/10 hover:border-white/20'}`}>
+                        <Smartphone size={20} className="text-blue-400 mb-2" />
+                        <p className="text-white font-bold text-sm leading-tight">D17 🇹🇳</p>
+                        {config?.d17
+                          ? <p className="font-mono text-xs mt-1 text-blue-400">{config.d17}</p>
                           : <p className="text-white/30 text-xs mt-1">Non configuré</p>
                         }
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    /* Orange Money + MTN for others */
+                    <div className="grid grid-cols-2 gap-3 mb-5">
+                      {[
+                        { key: 'orange_money' as const, label: 'Orange Money', color: '#FF6B00', num: config?.orange_money },
+                        { key: 'mtn' as const, label: 'MTN Mobile Money', color: '#FFC800', num: config?.mtn },
+                      ].map((m) => (
+                        <button key={m.key} onClick={() => setPayMethod(m.key)}
+                          disabled={!m.num}
+                          className={`p-4 rounded-2xl border-2 text-left transition-all disabled:opacity-30 disabled:cursor-not-allowed
+                            ${payMethod === m.key ? 'border-white/30 bg-white/5' : 'border-white/10 hover:border-white/20'}`}>
+                          <Smartphone size={20} style={{ color: m.color }} className="mb-2" />
+                          <p className="text-white font-bold text-sm leading-tight">{m.label}</p>
+                          {m.num
+                            ? <p className="font-mono text-xs mt-1" style={{ color: m.color }}>{m.num}</p>
+                            : <p className="text-white/30 text-xs mt-1">Non configuré</p>
+                          }
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Instruction */}
                   {number && (
@@ -320,7 +360,7 @@ export default function ShopPage() {
                       <p className="text-white/50 text-xs uppercase tracking-wider mb-2">Instructions</p>
                       <ol className="space-y-2 text-sm text-white/70">
                         <li className="flex gap-2"><span className="text-[#F5C518] font-bold">1.</span>
-                          Envoie <span className="text-[#F5C518] font-black">{fcfa(price)}</span> au numéro :
+                          Envoie <span className="text-[#F5C518] font-black">{priceLabel}</span> au numéro :
                         </li>
                         <li className="bg-white/5 rounded-xl px-4 py-2 font-mono text-white font-bold text-center text-base tracking-widest">
                           {number}
