@@ -69,7 +69,8 @@ export default function ShopPage() {
   const supabase = createClient()
   const [config, setConfig] = useState<ShopConfig | null>(null)
   const [myRequests, setMyRequests] = useState<PaymentRequest[]>([])
-  const [isTunisian, setIsTunisian] = useState(false)
+  const [payRegion, setPayRegion] = useState<'cameroun' | 'tunisie'>('cameroun')
+  const isTunisian = payRegion === 'tunisie'
   const hasPending = myRequests.some((r) => r.status === 'pending')
   const [selected, setSelected] = useState<typeof PACKS[0] | null>(null)
   const [step, setStep] = useState<'method' | 'form'>('method')
@@ -86,25 +87,21 @@ export default function ShopPage() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
-      const [{ data: profile }, { data: reqs }] = await Promise.all([
-        supabase.from('users').select('nation').eq('id', user.id).single(),
-        supabase
-          .from('payment_requests')
-          .select('id, pack_name, amount_fcfa, coins_to_credit, payment_method, status, admin_note, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10),
-      ])
-
-      if (profile?.nation === 'Tunisia') {
-        setIsTunisian(true)
-        setPayMethod('d17')
-      }
+      const { data: reqs } = await supabase
+        .from('payment_requests')
+        .select('id, pack_name, amount_fcfa, coins_to_credit, payment_method, status, admin_note, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
       setMyRequests((reqs ?? []) as PaymentRequest[])
     }
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset payment method when switching region
+  useEffect(() => {
+    setPayMethod(isTunisian ? 'd17' : 'orange_money')
+  }, [isTunisian])
 
   function openModal(pack: typeof PACKS[0]) {
     setSelected(pack)
@@ -181,9 +178,24 @@ export default function ShopPage() {
           </div>
           <h1 className="text-5xl font-black text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>BOUTIQUE</h1>
         </div>
-        <p className="text-white/30 text-sm mt-2">
-          {isTunisian ? 'Recharge via D17 🇹🇳' : 'Recharge via Orange Money ou MTN Mobile Money'}
-        </p>
+
+        {/* Region toggle */}
+        <div className="mt-4 inline-flex items-center glass rounded-2xl p-1 border border-white/10">
+          <button
+            onClick={() => setPayRegion('cameroun')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all
+              ${payRegion === 'cameroun' ? 'bg-orange-500/20 text-orange-300' : 'text-white/30 hover:text-white/60'}`}
+          >
+            🇨🇲 Cameroun
+          </button>
+          <button
+            onClick={() => setPayRegion('tunisie')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all
+              ${payRegion === 'tunisie' ? 'bg-blue-500/20 text-blue-300' : 'text-white/30 hover:text-white/60'}`}
+          >
+            🇹🇳 Tunisie
+          </button>
+        </div>
       </div>
 
       {/* Bandeau demande en attente */}
