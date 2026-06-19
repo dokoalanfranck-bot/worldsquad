@@ -675,6 +675,7 @@ function ControlsTab() {
   const [body, setBody] = useState('')
   const [url, setUrl] = useState('/dashboard')
   const [sending, setSending] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/super/maintenance').then(r => r.json()).then((d: { enabled: boolean; message: string }) => {
@@ -688,6 +689,20 @@ function ControlsTab() {
     if (res.ok) { setMaintenance({ enabled, message: maintenanceMsg }); toast.success(enabled ? '🔴 Maintenance activée' : '🟢 App en ligne') }
     else toast.error('Erreur')
     setSaving(false)
+  }
+
+  async function resetDaily() {
+    if (!confirm('Distribuer les récompenses au top 3 et remettre les compteurs à 0 ?')) return
+    setResetting(true)
+    const res = await fetch('/api/admin/super/reset-daily', { method: 'POST' })
+    if (res.ok) {
+      const d = await res.json() as { rewarded: Array<{ pseudo: string; wins: number; coins: number }> }
+      const summary = d.rewarded.length > 0
+        ? d.rewarded.map((r, i) => `#${i + 1} ${r.pseudo} (+${r.coins} coins)`).join(', ')
+        : 'Aucun joueur à récompenser'
+      toast.success(`🏆 Reset effectué — ${summary}`)
+    } else toast.error('Erreur lors du reset')
+    setResetting(false)
   }
 
   async function sendBroadcast() {
@@ -759,6 +774,24 @@ function ControlsTab() {
             <Send size={14} /> {sending ? 'Envoi…' : 'Envoyer à tous les utilisateurs'}
           </button>
         </div>
+      </div>
+
+      <div className="border-t border-white/5" />
+
+      {/* Reset classement journalier */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <RotateCcw size={14} className="text-amber-400" />
+          <p className="text-white font-bold text-sm">Reset classement journalier</p>
+        </div>
+        <p className="text-white/30 text-xs">
+          Distribue les récompenses au top 3 (300 / 200 / 100 coins) et remet tous les compteurs à 0.
+          Le cron automatique tourne chaque nuit à minuit UTC — utilise ce bouton si besoin de forcer.
+        </p>
+        <button disabled={resetting} onClick={resetDaily}
+          className="w-full py-2.5 rounded-xl bg-amber-500/15 text-amber-400 font-bold text-sm hover:bg-amber-500/25 disabled:opacity-40 flex items-center justify-center gap-2">
+          <RotateCcw size={13} /> {resetting ? 'Reset en cours…' : 'Forcer le reset journalier'}
+        </button>
       </div>
     </div>
   )

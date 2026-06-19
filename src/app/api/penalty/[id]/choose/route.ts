@@ -174,12 +174,27 @@ export async function POST(
       updated_at: new Date().toISOString(),
     }).eq('id', battleId).eq('current_round', battle.current_round)
 
-    if (over && winnerId) {
-      const { data: wp } = await admin.from('users').select('battles_won, daily_battles_won').eq('id', winnerId).single()
-      await admin.from('users').update({
-        battles_won: (wp?.battles_won ?? 0) + 1,
-        daily_battles_won: (wp?.daily_battles_won ?? 0) + 1,
-      }).eq('id', winnerId)
+    if (over) {
+      const challId = battle.challenger_id
+      if (winnerId) {
+        // Human wins vs bot
+        const { data: wp } = await admin.from('users').select('battles_won, battles_played, battle_streak, best_streak, daily_battles_won').eq('id', winnerId).single()
+        const streak = (wp?.battle_streak ?? 0) + 1
+        await admin.from('users').update({
+          battles_won: (wp?.battles_won ?? 0) + 1,
+          battles_played: (wp?.battles_played ?? 0) + 1,
+          daily_battles_won: (wp?.daily_battles_won ?? 0) + 1,
+          battle_streak: streak,
+          best_streak: Math.max(streak, wp?.best_streak ?? 0),
+        }).eq('id', winnerId)
+      } else {
+        // Bot wins — only update human's battles_played and reset streak
+        const { data: cp } = await admin.from('users').select('battles_played').eq('id', challId).single()
+        await admin.from('users').update({
+          battles_played: (cp?.battles_played ?? 0) + 1,
+          battle_streak: 0,
+        }).eq('id', challId)
+      }
     }
     if (over && isTiebreakBot && winnerId) {
       const tdId = (battle as Record<string, unknown>).tournament_duel_id as string
@@ -288,12 +303,37 @@ export async function POST(
     return NextResponse.json({ submitted: true, resolved: false })
   }
 
-  if (over && winnerId) {
-    const { data: wp } = await admin.from('users').select('battles_won, daily_battles_won').eq('id', winnerId).single()
-    await admin.from('users').update({
-      battles_won: (wp?.battles_won ?? 0) + 1,
-      daily_battles_won: (wp?.daily_battles_won ?? 0) + 1,
-    }).eq('id', winnerId)
+  if (over) {
+    const challId = battle.challenger_id
+    const oppId   = battle.opponent_id as string | null
+    if (winnerId) {
+      const loserId = winnerId === challId ? oppId : challId
+      const [{ data: wp }, { data: lp }] = await Promise.all([
+        admin.from('users').select('battles_won, battles_played, battle_streak, best_streak, daily_battles_won').eq('id', winnerId).single(),
+        loserId ? admin.from('users').select('battles_played, battle_streak').eq('id', loserId).single() : Promise.resolve({ data: null }),
+      ])
+      const streak = (wp?.battle_streak ?? 0) + 1
+      await admin.from('users').update({
+        battles_won: (wp?.battles_won ?? 0) + 1,
+        battles_played: (wp?.battles_played ?? 0) + 1,
+        daily_battles_won: (wp?.daily_battles_won ?? 0) + 1,
+        battle_streak: streak,
+        best_streak: Math.max(streak, wp?.best_streak ?? 0),
+      }).eq('id', winnerId)
+      if (loserId && lp) {
+        await admin.from('users').update({
+          battles_played: ((lp as { battles_played?: number }).battles_played ?? 0) + 1,
+          battle_streak: 0,
+        }).eq('id', loserId)
+      }
+    } else {
+      // Draw or no winner — update battles_played for both
+      const players = [challId, ...(oppId ? [oppId] : [])]
+      await Promise.all(players.map(async (pid) => {
+        const { data: p } = await admin.from('users').select('battles_played').eq('id', pid).single()
+        await admin.from('users').update({ battles_played: ((p as { battles_played?: number } | null)?.battles_played ?? 0) + 1 }).eq('id', pid)
+      }))
+    }
   }
   if (over && isTiebreak && winnerId) {
     const tdId = (battle as Record<string, unknown>).tournament_duel_id as string
