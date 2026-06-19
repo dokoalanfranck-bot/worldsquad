@@ -15,6 +15,7 @@ CREATE INDEX ON super_admin_audit_log(target_user_id);
 CREATE INDEX ON super_admin_audit_log(admin_id, created_at DESC);
 
 ALTER TABLE super_admin_audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service audit" ON super_admin_audit_log;
 CREATE POLICY "Service audit" ON super_admin_audit_log
   FOR ALL USING (auth.role() = 'service_role');
 
@@ -27,6 +28,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone reads settings"  ON app_settings;
+DROP POLICY IF EXISTS "Service writes settings" ON app_settings;
 CREATE POLICY "Anyone reads settings"  ON app_settings FOR SELECT USING (true);
 CREATE POLICY "Service writes settings" ON app_settings FOR ALL   USING (auth.role() = 'service_role');
 
