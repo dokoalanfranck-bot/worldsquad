@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Globe, ChevronRight, Sparkles } from 'lucide-react'
+import { Globe, ChevronRight, Sparkles, Flame } from 'lucide-react'
+import type { TodayNation } from './page'
 import { GameCard } from '@/components/ui/Card'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import { useMusicContext } from '@/components/MusicProvider'
@@ -386,9 +387,10 @@ function PackRevealOverlay({
 interface Props {
   initialCoins: number
   pseudo: string
+  todayNations: TodayNation[]
 }
 
-export function PacksClient({ initialCoins, pseudo }: Props) {
+export function PacksClient({ initialCoins, pseudo, todayNations }: Props) {
   const [coins, setCoins] = useState(initialCoins)
   const [phase, setPhase] = useState<Phase>('idle')
   const [selectedPack, setSelectedPack] = useState<PackKey | null>(null)
@@ -465,6 +467,34 @@ export function PacksClient({ initialCoins, pseudo }: Props) {
           <CoinDisplay amount={coins} size="lg" />
         </div>
       </div>
+
+      {/* ── BOOST DU JOUR ── */}
+      {todayNations.length > 0 && phase === 'idle' && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-5 rounded-2xl border border-orange-500/30 overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, rgba(251,146,60,0.08) 0%, rgba(239,68,68,0.06) 100%)' }}
+        >
+          <div className="px-4 py-3 flex items-center gap-2 border-b border-orange-500/15">
+            <Flame size={14} className="text-orange-400 flex-shrink-0" />
+            <span className="text-orange-400 font-bold text-xs uppercase tracking-wider">Boost du jour</span>
+            <span className="text-white/30 text-xs ml-auto">3× plus de chances</span>
+          </div>
+          <div className="px-4 py-3 flex flex-wrap gap-2">
+            {todayNations.map((n) => (
+              <div
+                key={n.name}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)' }}
+              >
+                <span>{n.flag}</span>
+                <span>{n.name}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       <AnimatePresence mode="wait">
 
