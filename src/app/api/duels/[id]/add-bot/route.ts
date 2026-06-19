@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { randomBotName, seededShuffle } from '@/lib/duel-engine'
+import { randomBotName, seededShuffle, isCoach, isGK } from '@/lib/duel-engine'
 import type { Card } from '@/types'
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -28,9 +28,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
     .limit(200)
 
-  const pool       = seededShuffle((cards ?? []) as unknown as Card[], duelId)
-  const isCoach    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
-  const isGK       = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'GK'
+  const pool    = seededShuffle((cards ?? []) as unknown as Card[], duelId)
 
   const coaches     = pool.filter(isCoach)
   const goalkeepers = pool.filter(isGK)

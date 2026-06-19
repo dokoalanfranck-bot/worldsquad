@@ -10,8 +10,8 @@ export interface DuelEvent {
   type: 'goal' | 'chance' | 'save'
 }
 
-const RARITY_PTS: Record<string, number> = { Legend: 10, Epic: 7, Rare: 4, Common: 1 }
-const STAT_KEYS = ['pace', 'shooting', 'passing', 'defending', 'dribbling', 'physical']
+// ── Rarity weights (pay-to-win) ───────────────────────────────────────────────
+const RARITY_PTS: Record<string, number> = { Legend: 14, Epic: 8, Rare: 4, Common: 1 }
 
 function seededRng(seed: string) {
   let s = seed.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)
@@ -32,48 +32,79 @@ export function seededShuffle<T>(arr: T[], seed: string): T[] {
   return out
 }
 
-const isCoach = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'COACH'
-const isGK    = (c: Card) => String(c.stats?.position ?? '').toUpperCase() === 'GK'
+const pos = (c: Card) => String(c.stats?.position ?? '').toUpperCase()
+export const isCoach = (c: Card) => pos(c) === 'COACH'
+export const isGK    = (c: Card) => pos(c) === 'GK'
+
+// ── Position-weighted stats for a field player ────────────────────────────────
+function fieldPlayerScore(c: Card): number {
+  const v  = Number(c.stats?.vitesse    ?? c.stats?.pace     ?? 0)
+  const t  = Number(c.stats?.technique  ?? c.stats?.passing  ?? 0)
+  const pu = Number(c.stats?.puissance  ?? c.stats?.physical ?? 0)
+  const sf = Number(c.stats?.sang_froid ?? c.stats?.shooting ?? 0)
+  const ov = Number(c.stats?.overall    ?? 0)
+
+  const p = pos(c)
+  if (p === 'FWD') {
+    // Vitesse + sang_froid (finition) + puissance comptent le plus
+    return (v * 1.4 + sf * 1.3 + pu * 1.2 + t * 0.8) / 4.7
+  }
+  if (p === 'MID') {
+    // Technique + sang_froid + équilibre
+    return (t * 1.4 + sf * 1.2 + v * 0.9 + pu * 0.9) / 4.4
+  }
+  if (p === 'DEF') {
+    // Puissance + sang_froid défensif
+    return (pu * 1.5 + sf * 1.3 + t * 0.8 + v * 0.6) / 4.2
+  }
+  // Pas de position définie : overall direct
+  return ov
+}
 
 export function computePower(picks: Card[]): number {
-  if (!picks.length) return 0
-
-  const coach       = picks.find(isCoach) ?? null
-  const gk          = picks.find(isGK) ?? null
+  const coach        = picks.find(isCoach) ?? null
+  const gk           = picks.find(isGK)    ?? null
   const fieldPlayers = picks.filter((c) => !isCoach(c) && !isGK(c)).slice(0, 4)
 
   let score = 0
 
-  // Nation cohesion on field players (0-35)
+  // 1. RARITY BONUS — pay-to-win (0-45 pts, capé)
+  //    Legend=14, Epic=8, Rare=4, Common=1 par carte sur les 6
+  let rarityTotal = 0
+  for (const c of picks) rarityTotal += RARITY_PTS[c.rarity] ?? 1
+  score += Math.min(45, rarityTotal)
+
+  // 2. STATS JOUEURS DE CHAMP pondérées par poste (0-30 pts)
+  if (fieldPlayers.length > 0) {
+    let statSum = 0
+    for (const p of fieldPlayers) statSum += fieldPlayerScore(p)
+    score += Math.round((statSum / fieldPlayers.length / 99) * 30)
+  }
+
+  // 3. COHÉSION nationale (sur les 4 joueurs de champ, 0-15 pts)
   const nations: Record<string, number> = {}
   for (const p of fieldPlayers) nations[p.nation ?? '?'] = (nations[p.nation ?? '?'] ?? 0) + 1
   const maxSame = Math.max(0, ...Object.values(nations))
-  score += maxSame >= 4 ? 35 : maxSame === 3 ? 25 : maxSame === 2 ? 15 : 5
+  score += maxSame >= 4 ? 15 : maxSame === 3 ? 11 : maxSame === 2 ? 6 : 2
 
-  // Coach synergy (0-8)
-  if (coach?.nation && nations[coach.nation]) score += nations[coach.nation] >= 2 ? 8 : 4
-
-  // GK bonus (0-10): defending + physical stats
+  // 4. BONUS GK (0-8 pts) — stats spécifiques gardien
   if (gk) {
-    const def = Number(gk.stats?.defending ?? 0)
-    const phy = Number(gk.stats?.physical ?? 0)
-    score += Math.round(((def + phy) / 2 / 99) * 10)
+    const reflexes  = Number(gk.stats?.reflexes      ?? gk.stats?.sang_froid ?? 0)
+    const placement = Number(gk.stats?.positionnement ?? gk.stats?.technique  ?? 0)
+    score += Math.round(((reflexes + placement) / 2 / 99) * 8)
   }
 
-  // Rarity bonus on all 6 cards (0-30)
-  let rarityTotal = 0
-  for (const c of picks) rarityTotal += RARITY_PTS[c.rarity] ?? 1
-  score += Math.min(30, rarityTotal)
-
-  // Stats average on field players (0-35)
-  let statSum = 0, statCount = 0
-  for (const p of fieldPlayers) {
-    for (const k of STAT_KEYS) {
-      const v = Number(p.stats?.[k] ?? 0)
-      if (v > 0) { statSum += v; statCount++ }
-    }
+  // 5. BONUS COACH (0-7 pts) — stats spécifiques coach
+  if (coach) {
+    const tactique   = Number(coach.stats?.tactique   ?? 0)
+    const motivation = Number(coach.stats?.motivation ?? 0)
+    score += Math.round(((tactique + motivation) / 2 / 99) * 7)
   }
-  if (statCount > 0) score += Math.round((statSum / statCount / 99) * 35)
+
+  // 6. SYNERGIE coach-nation (0-5 pts)
+  if (coach?.nation && nations[coach.nation]) {
+    score += nations[coach.nation] >= 2 ? 5 : 2
+  }
 
   return Math.min(100, Math.round(score))
 }
@@ -84,10 +115,8 @@ function pickEventCard(
   rand: () => number,
 ): Card {
   if (type === 'save') {
-    // GK makes saves; fallback to first non-coach
     return picks.find(isGK) ?? picks.find((c) => !isCoach(c)) ?? picks[0]
   }
-  // Goals and chances: field players only (not GK, not coach)
   const field = picks.filter((c) => !isGK(c) && !isCoach(c))
   const pool  = field.length > 0 ? field : picks.filter((c) => !isCoach(c))
   return pool[Math.floor(rand() * pool.length)] ?? picks[0]
@@ -135,7 +164,6 @@ export function simulateDuel(
     const isGoal    = goalsLeft > 0 && rand() < 0.65
     const type: DuelEvent['type'] = isGoal ? 'goal' : rand() < 0.5 ? 'chance' : 'save'
 
-    // For saves the defending team acts; for goals/chances the attacking team
     const attackTeam: 'challenger' | 'opponent' = rand() < cProb ? 'challenger' : 'opponent'
     const team: 'challenger' | 'opponent'       = type === 'save'
       ? (attackTeam === 'challenger' ? 'opponent' : 'challenger')
