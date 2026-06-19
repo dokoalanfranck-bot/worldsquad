@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -63,10 +63,8 @@ const BOT_POOL = [
   { pseudo: 'StormBolt', nation: 'Mexico' }, { pseudo: 'RedPhoenix', nation: 'Poland' },
   { pseudo: 'ZeroGravX', nation: 'South Korea' }, { pseudo: 'LegendOf7', nation: 'Cameroon' },
 ]
-function getBotsForMode(m: Mode): LobbyPlayer[] {
-  const seed = Math.floor(Date.now() / 120000)
+function getBotsForSeed(seed: number, count: number): LobbyPlayer[] {
   const start = seed % BOT_POOL.length
-  const count = m === 'penalty' ? 2 : 3
   const bots: LobbyPlayer[] = []
   for (let i = 0; i < count; i++) {
     const b = BOT_POOL[(start + i) % BOT_POOL.length]
@@ -195,6 +193,8 @@ function LobbyCard({ player, mode, onChallenge }: {
     <motion.div
       initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 12 }}
+      layout
       className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-colors ${
         player.isSelf
           ? 'border-[#F5C518]/30 bg-[#F5C518]/8'
@@ -262,6 +262,24 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
   const [accepting, setAccepting] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [cancellingPenalty, setCancellingPenalty] = useState<string | null>(null)
+
+  // ── Dynamic bots — count (1-3) and which bots from pool change randomly ──
+  const [botCount, setBotCount] = useState(() => Math.floor(Math.random() * 3) + 1)
+  const [botSeed, setBotSeed]   = useState(() => Math.floor(Math.random() * BOT_POOL.length))
+  const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    function schedule() {
+      const delay = 15000 + Math.random() * 20000 // 15–35 s
+      botTimerRef.current = setTimeout(() => {
+        setBotCount(Math.floor(Math.random() * 3) + 1)
+        setBotSeed(Math.floor(Math.random() * BOT_POOL.length))
+        schedule()
+      }, delay)
+    }
+    schedule()
+    return () => { if (botTimerRef.current) clearTimeout(botTimerRef.current) }
+  }, [])
 
   // ── Supabase Presence — auto-join quand la page est ouverte ───────────────
   useEffect(() => {
@@ -415,7 +433,7 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
   const finished        = duels.filter((d) => d.status === 'finished')
   const finishedPenalty = penaltyBattles.filter((p) => p.status === 'finished')
 
-  const visibleLobby = [...onlinePlayers, ...getBotsForMode(mode)]
+  const visibleLobby = [...onlinePlayers, ...getBotsForSeed(botSeed, botCount)]
 
   return (
     <div className="min-h-screen px-4 lg:px-8 py-6 max-w-2xl lg:max-w-5xl mx-auto pb-28">
@@ -639,14 +657,16 @@ export function BattlesHub({ duels, currentUserId, penaltyBattles = [], tourname
 
             {/* Player list */}
             <div className="p-3 space-y-2">
-              {visibleLobby.map((p) => (
-                <LobbyCard
-                  key={p.userId ?? p.pseudo}
-                  player={p}
-                  mode={mode}
-                  onChallenge={setChallengeTarget}
-                />
-              ))}
+              <AnimatePresence initial={false}>
+                {visibleLobby.map((p) => (
+                  <LobbyCard
+                    key={p.userId ?? p.pseudo}
+                    player={p}
+                    mode={mode}
+                    onChallenge={setChallengeTarget}
+                  />
+                ))}
+              </AnimatePresence>
             </div>
           </div>}
 

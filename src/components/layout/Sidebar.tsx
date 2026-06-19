@@ -81,10 +81,16 @@ const DRAWER_SECTIONS: { label: string; items: { href: string; icon: LucideIcon;
     ],
   },
   {
+    label: 'Jeux',
+    items: [
+      { href: '/battles', icon: Swords, label: 'Battles' },
+      { href: '/packs',   icon: Gift,   label: 'Ouvrir des Packs' },
+    ],
+  },
+  {
     label: 'Collection',
     items: [
       { href: '/collection', icon: Layers,  label: 'Ma Collection' },
-      { href: '/packs',      icon: Gift,    label: 'Ouvrir des Packs' },
       { href: '/doublons',   icon: Repeat2, label: 'Vendre Doublons' },
     ],
   },
