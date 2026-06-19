@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
   const allowed = ['png', 'jpg', 'jpeg', 'webp', 'gif']
   if (!allowed.includes(ext)) {
-    return NextResponse.json({ error: 'Format non supporté (png, jpg, webp, gif)' }, { status: 400 })
+    return NextResponse.json({ error: 'Format non supportÃ© (png, jpg, webp, gif)' }, { status: 400 })
   }
 
   if (file.size > 5 * 1024 * 1024) {

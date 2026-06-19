@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
 async function checkAdmin() {
   const supabase = await createClient()
@@ -29,7 +28,7 @@ export async function POST() {
   const { error: cardsError } = await admin.from('user_cards').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   if (cardsError) return NextResponse.json({ error: `user_cards: ${cardsError.message}` }, { status: 500 })
 
-  // 2. Remettre les coins à 500 et les stats battles à 0 pour tous les utilisateurs
+  // 2. Remettre les coins Ã  500 et les stats battles Ã  0 pour tous les utilisateurs
   const { error: usersError } = await admin
     .from('users')
     .update({

@@ -1,33 +1,32 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
-// ─── FLAGS ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ FLAGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FLAGS: Record<string, string> = {
-  'Mexico': '🇲🇽', 'South Africa': '🇿🇦', 'South Korea': '🇰🇷', 'Czech Republic': '🇨🇿',
-  'Canada': '🇨🇦', 'Bosnia & Herzegovina': '🇧🇦', 'Qatar': '🇶🇦', 'Switzerland': '🇨🇭',
-  'Brazil': '🇧🇷', 'Morocco': '🇲🇦', 'Haiti': '🇭🇹', 'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-  'USA': '🇺🇸', 'Paraguay': '🇵🇾', 'Australia': '🇦🇺', 'Turkey': '🇹🇷',
-  'Germany': '🇩🇪', 'Curaçao': '🇨🇼', 'Ivory Coast': '🇨🇮', 'Ecuador': '🇪🇨',
-  'Netherlands': '🇳🇱', 'Japan': '🇯🇵', 'Sweden': '🇸🇪', 'Tunisia': '🇹🇳',
-  'Belgium': '🇧🇪', 'Egypt': '🇪🇬', 'Iran': '🇮🇷', 'New Zealand': '🇳🇿',
-  'Spain': '🇪🇸', 'Cape Verde': '🇨🇻', 'Saudi Arabia': '🇸🇦', 'Uruguay': '🇺🇾',
-  'France': '🇫🇷', 'Senegal': '🇸🇳', 'Iraq': '🇮🇶', 'Norway': '🇳🇴',
-  'Argentina': '🇦🇷', 'Algeria': '🇩🇿', 'Austria': '🇦🇹', 'Jordan': '🇯🇴',
-  'Portugal': '🇵🇹', 'DR Congo': '🇨🇩', 'Uzbekistan': '🇺🇿', 'Colombia': '🇨🇴',
-  'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Croatia': '🇭🇷', 'Ghana': '🇬🇭', 'Panama': '🇵🇦',
+  'Mexico': 'ðŸ‡²ðŸ‡½', 'South Africa': 'ðŸ‡¿ðŸ‡¦', 'South Korea': 'ðŸ‡°ðŸ‡·', 'Czech Republic': 'ðŸ‡¨ðŸ‡¿',
+  'Canada': 'ðŸ‡¨ðŸ‡¦', 'Bosnia & Herzegovina': 'ðŸ‡§ðŸ‡¦', 'Qatar': 'ðŸ‡¶ðŸ‡¦', 'Switzerland': 'ðŸ‡¨ðŸ‡­',
+  'Brazil': 'ðŸ‡§ðŸ‡·', 'Morocco': 'ðŸ‡²ðŸ‡¦', 'Haiti': 'ðŸ‡­ðŸ‡¹', 'Scotland': 'ðŸ´ó §ó ¢ó ³ó £ó ´ó ¿',
+  'USA': 'ðŸ‡ºðŸ‡¸', 'Paraguay': 'ðŸ‡µðŸ‡¾', 'Australia': 'ðŸ‡¦ðŸ‡º', 'Turkey': 'ðŸ‡¹ðŸ‡·',
+  'Germany': 'ðŸ‡©ðŸ‡ª', 'CuraÃ§ao': 'ðŸ‡¨ðŸ‡¼', 'Ivory Coast': 'ðŸ‡¨ðŸ‡®', 'Ecuador': 'ðŸ‡ªðŸ‡¨',
+  'Netherlands': 'ðŸ‡³ðŸ‡±', 'Japan': 'ðŸ‡¯ðŸ‡µ', 'Sweden': 'ðŸ‡¸ðŸ‡ª', 'Tunisia': 'ðŸ‡¹ðŸ‡³',
+  'Belgium': 'ðŸ‡§ðŸ‡ª', 'Egypt': 'ðŸ‡ªðŸ‡¬', 'Iran': 'ðŸ‡®ðŸ‡·', 'New Zealand': 'ðŸ‡³ðŸ‡¿',
+  'Spain': 'ðŸ‡ªðŸ‡¸', 'Cape Verde': 'ðŸ‡¨ðŸ‡»', 'Saudi Arabia': 'ðŸ‡¸ðŸ‡¦', 'Uruguay': 'ðŸ‡ºðŸ‡¾',
+  'France': 'ðŸ‡«ðŸ‡·', 'Senegal': 'ðŸ‡¸ðŸ‡³', 'Iraq': 'ðŸ‡®ðŸ‡¶', 'Norway': 'ðŸ‡³ðŸ‡´',
+  'Argentina': 'ðŸ‡¦ðŸ‡·', 'Algeria': 'ðŸ‡©ðŸ‡¿', 'Austria': 'ðŸ‡¦ðŸ‡¹', 'Jordan': 'ðŸ‡¯ðŸ‡´',
+  'Portugal': 'ðŸ‡µðŸ‡¹', 'DR Congo': 'ðŸ‡¨ðŸ‡©', 'Uzbekistan': 'ðŸ‡ºðŸ‡¿', 'Colombia': 'ðŸ‡¨ðŸ‡´',
+  'England': 'ðŸ´ó §ó ¢ó ¥ó ®ó §ó ¿', 'Croatia': 'ðŸ‡­ðŸ‡·', 'Ghana': 'ðŸ‡¬ðŸ‡­', 'Panama': 'ðŸ‡µðŸ‡¦',
 }
 
-// ─── TEAMS BY GROUP ───────────────────────────────────────────────────────────
+// â”€â”€â”€ TEAMS BY GROUP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GROUPS: Record<string, string[]> = {
   A: ['Mexico', 'South Africa', 'South Korea', 'Czech Republic'],
   B: ['Canada', 'Bosnia & Herzegovina', 'Qatar', 'Switzerland'],
   C: ['Brazil', 'Morocco', 'Haiti', 'Scotland'],
   D: ['USA', 'Paraguay', 'Australia', 'Turkey'],
-  E: ['Germany', 'Curaçao', 'Ivory Coast', 'Ecuador'],
+  E: ['Germany', 'CuraÃ§ao', 'Ivory Coast', 'Ecuador'],
   F: ['Netherlands', 'Japan', 'Sweden', 'Tunisia'],
   G: ['Belgium', 'Egypt', 'Iran', 'New Zealand'],
   H: ['Spain', 'Cape Verde', 'Saudi Arabia', 'Uruguay'],
@@ -37,7 +36,7 @@ const GROUPS: Record<string, string[]> = {
   L: ['England', 'Croatia', 'Ghana', 'Panama'],
 }
 
-// ─── GROUP STAGE MATCHES (UTC times) ─────────────────────────────────────────
+// â”€â”€â”€ GROUP STAGE MATCHES (UTC times) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GROUP_MATCHES = [
   // GROUP A
   { a: 'Mexico', b: 'South Africa', date: '2026-06-11T19:00:00Z', group: 'A', venue: 'Mexico City' },
@@ -68,11 +67,11 @@ const GROUP_MATCHES = [
   { a: 'Turkey', b: 'USA', date: '2026-06-26T02:00:00Z', group: 'D', venue: 'Los Angeles' },
   { a: 'Paraguay', b: 'Australia', date: '2026-06-26T02:00:00Z', group: 'D', venue: 'San Francisco' },
   // GROUP E
-  { a: 'Germany', b: 'Curaçao', date: '2026-06-14T17:00:00Z', group: 'E', venue: 'Houston' },
+  { a: 'Germany', b: 'CuraÃ§ao', date: '2026-06-14T17:00:00Z', group: 'E', venue: 'Houston' },
   { a: 'Ivory Coast', b: 'Ecuador', date: '2026-06-14T23:00:00Z', group: 'E', venue: 'Philadelphia' },
   { a: 'Germany', b: 'Ivory Coast', date: '2026-06-20T20:00:00Z', group: 'E', venue: 'Toronto' },
-  { a: 'Ecuador', b: 'Curaçao', date: '2026-06-21T00:00:00Z', group: 'E', venue: 'Kansas City' },
-  { a: 'Curaçao', b: 'Ivory Coast', date: '2026-06-25T20:00:00Z', group: 'E', venue: 'Philadelphia' },
+  { a: 'Ecuador', b: 'CuraÃ§ao', date: '2026-06-21T00:00:00Z', group: 'E', venue: 'Kansas City' },
+  { a: 'CuraÃ§ao', b: 'Ivory Coast', date: '2026-06-25T20:00:00Z', group: 'E', venue: 'Philadelphia' },
   { a: 'Ecuador', b: 'Germany', date: '2026-06-25T20:00:00Z', group: 'E', venue: 'New York/New Jersey' },
   // GROUP F
   { a: 'Netherlands', b: 'Japan', date: '2026-06-14T20:00:00Z', group: 'F', venue: 'Dallas' },
@@ -125,42 +124,42 @@ const GROUP_MATCHES = [
   { a: 'Croatia', b: 'Ghana', date: '2026-06-27T21:00:00Z', group: 'L', venue: 'Philadelphia' },
 ]
 
-// ─── KNOCKOUT MATCHES (TBD teams) ────────────────────────────────────────────
+// â”€â”€â”€ KNOCKOUT MATCHES (TBD teams) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const KNOCKOUT_MATCHES = [
-  // Round of 32 (June 28 – July 3)
-  { a: 'TBD', b: 'TBD', date: '2026-06-28T19:00:00Z', phase: 'round16', venue: 'Los Angeles', label: 'Round of 32 · M73' },
-  { a: 'TBD', b: 'TBD', date: '2026-06-29T20:30:00Z', phase: 'round16', venue: 'Boston', label: 'Round of 32 · M74' },
-  { a: 'TBD', b: 'TBD', date: '2026-06-29T01:00:00Z', phase: 'round16', venue: 'Monterrey', label: 'Round of 32 · M75' },
-  { a: 'TBD', b: 'TBD', date: '2026-06-29T17:00:00Z', phase: 'round16', venue: 'Houston', label: 'Round of 32 · M76' },
-  { a: 'TBD', b: 'TBD', date: '2026-06-30T21:00:00Z', phase: 'round16', venue: 'New York/New Jersey', label: 'Round of 32 · M77' },
-  { a: 'TBD', b: 'TBD', date: '2026-06-30T17:00:00Z', phase: 'round16', venue: 'Dallas', label: 'Round of 32 · M78' },
-  { a: 'TBD', b: 'TBD', date: '2026-06-30T01:00:00Z', phase: 'round16', venue: 'Mexico City', label: 'Round of 32 · M79' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-01T16:00:00Z', phase: 'round16', venue: 'Atlanta', label: 'Round of 32 · M80' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-01T00:00:00Z', phase: 'round16', venue: 'San Francisco', label: 'Round of 32 · M81' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-01T20:00:00Z', phase: 'round16', venue: 'Seattle', label: 'Round of 32 · M82' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-02T23:00:00Z', phase: 'round16', venue: 'Toronto', label: 'Round of 32 · M83' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-02T19:00:00Z', phase: 'round16', venue: 'Los Angeles', label: 'Round of 32 · M84' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-03T03:00:00Z', phase: 'round16', venue: 'Vancouver', label: 'Round of 32 · M85' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-03T22:00:00Z', phase: 'round16', venue: 'Miami', label: 'Round of 32 · M86' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-04T01:30:00Z', phase: 'round16', venue: 'Kansas City', label: 'Round of 32 · M87' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-03T18:00:00Z', phase: 'round16', venue: 'Dallas', label: 'Round of 32 · M88' },
-  // Round of 16 (July 4–7)
-  { a: 'TBD', b: 'TBD', date: '2026-07-04T21:00:00Z', phase: 'round16', venue: 'Philadelphia', label: 'Round of 16 · M89' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-04T17:00:00Z', phase: 'round16', venue: 'Houston', label: 'Round of 16 · M90' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-05T20:00:00Z', phase: 'round16', venue: 'New York/New Jersey', label: 'Round of 16 · M91' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-06T00:00:00Z', phase: 'round16', venue: 'Mexico City', label: 'Round of 16 · M92' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-06T19:00:00Z', phase: 'round16', venue: 'Dallas', label: 'Round of 16 · M93' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-07T00:00:00Z', phase: 'round16', venue: 'Seattle', label: 'Round of 16 · M94' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-07T16:00:00Z', phase: 'round16', venue: 'Atlanta', label: 'Round of 16 · M95' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-07T20:00:00Z', phase: 'round16', venue: 'Vancouver', label: 'Round of 16 · M96' },
-  // Quarter-finals (July 9–11)
-  { a: 'TBD', b: 'TBD', date: '2026-07-09T20:00:00Z', phase: 'quarter', venue: 'Boston', label: 'Quart de finale · M97' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-10T19:00:00Z', phase: 'quarter', venue: 'Los Angeles', label: 'Quart de finale · M98' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-11T21:00:00Z', phase: 'quarter', venue: 'Miami', label: 'Quart de finale · M99' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-12T01:00:00Z', phase: 'quarter', venue: 'Kansas City', label: 'Quart de finale · M100' },
-  // Semi-finals (July 14–15)
-  { a: 'TBD', b: 'TBD', date: '2026-07-14T19:00:00Z', phase: 'semi', venue: 'Dallas', label: 'Demi-finale · M101' },
-  { a: 'TBD', b: 'TBD', date: '2026-07-15T19:00:00Z', phase: 'semi', venue: 'Atlanta', label: 'Demi-finale · M102' },
+  // Round of 32 (June 28 â€“ July 3)
+  { a: 'TBD', b: 'TBD', date: '2026-06-28T19:00:00Z', phase: 'round16', venue: 'Los Angeles', label: 'Round of 32 Â· M73' },
+  { a: 'TBD', b: 'TBD', date: '2026-06-29T20:30:00Z', phase: 'round16', venue: 'Boston', label: 'Round of 32 Â· M74' },
+  { a: 'TBD', b: 'TBD', date: '2026-06-29T01:00:00Z', phase: 'round16', venue: 'Monterrey', label: 'Round of 32 Â· M75' },
+  { a: 'TBD', b: 'TBD', date: '2026-06-29T17:00:00Z', phase: 'round16', venue: 'Houston', label: 'Round of 32 Â· M76' },
+  { a: 'TBD', b: 'TBD', date: '2026-06-30T21:00:00Z', phase: 'round16', venue: 'New York/New Jersey', label: 'Round of 32 Â· M77' },
+  { a: 'TBD', b: 'TBD', date: '2026-06-30T17:00:00Z', phase: 'round16', venue: 'Dallas', label: 'Round of 32 Â· M78' },
+  { a: 'TBD', b: 'TBD', date: '2026-06-30T01:00:00Z', phase: 'round16', venue: 'Mexico City', label: 'Round of 32 Â· M79' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-01T16:00:00Z', phase: 'round16', venue: 'Atlanta', label: 'Round of 32 Â· M80' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-01T00:00:00Z', phase: 'round16', venue: 'San Francisco', label: 'Round of 32 Â· M81' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-01T20:00:00Z', phase: 'round16', venue: 'Seattle', label: 'Round of 32 Â· M82' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-02T23:00:00Z', phase: 'round16', venue: 'Toronto', label: 'Round of 32 Â· M83' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-02T19:00:00Z', phase: 'round16', venue: 'Los Angeles', label: 'Round of 32 Â· M84' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-03T03:00:00Z', phase: 'round16', venue: 'Vancouver', label: 'Round of 32 Â· M85' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-03T22:00:00Z', phase: 'round16', venue: 'Miami', label: 'Round of 32 Â· M86' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-04T01:30:00Z', phase: 'round16', venue: 'Kansas City', label: 'Round of 32 Â· M87' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-03T18:00:00Z', phase: 'round16', venue: 'Dallas', label: 'Round of 32 Â· M88' },
+  // Round of 16 (July 4â€“7)
+  { a: 'TBD', b: 'TBD', date: '2026-07-04T21:00:00Z', phase: 'round16', venue: 'Philadelphia', label: 'Round of 16 Â· M89' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-04T17:00:00Z', phase: 'round16', venue: 'Houston', label: 'Round of 16 Â· M90' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-05T20:00:00Z', phase: 'round16', venue: 'New York/New Jersey', label: 'Round of 16 Â· M91' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-06T00:00:00Z', phase: 'round16', venue: 'Mexico City', label: 'Round of 16 Â· M92' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-06T19:00:00Z', phase: 'round16', venue: 'Dallas', label: 'Round of 16 Â· M93' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-07T00:00:00Z', phase: 'round16', venue: 'Seattle', label: 'Round of 16 Â· M94' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-07T16:00:00Z', phase: 'round16', venue: 'Atlanta', label: 'Round of 16 Â· M95' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-07T20:00:00Z', phase: 'round16', venue: 'Vancouver', label: 'Round of 16 Â· M96' },
+  // Quarter-finals (July 9â€“11)
+  { a: 'TBD', b: 'TBD', date: '2026-07-09T20:00:00Z', phase: 'quarter', venue: 'Boston', label: 'Quart de finale Â· M97' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-10T19:00:00Z', phase: 'quarter', venue: 'Los Angeles', label: 'Quart de finale Â· M98' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-11T21:00:00Z', phase: 'quarter', venue: 'Miami', label: 'Quart de finale Â· M99' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-12T01:00:00Z', phase: 'quarter', venue: 'Kansas City', label: 'Quart de finale Â· M100' },
+  // Semi-finals (July 14â€“15)
+  { a: 'TBD', b: 'TBD', date: '2026-07-14T19:00:00Z', phase: 'semi', venue: 'Dallas', label: 'Demi-finale Â· M101' },
+  { a: 'TBD', b: 'TBD', date: '2026-07-15T19:00:00Z', phase: 'semi', venue: 'Atlanta', label: 'Demi-finale Â· M102' },
   // Third place + Final
   { a: 'TBD', b: 'TBD', date: '2026-07-18T21:00:00Z', phase: 'semi', venue: 'Miami', label: 'Match 3e place' },
   { a: 'TBD', b: 'TBD', date: '2026-07-19T19:00:00Z', phase: 'final', venue: 'New York/New Jersey', label: 'FINALE' },
@@ -179,7 +178,7 @@ export async function POST() {
 
   // 1. Upsert all 48 teams
   const teamsToInsert = Object.entries(GROUPS).flatMap(([groupLetter, teams]) =>
-    teams.map((name) => ({ name, flag: FLAGS[name] ?? '🏳', group_letter: groupLetter }))
+    teams.map((name) => ({ name, flag: FLAGS[name] ?? 'ðŸ³', group_letter: groupLetter }))
   )
   const { error: teamsError } = await admin.from('teams').upsert(teamsToInsert, { onConflict: 'name' })
   if (teamsError) return NextResponse.json({ error: `Teams: ${teamsError.message}` }, { status: 500 })
@@ -191,8 +190,8 @@ export async function POST() {
   const groupMatches = GROUP_MATCHES.map((m) => ({
     team_a: m.a,
     team_b: m.b,
-    flag_a: FLAGS[m.a] ?? '🏳',
-    flag_b: FLAGS[m.b] ?? '🏳',
+    flag_a: FLAGS[m.a] ?? 'ðŸ³',
+    flag_b: FLAGS[m.b] ?? 'ðŸ³',
     match_date: m.date,
     phase: 'group' as const,
     group_letter: m.group,
@@ -208,8 +207,8 @@ export async function POST() {
   const knockoutMatches = KNOCKOUT_MATCHES.map((m) => ({
     team_a: m.a,
     team_b: m.b,
-    flag_a: '🏳',
-    flag_b: '🏳',
+    flag_a: 'ðŸ³',
+    flag_b: 'ðŸ³',
     match_date: m.date,
     phase: m.phase as 'round16' | 'quarter' | 'semi' | 'final',
     group_name: m.label,

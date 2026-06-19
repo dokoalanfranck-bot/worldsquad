@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail, welcomeEmailHtml } from '@/lib/email'
 
-export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {

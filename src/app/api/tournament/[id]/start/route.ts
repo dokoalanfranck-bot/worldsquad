@@ -4,7 +4,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { randomBotName, botNation } from '@/lib/duel-engine'
 import { launchSemis } from '@/lib/launch-semis'
 
-export const dynamic = 'force-dynamic'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

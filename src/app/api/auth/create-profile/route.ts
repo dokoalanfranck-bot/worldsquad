@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +16,7 @@ export async function POST(req: NextRequest) {
     const { data: authUser, error: authCheckError } = await supabase.auth.admin.getUserById(userId)
     if (authCheckError || !authUser?.user) {
       return NextResponse.json(
-        { error: 'Compte non créé — vérifie tes emails ou réessaie' },
+        { error: 'Compte non crÃ©Ã© â€” vÃ©rifie tes emails ou rÃ©essaie' },
         { status: 400 }
       )
     }

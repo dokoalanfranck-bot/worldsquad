@@ -19,13 +19,7 @@ export async function GET(req: Request) {
   const supabase = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  // 1. Fetch today's World Cup events from TheSportsDB
-  const sportsEvents = await fetchDayEvents(today)
-  if (sportsEvents.length === 0) {
-    return NextResponse.json({ message: 'Aucun match aujourd\'hui', processed: 0 })
-  }
-
-  // 2. Fetch our matches for today (±2h window for timezone edge cases)
+  // 1. Check DB first — skip external API if no matches scheduled today
   const startWindow = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   const endWindow = new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString()
 
@@ -37,6 +31,12 @@ export async function GET(req: Request) {
 
   if (!ourMatches || ourMatches.length === 0) {
     return NextResponse.json({ message: 'Aucun match dans la fenêtre', processed: 0 })
+  }
+
+  // 2. Only now call the external API (matches exist in DB)
+  const sportsEvents = await fetchDayEvents(today)
+  if (sportsEvents.length === 0) {
+    return NextResponse.json({ message: 'Aucun match aujourd\'hui', processed: 0 })
   }
 
   const notifications: string[] = []

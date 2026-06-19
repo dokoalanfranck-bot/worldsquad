@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   // Auth check
@@ -31,7 +30,7 @@ export async function POST(req: NextRequest) {
     for (const team of groupTeams) {
       teamsToInsert.push({
         name: team.name,
-        flag: team.flag ?? '🏳',
+        flag: team.flag ?? 'ðŸ³',
         group_letter: groupLetter,
       })
     }
@@ -76,8 +75,8 @@ export async function POST(req: NextRequest) {
           matchesToInsert.push({
             team_a: groupTeams[i].name,
             team_b: groupTeams[j].name,
-            flag_a: groupTeams[i].flag ?? '🏳',
-            flag_b: groupTeams[j].flag ?? '🏳',
+            flag_a: groupTeams[i].flag ?? 'ðŸ³',
+            flag_b: groupTeams[j].flag ?? 'ðŸ³',
             match_date: matchDate.toISOString(),
             phase: 'group',
             group_letter: groupLetter,

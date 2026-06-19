@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendPushToAll, sendPushToUser } from '@/lib/push'
 
-export const dynamic = 'force-dynamic'
 
 async function checkAdmin() {
   const supabase = await createClient()

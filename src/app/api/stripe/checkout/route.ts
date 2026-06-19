@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
 const PACKS = {
   starter: { name: 'Pack Starter', price: 299, coins: 1000 },
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
         price_data: {
           currency: 'usd',
           unit_amount: pack.price,
-          product_data: { name: pack.name, description: `WorldSquad — ${pack.coins > 0 ? `${pack.coins} SquadCoins` : 'Accès VIP'}` },
+          product_data: { name: pack.name, description: `WorldSquad â€” ${pack.coins > 0 ? `${pack.coins} SquadCoins` : 'AccÃ¨s VIP'}` },
         },
         quantity: 1,
       },

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -6,56 +6,55 @@ import { WC2026_SQUADS } from '@/data/wc2026-squads'
 import { getFC25Stats } from '@/data/wc2026-player-stats'
 import type { CardRarity } from '@/types'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// ─── FLAGS ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ FLAGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FLAGS: Record<string, string> = {
-  'Mexico': '🇲🇽', 'South Africa': '🇿🇦', 'South Korea': '🇰🇷', 'Czech Republic': '🇨🇿',
-  'Canada': '🇨🇦', 'Bosnia & Herzegovina': '🇧🇦', 'Qatar': '🇶🇦', 'Switzerland': '🇨🇭',
-  'Brazil': '🇧🇷', 'Morocco': '🇲🇦', 'Haiti': '🇭🇹', 'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-  'USA': '🇺🇸', 'Paraguay': '🇵🇾', 'Australia': '🇦🇺', 'Turkey': '🇹🇷',
-  'Germany': '🇩🇪', 'Curaçao': '🇨🇼', 'Ivory Coast': '🇨🇮', 'Ecuador': '🇪🇨',
-  'Netherlands': '🇳🇱', 'Japan': '🇯🇵', 'Sweden': '🇸🇪', 'Tunisia': '🇹🇳',
-  'Belgium': '🇧🇪', 'Egypt': '🇪🇬', 'Iran': '🇮🇷', 'New Zealand': '🇳🇿',
-  'Spain': '🇪🇸', 'Cape Verde': '🇨🇻', 'Saudi Arabia': '🇸🇦', 'Uruguay': '🇺🇾',
-  'France': '🇫🇷', 'Senegal': '🇸🇳', 'Iraq': '🇮🇶', 'Norway': '🇳🇴',
-  'Argentina': '🇦🇷', 'Algeria': '🇩🇿', 'Austria': '🇦🇹', 'Jordan': '🇯🇴',
-  'Portugal': '🇵🇹', 'DR Congo': '🇨🇩', 'Uzbekistan': '🇺🇿', 'Colombia': '🇨🇴',
-  'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Croatia': '🇭🇷', 'Ghana': '🇬🇭', 'Panama': '🇵🇦',
+  'Mexico': 'ðŸ‡²ðŸ‡½', 'South Africa': 'ðŸ‡¿ðŸ‡¦', 'South Korea': 'ðŸ‡°ðŸ‡·', 'Czech Republic': 'ðŸ‡¨ðŸ‡¿',
+  'Canada': 'ðŸ‡¨ðŸ‡¦', 'Bosnia & Herzegovina': 'ðŸ‡§ðŸ‡¦', 'Qatar': 'ðŸ‡¶ðŸ‡¦', 'Switzerland': 'ðŸ‡¨ðŸ‡­',
+  'Brazil': 'ðŸ‡§ðŸ‡·', 'Morocco': 'ðŸ‡²ðŸ‡¦', 'Haiti': 'ðŸ‡­ðŸ‡¹', 'Scotland': 'ðŸ´ó §ó ¢ó ³ó £ó ´ó ¿',
+  'USA': 'ðŸ‡ºðŸ‡¸', 'Paraguay': 'ðŸ‡µðŸ‡¾', 'Australia': 'ðŸ‡¦ðŸ‡º', 'Turkey': 'ðŸ‡¹ðŸ‡·',
+  'Germany': 'ðŸ‡©ðŸ‡ª', 'CuraÃ§ao': 'ðŸ‡¨ðŸ‡¼', 'Ivory Coast': 'ðŸ‡¨ðŸ‡®', 'Ecuador': 'ðŸ‡ªðŸ‡¨',
+  'Netherlands': 'ðŸ‡³ðŸ‡±', 'Japan': 'ðŸ‡¯ðŸ‡µ', 'Sweden': 'ðŸ‡¸ðŸ‡ª', 'Tunisia': 'ðŸ‡¹ðŸ‡³',
+  'Belgium': 'ðŸ‡§ðŸ‡ª', 'Egypt': 'ðŸ‡ªðŸ‡¬', 'Iran': 'ðŸ‡®ðŸ‡·', 'New Zealand': 'ðŸ‡³ðŸ‡¿',
+  'Spain': 'ðŸ‡ªðŸ‡¸', 'Cape Verde': 'ðŸ‡¨ðŸ‡»', 'Saudi Arabia': 'ðŸ‡¸ðŸ‡¦', 'Uruguay': 'ðŸ‡ºðŸ‡¾',
+  'France': 'ðŸ‡«ðŸ‡·', 'Senegal': 'ðŸ‡¸ðŸ‡³', 'Iraq': 'ðŸ‡®ðŸ‡¶', 'Norway': 'ðŸ‡³ðŸ‡´',
+  'Argentina': 'ðŸ‡¦ðŸ‡·', 'Algeria': 'ðŸ‡©ðŸ‡¿', 'Austria': 'ðŸ‡¦ðŸ‡¹', 'Jordan': 'ðŸ‡¯ðŸ‡´',
+  'Portugal': 'ðŸ‡µðŸ‡¹', 'DR Congo': 'ðŸ‡¨ðŸ‡©', 'Uzbekistan': 'ðŸ‡ºðŸ‡¿', 'Colombia': 'ðŸ‡¨ðŸ‡´',
+  'England': 'ðŸ´ó §ó ¢ó ¥ó ®ó §ó ¿', 'Croatia': 'ðŸ‡­ðŸ‡·', 'Ghana': 'ðŸ‡¬ðŸ‡­', 'Panama': 'ðŸ‡µðŸ‡¦',
 }
 
-// ─── SYSTÈME DE RARETÉ (cote de popularité + potentiel FC25) ─────────────────
+// â”€â”€â”€ SYSTÃˆME DE RARETÃ‰ (cote de popularitÃ© + potentiel FC25) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
-// Tier Legend garanti : superstars mondiales dont la renommée dépasse les stats
+// Tier Legend garanti : superstars mondiales dont la renommÃ©e dÃ©passe les stats
 // Tier Epic garanti   : stars internationales de premier plan
-// Pour tous les autres : score FC25 pondéré par poste → seuils automatiques
-//   ≥86 → Legend | ≥76 → Epic | ≥65 → Rare | <65 → Common
+// Pour tous les autres : score FC25 pondÃ©rÃ© par poste â†’ seuils automatiques
+//   â‰¥86 â†’ Legend | â‰¥76 â†’ Epic | â‰¥65 â†’ Rare | <65 â†’ Common
 
 const LEGEND_FLOOR = new Set([
-  // Attaquants / milieux offensifs — icônes planétaires
-  'kylian mbappe', 'kylian mbappé', 'lionel messi', 'cristiano ronaldo',
-  'erling haaland', 'vinicius jr', 'vinícius júnior', 'vinicius junior',
+  // Attaquants / milieux offensifs â€” icÃ´nes planÃ©taires
+  'kylian mbappe', 'kylian mbappÃ©', 'lionel messi', 'cristiano ronaldo',
+  'erling haaland', 'vinicius jr', 'vinÃ­cius jÃºnior', 'vinicius junior',
   'jude bellingham', 'lamine yamal', 'jamal musiala', 'florian wirtz',
   'pedri', 'rodri', 'bukayo saka', 'phil foden',
-  'mohamed salah', 'sadio mane', 'sadio mané',
+  'mohamed salah', 'sadio mane', 'sadio manÃ©',
   'harry kane', 'son heung-min', 'son heungmin',
-  'neymar', 'neymar jr', 'darwin nunez', 'darwin núñez',
-  'lautaro martinez', 'julian alvarez', 'julián álvarez',
-  // Milieux / défenseurs — légendes du jeu
-  'kevin de bruyne', 'luka modric', 'luka modrić',
-  'martin odegaard', 'martin ødegaard', 'federico valverde',
-  // Défenseurs / GK
-  'virgil van dijk', 'ruben dias', 'rúben dias',
+  'neymar', 'neymar jr', 'darwin nunez', 'darwin nÃºÃ±ez',
+  'lautaro martinez', 'julian alvarez', 'juliÃ¡n Ã¡lvarez',
+  // Milieux / dÃ©fenseurs â€” lÃ©gendes du jeu
+  'kevin de bruyne', 'luka modric', 'luka modriÄ‡',
+  'martin odegaard', 'martin Ã¸degaard', 'federico valverde',
+  // DÃ©fenseurs / GK
+  'virgil van dijk', 'ruben dias', 'rÃºben dias',
   'thibaut courtois', 'alisson', 'ederson', 'emiliano martinez',
-  // Romelu Lukaku — record de buts en sélection belge
+  // Romelu Lukaku â€” record de buts en sÃ©lection belge
   'romelu lukaku',
 ])
 
 const EPIC_FLOOR = new Set([
   // France
-  'ousmane dembele', 'ousmane dembélé', 'marcus thuram', 'antoine griezmann',
-  'aurelien tchouameni', 'aurélien tchouaméni', 'theo hernandez', 'théo hernandez',
+  'ousmane dembele', 'ousmane dembÃ©lÃ©', 'marcus thuram', 'antoine griezmann',
+  'aurelien tchouameni', 'aurÃ©lien tchouamÃ©ni', 'theo hernandez', 'thÃ©o hernandez',
   'william saliba', 'mike maignan', 'randal kolo muani', 'bradley barcola',
   // Angleterre
   'declan rice', 'marcus rashford', 'trent alexander-arnold',
@@ -64,12 +63,12 @@ const EPIC_FLOOR = new Set([
   'gavi', 'nico williams', 'dani carvajal', 'alejandro grimaldo',
   'ferran torres', 'alvaro morata', 'pau torres',
   // Allemagne
-  'leroy sane', 'leroy sané', 'kai havertz', 'thomas muller', 'thomas müller',
-  'antonio rudiger', 'antonio rüdiger', 'joshua kimmich', 'ilkay gundogan',
+  'leroy sane', 'leroy sanÃ©', 'kai havertz', 'thomas muller', 'thomas mÃ¼ller',
+  'antonio rudiger', 'antonio rÃ¼diger', 'joshua kimmich', 'ilkay gundogan',
   'serge gnabry', 'josko gvardiol',
   // Portugal
-  'bruno fernandes', 'bernardo silva', 'rafael leao', 'rafael leão',
-  'joao felix', 'joao félix', 'diogo jota', 'vitinha', 'joao neves',
+  'bruno fernandes', 'bernardo silva', 'rafael leao', 'rafael leÃ£o',
+  'joao felix', 'joao fÃ©lix', 'diogo jota', 'vitinha', 'joao neves',
   'nuno mendes', 'joao cancelo',
   // Pays-Bas
   'cody gakpo', 'frenkie de jong', 'ryan gravenberch', 'xavi simons',
@@ -79,15 +78,15 @@ const EPIC_FLOOR = new Set([
   'amadou onana', 'youri tielemans', 'alexis saelemaekers', 'charles de ketelaere',
   'leandro trossard',
   // Argentine
-  'alexis mac allister', 'enzo fernandez', 'enzo fernández', 'rodrigo de paul',
+  'alexis mac allister', 'enzo fernandez', 'enzo fernÃ¡ndez', 'rodrigo de paul',
   'cristian romero', 'lisandro martinez', 'nahuel molina', 'leandro paredes',
-  // Brésil
-  'raphinha', 'rodrygo', 'gabriel martinelli', 'lucas paqueta', 'lucas paquetá',
+  // BrÃ©sil
+  'raphinha', 'rodrygo', 'gabriel martinelli', 'lucas paqueta', 'lucas paquetÃ¡',
   'marquinhos', 'eder militao', 'casemiro', 'endrick', 'bruno guimaraes',
   // Croatie
-  'ivan perisic', 'ivan perišić', 'mateo kovacic', 'mateo kovačić',
-  'andrej kramaric', 'andrej kramarić', 'marcelo brozovic',
-  // Sénégal
+  'ivan perisic', 'ivan periÅ¡iÄ‡', 'mateo kovacic', 'mateo kovaÄiÄ‡',
+  'andrej kramaric', 'andrej kramariÄ‡', 'marcelo brozovic',
+  // SÃ©nÃ©gal
   'kalidou koulibaly', 'idrissa gana gueye', 'ismaila sarr', 'nicolas jackson',
   'pape matar sarr', 'lamine camara',
   // Maroc
@@ -96,7 +95,7 @@ const EPIC_FLOOR = new Set([
   // Japon
   'kaoru mitoma', 'takefusa kubo', 'daichi kamada', 'wataru endo', 'ritsu doan',
   'junya ito', 'takehiro tomiyasu',
-  // Corée du Sud
+  // CorÃ©e du Sud
   'kim minjae', 'hwang hee-chan', 'lee kangin',
   // Mexique
   'santiago gimenez', 'hirving lozano', 'edson alvarez', 'raul jimenez',
@@ -108,29 +107,29 @@ const EPIC_FLOOR = new Set([
   // Uruguay
   'rodrigo bentancur', 'jose maria gimenez', 'facundo torres',
   // Colombie
-  'luis diaz', 'luis díaz', 'moises caicedo', 'moisés caicedo',
-  'james rodriguez', 'james rodríguez', 'davinson sanchez',
+  'luis diaz', 'luis dÃ­az', 'moises caicedo', 'moisÃ©s caicedo',
+  'james rodriguez', 'james rodrÃ­guez', 'davinson sanchez',
   // Turquie
-  'hakan calhanoglu', 'hakan çalhanoğlu', 'arda guler', 'kenan yildiz', 'merih demiral',
-  // Algérie
+  'hakan calhanoglu', 'hakan Ã§alhanoÄŸlu', 'arda guler', 'kenan yildiz', 'merih demiral',
+  // AlgÃ©rie
   'riyad mahrez', 'houssem aouar', 'amine gouiri', 'ramy bensebaini',
-  // Suède
+  // SuÃ¨de
   'alexander isak', 'dejan kulusevski', 'viktor gyokeres', 'emil forsberg',
   // Suisse
   'granit xhaka', 'yann sommer', 'breel embolo', 'xherdan shaqiri', 'manuel akanji',
-  // Norvège
+  // NorvÃ¨ge
   'alexander sorloth',
-  // Écosse
+  // Ã‰cosse
   'scott mctominay', 'andy robertson', 'john mcginn',
   // Ghana
   'thomas partey', 'jordan ayew',
-  // Côte d'Ivoire
-  'franck kessie', 'franck kessié', 'sebastien haller', 'sébastien haller',
-  // Égypte
+  // CÃ´te d'Ivoire
+  'franck kessie', 'franck kessiÃ©', 'sebastien haller', 'sÃ©bastien haller',
+  // Ã‰gypte
   'omar marmoush',
   // Iran
   'mehdi taremi', 'sardar azmoun',
-  // Équateur
+  // Ã‰quateur
   'enner valencia',
   // Australie
   'mathew leckie',
@@ -138,7 +137,7 @@ const EPIC_FLOOR = new Set([
   'rayan cherki',
 ])
 
-// Score global pondéré par poste (basé sur FC25)
+// Score global pondÃ©rÃ© par poste (basÃ© sur FC25)
 function positionOverall(
   s: { pace: number; shooting: number; passing: number; defending: number; dribbling: number; physical: number },
   pos: string
@@ -154,11 +153,11 @@ function positionOverall(
 function assignRarity(name: string, pos: string): CardRarity {
   const n = name.toLowerCase()
 
-  // Plancher garanti par la renommée mondiale
+  // Plancher garanti par la renommÃ©e mondiale
   if (LEGEND_FLOOR.has(n)) return 'Legend'
   if (EPIC_FLOOR.has(n)) return 'Epic'
 
-  // Score FC25 pour les joueurs avec des stats réelles
+  // Score FC25 pour les joueurs avec des stats rÃ©elles
   const fc25 = getFC25Stats(name)
   if (fc25) {
     const score = positionOverall(fc25, pos)
@@ -168,7 +167,7 @@ function assignRarity(name: string, pos: string): CardRarity {
     return 'Common'
   }
 
-  // Fallback déterministe pour les joueurs sans stats FC25
+  // Fallback dÃ©terministe pour les joueurs sans stats FC25
   // Distribution : ~3% Epic, ~22% Rare, ~75% Common
   let hash = 0
   for (const c of n) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff
@@ -183,7 +182,7 @@ function generateStats(pos: string, name: string) {
   const fc25 = getFC25Stats(name)
   if (fc25) return fc25
 
-  // Fallback déterministe par position
+  // Fallback dÃ©terministe par position
   let seed = 0
   for (const c of name) seed = (seed * 31 + c.charCodeAt(0)) & 0xffffffff
   seed = Math.abs(seed)
@@ -197,7 +196,7 @@ function generateStats(pos: string, name: string) {
   return { pace: v(86, 10), shooting: v(85, 10), passing: v(72), defending: v(38), dribbling: v(84, 10), physical: v(74) }
 }
 
-// ─── TheSportsDB PHOTO SEARCH ─────────────────────────────────────────────────
+// â”€â”€â”€ TheSportsDB PHOTO SEARCH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface SportsDBPlayer {
   strPlayer: string
   strSport: string | null
@@ -205,7 +204,7 @@ interface SportsDBPlayer {
   strCutout: string | null
 }
 
-// Search for a player by name → return best photo URL
+// Search for a player by name â†’ return best photo URL
 async function fetchPlayerPhoto(playerName: string): Promise<string | null> {
   try {
     // Use last name or full name for better results
@@ -244,7 +243,7 @@ async function fetchPhotoBatch(names: string[]): Promise<Record<string, string |
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// ─── ROUTE ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ ROUTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -267,7 +266,7 @@ export async function POST(request: Request) {
 
   const existing = existingRaw ?? []
 
-  // Map "name||nation" → premier id trouvé (garde une seule carte par joueur)
+  // Map "name||nation" â†’ premier id trouvÃ© (garde une seule carte par joueur)
   const existingMap = new Map<string, { id: string; image_url: string | null }>()
   const allExistingIds = new Set<string>()
   for (const c of existing) {
@@ -276,7 +275,7 @@ export async function POST(request: Request) {
     if (!existingMap.has(key)) existingMap.set(key, { id: c.id, image_url: c.image_url })
   }
 
-  // Images uploadées manuellement à préserver
+  // Images uploadÃ©es manuellement Ã  prÃ©server
   const savedImages: Record<string, string> = {}
   for (const c of existing) {
     if (c.image_url?.includes('supabase.co')) savedImages[c.name] = c.image_url
@@ -308,9 +307,9 @@ export async function POST(request: Request) {
     }
   }
 
-  // 4. Build card rows — inclure l'id existant si le joueur est déjà en DB
+  // 4. Build card rows â€” inclure l'id existant si le joueur est dÃ©jÃ  en DB
   const cards = allPlayers.map((p) => {
-    const flag = FLAGS[p.team] ?? '🏳'
+    const flag = FLAGS[p.team] ?? 'ðŸ³'
     const rarity: CardRarity = p.isCoach ? 'Rare' : assignRarity(p.name, p.pos)
     const found = existingMap.get(`${p.name}||${p.team}`)
     return {
@@ -320,24 +319,24 @@ export async function POST(request: Request) {
       rarity,
       image_url: savedImages[p.name] ?? photoMap[p.name] ?? found?.image_url ?? null,
       nation: p.team,
-      description: p.isCoach ? `${flag} ${p.team} · Coach` : `${flag} ${p.team} · ${p.pos}`,
+      description: p.isCoach ? `${flag} ${p.team} Â· Coach` : `${flag} ${p.team} Â· ${p.pos}`,
       stats: { ...generateStats(p.pos, p.name), position: p.pos },
     }
   })
 
-  // 5. Nettoyer les doublons — y compris ceux possédés (migrer user_cards vers la carte canonique)
+  // 5. Nettoyer les doublons â€” y compris ceux possÃ©dÃ©s (migrer user_cards vers la carte canonique)
   const keepIds = new Set(cards.filter((c) => 'id' in c).map((c) => (c as { id: string }).id))
   const orphanIds = Array.from(allExistingIds).filter((id) => !keepIds.has(id))
 
   if (orphanIds.length > 0) {
-    // Récupérer toutes les user_cards pointant sur des doublons
+    // RÃ©cupÃ©rer toutes les user_cards pointant sur des doublons
     const { data: ownedOrphans } = await admin
       .from('user_cards')
       .select('id, user_id, card_id')
       .in('card_id', orphanIds)
 
     if (ownedOrphans && ownedOrphans.length > 0) {
-      // Construire la map orphan_id → canonical_id
+      // Construire la map orphan_id â†’ canonical_id
       const orphanToCanonical = new Map<string, string>()
       for (const orphanId of orphanIds) {
         const orphanCard = existing.find((c) => c.id === orphanId)
@@ -346,7 +345,7 @@ export async function POST(request: Request) {
         if (canonical) orphanToCanonical.set(orphanId, canonical.id)
       }
 
-      // Vérifier quels users possèdent déjà la carte canonique
+      // VÃ©rifier quels users possÃ¨dent dÃ©jÃ  la carte canonique
       const affectedUserIds = Array.from(new Set(ownedOrphans.map((uc) => uc.user_id)))
       const canonicalIds = Array.from(new Set(orphanToCanonical.values()))
       const { data: alreadyOwned } = await admin
@@ -366,10 +365,10 @@ export async function POST(request: Request) {
         const canonicalId = orphanToCanonical.get(uc.card_id)
         if (!canonicalId) { ucToDelete.push(uc.id); continue }
         if (ownsCanonical.has(`${uc.user_id}__${canonicalId}`)) {
-          // User possède déjà la canonique → supprimer le doublon
+          // User possÃ¨de dÃ©jÃ  la canonique â†’ supprimer le doublon
           ucToDelete.push(uc.id)
         } else {
-          // User ne possède que le doublon → rediriger vers la canonique
+          // User ne possÃ¨de que le doublon â†’ rediriger vers la canonique
           ucToUpdate.push({ id: uc.id, card_id: canonicalId })
         }
       }
@@ -381,7 +380,7 @@ export async function POST(request: Request) {
         await admin.from('user_cards').update({ card_id: u.card_id }).eq('id', u.id)
     }
 
-    // Supprimer tous les doublons (plus aucune FK ne les référence)
+    // Supprimer tous les doublons (plus aucune FK ne les rÃ©fÃ©rence)
     await admin.from('cards').delete().in('id', orphanIds)
   }
 

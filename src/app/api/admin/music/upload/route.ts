@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export const dynamic = 'force-dynamic'
 
 async function checkAdmin() {
   const supabase = await createClient()
@@ -34,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const allowedTypes = ['audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/aac', 'audio/mp4', 'audio/x-m4a']
   if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp3|ogg|wav|aac|m4a)$/i)) {
-    return NextResponse.json({ error: 'Format audio non supporté (mp3, ogg, wav, aac, m4a)' }, { status: 400 })
+    return NextResponse.json({ error: 'Format audio non supportÃ© (mp3, ogg, wav, aac, m4a)' }, { status: 400 })
   }
 
   if (file.size > 30 * 1024 * 1024) {
@@ -43,13 +42,13 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Créer le bucket si nécessaire
+  // CrÃ©er le bucket si nÃ©cessaire
   const { error: bucketError } = await admin.storage.createBucket('music', {
     public: true,
     allowedMimeTypes: allowedTypes,
     fileSizeLimit: 31457280,
   })
-  // Ignorer l'erreur si le bucket existe déjà
+  // Ignorer l'erreur si le bucket existe dÃ©jÃ 
   if (bucketError && !bucketError.message.includes('already exists') && !bucketError.message.includes('Duplicate')) {
     console.warn('[music bucket]', bucketError.message)
   }
@@ -73,7 +72,7 @@ export async function POST(req: NextRequest) {
   const { data: urlData } = admin.storage.from('music').getPublicUrl(uploaded.path)
   const publicUrl = urlData.publicUrl
 
-  // Sauvegarder les métadonnées en DB
+  // Sauvegarder les mÃ©tadonnÃ©es en DB
   const name = trackName.trim() || file.name.replace(/\.[^.]+$/, '')
   const { data: track, error: dbError } = await admin
     .from('music_tracks')
@@ -89,7 +88,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (dbError) {
-    // Nettoyer le fichier uploadé si l'insert DB échoue
+    // Nettoyer le fichier uploadÃ© si l'insert DB Ã©choue
     await admin.storage.from('music').remove([uploaded.path])
     return NextResponse.json({ error: dbError.message }, { status: 500 })
   }

@@ -5,7 +5,6 @@ import { getBotPicksFromPool } from '@/lib/tournament-engine'
 import { sendPushToUser } from '@/lib/push'
 import type { Card } from '@/types'
 
-export const dynamic = 'force-dynamic'
 
 const WINNER_COINS  = 75
 
@@ -66,50 +65,52 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   // ── PHASE SEMI : vérifier si les deux demi-finales sont terminées ─────────
   if (t.status !== 'semi_active') return NextResponse.json({ status: t.status })
 
-  // Résultat semi1
   let semi1Done = !!t.semi1
   let semi1WinnerId: string | null = t.semi1_winner_id ?? null
   let semi1WinnerSlot = t.semi1_winner_slot ?? null
 
-  if (!semi1Done && t.semi1_duel_id) {
-    const { data: d1, error: d1Err } = await admin.from('duels')
-      .select('winner_id, challenger_id, challenger_score, opponent_score, match_events')
-      .eq('id', t.semi1_duel_id).single()
-    if (d1Err) console.error('[advance] select semi1 duel failed:', d1Err)
-    if (d1?.winner_id) {
-      const challWon1  = d1.winner_id === d1.challenger_id
-      semi1Done        = true
-      semi1WinnerId    = d1.winner_id
-      semi1WinnerSlot  = challWon1 ? 0 : 1
-      await admin.from('tournaments').update({
-        semi1: { scoreA: d1.challenger_score, scoreB: d1.opponent_score, events: d1.match_events, winner: semi1WinnerSlot },
-        semi1_winner_id:   semi1WinnerId,
-        semi1_winner_slot: semi1WinnerSlot,
-      }).eq('id', id)
-    }
-  }
-
-  // Résultat semi2
   let semi2Done = !!t.semi2
   let semi2WinnerId: string | null = t.semi2_winner_id ?? null
   let semi2WinnerSlot = t.semi2_winner_slot ?? null
 
-  if (!semi2Done && t.semi2_duel_id) {
-    const { data: d2, error: d2Err } = await admin.from('duels')
-      .select('winner_id, challenger_id, challenger_score, opponent_score, match_events')
-      .eq('id', t.semi2_duel_id).single()
-    if (d2Err) console.error('[advance] select semi2 duel failed:', d2Err)
-    if (d2?.winner_id) {
-      const challWon2  = d2.winner_id === d2.challenger_id
-      semi2Done        = true
-      semi2WinnerId    = d2.winner_id
-      semi2WinnerSlot  = challWon2 ? 2 : 3
-      await admin.from('tournaments').update({
-        semi2: { scoreA: d2.challenger_score, scoreB: d2.opponent_score, events: d2.match_events, winner: semi2WinnerSlot },
-        semi2_winner_id:   semi2WinnerId,
-        semi2_winner_slot: semi2WinnerSlot,
-      }).eq('id', id)
-    }
+  // Fetch both pending semi results in parallel
+  const [semi1Fetch, semi2Fetch] = await Promise.all([
+    (!semi1Done && t.semi1_duel_id)
+      ? admin.from('duels').select('winner_id, challenger_id, challenger_score, opponent_score, match_events').eq('id', t.semi1_duel_id).single()
+      : Promise.resolve({ data: null, error: null }),
+    (!semi2Done && t.semi2_duel_id)
+      ? admin.from('duels').select('winner_id, challenger_id, challenger_score, opponent_score, match_events').eq('id', t.semi2_duel_id).single()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
+  if (semi1Fetch.error) console.error('[advance] select semi1 duel failed:', semi1Fetch.error)
+  if (semi2Fetch.error) console.error('[advance] select semi2 duel failed:', semi2Fetch.error)
+
+  const d1 = semi1Fetch.data
+  const d2 = semi2Fetch.data
+
+  if (!semi1Done && d1?.winner_id) {
+    const challWon1 = d1.winner_id === d1.challenger_id
+    semi1Done       = true
+    semi1WinnerId   = d1.winner_id
+    semi1WinnerSlot = challWon1 ? 0 : 1
+    await admin.from('tournaments').update({
+      semi1: { scoreA: d1.challenger_score, scoreB: d1.opponent_score, events: d1.match_events, winner: semi1WinnerSlot },
+      semi1_winner_id:   semi1WinnerId,
+      semi1_winner_slot: semi1WinnerSlot,
+    }).eq('id', id)
+  }
+
+  if (!semi2Done && d2?.winner_id) {
+    const challWon2 = d2.winner_id === d2.challenger_id
+    semi2Done       = true
+    semi2WinnerId   = d2.winner_id
+    semi2WinnerSlot = challWon2 ? 2 : 3
+    await admin.from('tournaments').update({
+      semi2: { scoreA: d2.challenger_score, scoreB: d2.opponent_score, events: d2.match_events, winner: semi2WinnerSlot },
+      semi2_winner_id:   semi2WinnerId,
+      semi2_winner_slot: semi2WinnerSlot,
+    }).eq('id', id)
   }
 
   // Cas bot-vs-bot : semi2 JSONB déjà set par launchSemis mais winner_slot jamais stocké
