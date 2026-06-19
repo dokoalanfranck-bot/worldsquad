@@ -7,7 +7,8 @@ import { X, Coins, ShoppingBag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const THRESHOLD = 120
-const LS_KEY = 'low_coins_prompted'
+const LS_KEY = 'low_coins_prompted_at'
+const COOLDOWN_MS = 24 * 60 * 60 * 1000 // re-show after 24h if still below threshold
 
 export function LowCoinsModal({ userId, initialCoins }: { userId: string; initialCoins: number }) {
   const router = useRouter()
@@ -17,11 +18,19 @@ export function LowCoinsModal({ userId, initialCoins }: { userId: string; initia
   const coinsRef = useRef(coins)
   useEffect(() => { coinsRef.current = coins }, [coins])
 
-  // Show modal if already below threshold on mount (and not yet prompted)
+  function shouldShow(): boolean {
+    const stored = localStorage.getItem(LS_KEY)
+    if (!stored) return true
+    return Date.now() - parseInt(stored) > COOLDOWN_MS
+  }
+
+  function markShown() { localStorage.setItem(LS_KEY, Date.now().toString()) }
+
+  // Show modal if already below threshold on mount
   useEffect(() => {
-    if (initialCoins < THRESHOLD && !localStorage.getItem(LS_KEY)) {
+    if (initialCoins < THRESHOLD && shouldShow()) {
       setVisible(true)
-      localStorage.setItem(LS_KEY, '1')
+      markShown()
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -42,10 +51,10 @@ export function LowCoinsModal({ userId, initialCoins }: { userId: string; initia
             localStorage.removeItem(LS_KEY)
           }
 
-          // Show once when crossing below threshold
-          if (newCoins < THRESHOLD && prev >= THRESHOLD && !localStorage.getItem(LS_KEY)) {
+          // Show when crossing below threshold (respects 24h cooldown)
+          if (newCoins < THRESHOLD && prev >= THRESHOLD && shouldShow()) {
             setVisible(true)
-            localStorage.setItem(LS_KEY, '1')
+            markShown()
           }
         }
       )
