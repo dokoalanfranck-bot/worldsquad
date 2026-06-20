@@ -16,6 +16,7 @@ async function buildBotPicks(
     .from('cards')
     .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
     .eq('type', 'player')
+    .neq('rarity', 'Legend')
     .limit(200)
   const pool = seededShuffle((data ?? []) as Card[], seed)
   return getBotPicksFromPool(pool, seed)

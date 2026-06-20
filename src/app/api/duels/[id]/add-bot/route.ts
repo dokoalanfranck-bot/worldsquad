@@ -26,6 +26,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { data: cards } = await admin
     .from('cards')
     .select('id, name, rarity, image_url, stats, type, nation, description, created_at')
+    .neq('rarity', 'Legend')
     .limit(200)
 
   const pool    = seededShuffle((cards ?? []) as unknown as Card[], duelId)
@@ -36,7 +37,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const coach = coaches[0]   ?? pool[pool.length - 1]
   const gk    = goalkeepers[0] ?? pool[pool.length - 2]
-  const field = fieldCards.slice(0, 4)
+
+  // Max 1 carte Epic parmi les 4 joueurs de champ
+  const epicField    = fieldCards.filter((c) => c.rarity === 'Epic').slice(0, 1)
+  const nonEpicField = fieldCards.filter((c) => c.rarity !== 'Epic')
+  const field = [...epicField, ...nonEpicField].slice(0, 4)
 
   const botPicks: Card[] = [...field, gk, coach].filter(Boolean).slice(0, 6)
 

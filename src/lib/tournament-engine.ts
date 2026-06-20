@@ -17,10 +17,16 @@ export function selectBestSix(cards: Card[]): Card[] {
 }
 
 export function getBotPicksFromPool(pool: Card[], seed: string): Card[] {
-  const shuffled = seededShuffle(pool, seed)
+  // Jamais de cartes légendaires pour les bots
+  const filtered = pool.filter((c) => c.rarity !== 'Legend')
+  const shuffled = seededShuffle(filtered, seed)
   const coach    = shuffled.find(isCoach)
   const gk       = shuffled.find(isGK)
-  const field    = shuffled.filter((c) => !isCoach(c) && !isGK(c))
+  const fieldAll = shuffled.filter((c) => !isCoach(c) && !isGK(c))
+  // Max 1 carte Epic parmi les joueurs de champ
+  const epicField    = fieldAll.filter((c) => c.rarity === 'Epic').slice(0, 1)
+  const nonEpicField = fieldAll.filter((c) => c.rarity !== 'Epic')
+  const field    = [...epicField, ...nonEpicField]
   const picks: Card[] = []
   if (gk) picks.push(gk)
   if (coach) picks.push(coach)
