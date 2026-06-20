@@ -50,15 +50,23 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check both directions separately (reliable, avoids nested PostgREST syntax)
+  // Check both directions — only block on active states (pending / accepted)
+  // A declined friendship must NOT block a new request
   const [{ data: dir1 }, { data: dir2 }] = await Promise.all([
-    admin.from('friendships').select('id').eq('requester_id', user.id).eq('addressee_id', targetId).limit(1),
-    admin.from('friendships').select('id').eq('requester_id', targetId).eq('addressee_id', user.id).limit(1),
+    admin.from('friendships').select('id').eq('requester_id', user.id).eq('addressee_id', targetId).in('status', ['pending', 'accepted']).limit(1),
+    admin.from('friendships').select('id').eq('requester_id', targetId).eq('addressee_id', user.id).in('status', ['pending', 'accepted']).limit(1),
   ])
 
   if ((dir1 && dir1.length > 0) || (dir2 && dir2.length > 0)) {
     return NextResponse.json({ error: 'Demande déjà envoyée ou amitié existante' }, { status: 409 })
   }
+
+  // Clean up any lingering declined rows before inserting a fresh request
+  await admin.from('friendships')
+    .delete()
+    .eq('requester_id', user.id)
+    .eq('addressee_id', targetId)
+    .eq('status', 'declined')
 
   const { data, error } = await admin
     .from('friendships')
