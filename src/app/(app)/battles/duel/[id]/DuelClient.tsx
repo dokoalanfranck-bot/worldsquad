@@ -601,6 +601,8 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channelRef = useRef<any>(null)
   const sentIds = useRef(new Set<string>())
+  const prevMyGoalsRef = useRef(0)
+  const prevTheirGoalsRef = useRef(0)
 
   // Realtime broadcast chat (skip for bot duels)
   useEffect(() => {
@@ -625,6 +627,43 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
     setChatMsgs((prev) => [...prev.slice(-4), msg])
     setTimeout(() => setChatMsgs((prev) => prev.filter((m) => m.id !== msgId)), 3500)
   }
+
+  const pushBotMsg = (text: string) => {
+    const msgId = `bot-${Date.now()}-${Math.random()}`
+    setChatMsgs((prev) => [...prev.slice(-4), { id: msgId, text, isMine: false }])
+    setTimeout(() => setChatMsgs((prev) => prev.filter((m) => m.id !== msgId)), 3500)
+  }
+
+  // Bot réagit aux buts en temps réel
+  useEffect(() => {
+    if (!duel.is_bot) return
+    const BOT_GOAL  = ['BUT !!! ⚽', '🔥', '👑', 'GG 👏', '😂']
+    const BOT_FRUST = ['Noooon 😱', '💀', 'Chanceux 😤', '😤']
+    if (theirGoals > prevTheirGoalsRef.current) {
+      prevTheirGoalsRef.current = theirGoals
+      setTimeout(() => pushBotMsg(BOT_GOAL[Math.floor(Math.random() * BOT_GOAL.length)]), 300 + Math.random() * 700)
+    }
+    if (myGoals > prevMyGoalsRef.current) {
+      prevMyGoalsRef.current = myGoals
+      setTimeout(() => pushBotMsg(BOT_FRUST[Math.floor(Math.random() * BOT_FRUST.length)]), 400 + Math.random() * 900)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myGoals, theirGoals, duel.is_bot])
+
+  // Bot envoie 1-2 messages aléatoires pendant le match
+  useEffect(() => {
+    if (!duel.is_bot) return
+    const RANDOM = ['🔥', '😂', 'GG 👏', '💀', '⚽']
+    const count = 1 + Math.floor(Math.random() * 2)
+    const ids: ReturnType<typeof setTimeout>[] = []
+    for (let i = 0; i < count; i++) {
+      ids.push(setTimeout(() => {
+        pushBotMsg(RANDOM[Math.floor(Math.random() * RANDOM.length)])
+      }, 4000 + Math.random() * 20000))
+    }
+    return () => { ids.forEach(clearTimeout) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duel.is_bot])
 
   const events = useMemo(() => {
     const raw = (duel.match_events ?? []) as DuelEvent[]
@@ -840,7 +879,7 @@ function AnimationView({ duel, isChallenger, me, them }: { duel: Duel; isChallen
     </AnimatePresence>
 
     {/* Quick chat bar — en dehors de motion.div */}
-    {!duel.is_bot && !isFinished && (
+    {!isFinished && (
       <div
         className="fixed left-0 right-0 z-[70] px-3 py-2 flex gap-2 overflow-x-auto no-scrollbar"
         style={{
