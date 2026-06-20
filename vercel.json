@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/reset-daily-leaderboard",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/kick-off-matches",
+      "schedule": "*/5 * * * *"
     }
   ],
   "headers": [

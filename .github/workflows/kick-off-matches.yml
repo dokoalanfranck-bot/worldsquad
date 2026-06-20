@@ -1,0 +1,17 @@
+name: kick-off-matches
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  kick-off:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger kick-off cron
+        run: |
+          curl -sf -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/kick-off-matches" \
+            || echo "Cron call failed (non-blocking)"
