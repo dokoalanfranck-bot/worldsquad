@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Calendar, Layers, Swords, Users,
   Trophy, ShoppingBag, Settings, Crown, Globe, Gift,
   Menu, X, Shield, ChevronRight, type LucideIcon,
-  CreditCard, Repeat2, Radio, UserPlus, TrendingUp,
+  CreditCard, Repeat2, Radio, UserPlus, TrendingUp, Film,
 } from 'lucide-react'
 import { CoinDisplay } from '@/components/ui/CoinDisplay'
 import type { User } from '@/types'
@@ -25,9 +25,10 @@ const DESKTOP_SECTIONS: { label: string; items: { href: string; icon: LucideIcon
   {
     label: 'Compétition',
     items: [
-      { href: '/matches',  icon: Calendar,    label: 'Matchs & Pronostics' },
-      { href: '/live',     icon: Radio,       label: 'Match en Direct' },
-      { href: '/leaderboard', icon: Trophy,   label: 'Classement' },
+      { href: '/matches',    icon: Calendar, label: 'Matchs & Pronostics' },
+      { href: '/highlights', icon: Film,     label: 'Résumés Vidéo' },
+      { href: '/live',       icon: Radio,    label: 'Match en Direct' },
+      { href: '/leaderboard', icon: Trophy,  label: 'Classement' },
     ],
   },
   {
@@ -68,6 +69,7 @@ const MOBILE_LEFT = [
 ]
 const MOBILE_RIGHT = [
   { href: '/matches',     icon: TrendingUp, label: 'Matchs' },
+  { href: '/highlights',  icon: Film,       label: 'Résumés' },
 ]
 
 // ── Mobile drawer sections ─────────────────────────────────────────────────
@@ -77,6 +79,7 @@ const DRAWER_SECTIONS: { label: string; items: { href: string; icon: LucideIcon;
     label: 'Compétition',
     items: [
       { href: '/leaderboard', icon: Trophy,    label: 'Classement' },
+      { href: '/highlights',  icon: Film,      label: 'Résumés Vidéo' },
       { href: '/live',        icon: Radio,     label: 'Match en Direct' },
     ],
   },
