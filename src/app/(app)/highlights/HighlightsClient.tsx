@@ -7,12 +7,15 @@ import { Play, X, Film } from 'lucide-react'
 interface Highlight {
   id: string
   title: string
-  youtube_id: string
+  youtube_id: string | null
+  video_url: string | null
   created_at: string
 }
 
 function VideoCard({ highlight }: { highlight: Highlight }) {
   const [playing, setPlaying] = useState(false)
+
+  const isYoutube = !!highlight.youtube_id
 
   return (
     <motion.div
@@ -22,16 +25,25 @@ function VideoCard({ highlight }: { highlight: Highlight }) {
     >
       {playing ? (
         <div className="relative aspect-video bg-black">
-          <iframe
-            src={`https://www.youtube.com/embed/${highlight.youtube_id}?autoplay=1&rel=0`}
-            title={highlight.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="w-full h-full"
-          />
+          {isYoutube ? (
+            <iframe
+              src={`https://www.youtube.com/embed/${highlight.youtube_id}?autoplay=1&rel=0`}
+              title={highlight.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full"
+            />
+          ) : (
+            <video
+              src={highlight.video_url!}
+              autoPlay
+              controls
+              className="w-full h-full"
+            />
+          )}
           <button
             onClick={() => setPlaying(false)}
-            className="absolute top-2 right-2 w-8 h-8 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-black/90 transition-colors"
+            className="absolute top-2 right-2 w-8 h-8 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-black/90 transition-colors z-10"
           >
             <X size={14} />
           </button>
@@ -41,26 +53,31 @@ function VideoCard({ highlight }: { highlight: Highlight }) {
           onClick={() => setPlaying(true)}
           className="relative w-full aspect-video group overflow-hidden"
         >
-          {/* Thumbnail */}
-          <img
-            src={`https://img.youtube.com/vi/${highlight.youtube_id}/maxresdefault.jpg`}
-            alt={highlight.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={(e) => {
-              // fallback to mqdefault if maxresdefault unavailable
-              const img = e.currentTarget
-              if (!img.src.includes('mqdefault')) {
-                img.src = `https://img.youtube.com/vi/${highlight.youtube_id}/mqdefault.jpg`
-              }
-            }}
-          />
-          {/* Overlay */}
+          {isYoutube ? (
+            <img
+              src={`https://img.youtube.com/vi/${highlight.youtube_id}/maxresdefault.jpg`}
+              alt={highlight.title}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                const img = e.currentTarget
+                if (!img.src.includes('mqdefault')) {
+                  img.src = `https://img.youtube.com/vi/${highlight.youtube_id}/mqdefault.jpg`
+                }
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 group-hover:from-gray-700 group-hover:to-gray-800 transition-all duration-300" />
+          )}
+
+          {/* Overlay play */}
           <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors flex items-center justify-center">
             <motion.div
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-xl"
-              style={{ boxShadow: '0 0 30px rgba(220,38,38,0.5)' }}
+              className={`w-14 h-14 rounded-full flex items-center justify-center shadow-xl ${
+                isYoutube ? 'bg-red-600' : 'bg-blue-600'
+              }`}
+              style={{ boxShadow: isYoutube ? '0 0 30px rgba(220,38,38,0.5)' : '0 0 30px rgba(37,99,235,0.5)' }}
             >
               <Play size={24} fill="white" className="text-white ml-1" />
             </motion.div>
@@ -81,7 +98,6 @@ function VideoCard({ highlight }: { highlight: Highlight }) {
 export function HighlightsClient({ highlights }: { highlights: Highlight[] }) {
   return (
     <div className="dashboard-content min-h-screen px-4 py-6 max-w-2xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-2xl bg-red-600/15 flex items-center justify-center">
           <Film size={20} className="text-red-500" />
