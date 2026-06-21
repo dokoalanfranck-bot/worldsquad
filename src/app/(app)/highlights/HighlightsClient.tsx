@@ -14,6 +14,7 @@ interface Highlight {
 
 function VideoCard({ highlight }: { highlight: Highlight }) {
   const [playing, setPlaying] = useState(false)
+  const [videoError, setVideoError] = useState(false)
 
   const isYoutube = !!highlight.youtube_id
 
@@ -33,16 +34,24 @@ function VideoCard({ highlight }: { highlight: Highlight }) {
               allowFullScreen
               className="w-full h-full"
             />
+          ) : videoError ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-900 text-gray-400">
+              <span className="text-2xl">⚠️</span>
+              <p className="text-xs text-center px-4">Vidéo indisponible<br/>Vérifie que le bucket Supabase est public</p>
+            </div>
           ) : (
             <video
               src={highlight.video_url!}
               autoPlay
+              muted={false}
               controls
+              playsInline
               className="w-full h-full"
+              onError={() => setVideoError(true)}
             />
           )}
           <button
-            onClick={() => setPlaying(false)}
+            onClick={() => { setPlaying(false); setVideoError(false) }}
             className="absolute top-2 right-2 w-8 h-8 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-black/90 transition-colors z-10"
           >
             <X size={14} />
