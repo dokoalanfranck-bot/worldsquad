@@ -35,17 +35,24 @@ function VideoCard({ highlight }: { highlight: Highlight }) {
               className="w-full h-full"
             />
           ) : videoError ? (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-900 text-gray-400">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-900 text-gray-400 min-h-[180px]">
               <span className="text-2xl">⚠️</span>
-              <p className="text-xs text-center px-4">Vidéo indisponible<br/>Vérifie que le bucket Supabase est public</p>
+              <p className="text-xs text-center px-4">Impossible de lire la vidéo</p>
+              <a
+                href={highlight.video_url!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 text-xs underline mt-1"
+              >
+                Ouvrir dans un nouvel onglet
+              </a>
             </div>
           ) : (
             <video
               src={highlight.video_url!}
-              autoPlay
-              muted={false}
               controls
               playsInline
+              preload="metadata"
               className="w-full h-full"
               onError={() => setVideoError(true)}
             />
