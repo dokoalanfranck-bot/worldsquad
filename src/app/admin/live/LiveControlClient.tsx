@@ -967,6 +967,98 @@ function LiveMatchCard({
   )
 }
 
+// ── Compte à rebours ──────────────────────────────────────────────────────────
+
+function useCountdown(targetDate: string) {
+  const [diff, setDiff] = useState(() => new Date(targetDate).getTime() - Date.now())
+
+  useEffect(() => {
+    const tick = () => setDiff(new Date(targetDate).getTime() - Date.now())
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [targetDate])
+
+  if (diff <= 0) return { expired: true, display: '00:00:00' }
+
+  const totalSec = Math.floor(diff / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  return {
+    expired: false,
+    display: h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`,
+    totalSec,
+  }
+}
+
+function UpcomingMatchCard({
+  match,
+  startingId,
+  onStart,
+}: {
+  match: Match
+  startingId: string | null
+  onStart: (id: string) => void
+}) {
+  const { expired, display, totalSec } = useCountdown(match.match_date)
+  const hasStarted = useRef(false)
+
+  // Auto-démarrage quand le compteur expire (déclenché une seule fois)
+  useEffect(() => {
+    if (expired && !hasStarted.current && startingId !== match.id) {
+      hasStarted.current = true
+      onStart(match.id)
+    }
+  }, [expired, match.id, onStart, startingId])
+
+  const isImminent = !expired && (totalSec ?? Infinity) <= 300 // ≤ 5 min
+
+  return (
+    <div className={`glass rounded-xl p-4 border flex items-center gap-4 transition-colors ${
+      expired
+        ? 'border-red-500/40 bg-red-500/5'
+        : isImminent
+        ? 'border-yellow-500/40 bg-yellow-500/3'
+        : 'border-white/5'
+    }`}>
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="text-xl">{match.flag_a ?? '🏳'}</span>
+        <span className="text-white font-semibold text-sm truncate">{match.team_a}</span>
+        <span className="text-white/30 text-xs">vs</span>
+        <span className="text-white font-semibold text-sm truncate">{match.team_b}</span>
+        <span className="text-xl">{match.flag_b ?? '🏳'}</span>
+      </div>
+
+      {/* Countdown */}
+      <div className={`flex items-center gap-1.5 flex-shrink-0 font-mono font-black text-sm tabular-nums ${
+        expired ? 'text-red-400' : isImminent ? 'text-yellow-400' : 'text-white/50'
+      }`}>
+        <Clock size={12} className="opacity-60" />
+        {expired ? (
+          <span className="animate-pulse">DÉMARRAGE…</span>
+        ) : (
+          <span>{display}</span>
+        )}
+      </div>
+
+      <button
+        onClick={() => onStart(match.id)}
+        disabled={startingId === match.id}
+        className={`flex-shrink-0 px-4 py-2 rounded-xl border font-bold text-sm flex items-center gap-2 transition-colors disabled:opacity-40 ${
+          expired || isImminent
+            ? 'bg-red-500/25 border-red-500/40 text-red-300 hover:bg-red-500/35 animate-pulse'
+            : 'bg-red-500/15 border-red-500/25 text-red-400 hover:bg-red-500/25'
+        }`}
+      >
+        <Play size={13} /> DÉMARRER
+      </button>
+    </div>
+  )
+}
+
 export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled, players }: Props) {
   const supabase = createClient()
   const [live, setLive] = useState<Match[]>(initialLive)
@@ -1068,27 +1160,12 @@ export function LiveControlClient({ initialLive, initialUpcoming, cronEnabled, p
           <h2 className="font-bebas text-2xl text-[#F5C518] mb-4">PROCHAINS MATCHS</h2>
           <div className="space-y-2">
             {upcoming.map((match) => (
-              <div key={match.id} className="glass rounded-xl p-4 border border-white/5 flex items-center gap-4">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-xl">{match.flag_a ?? '🏳'}</span>
-                  <span className="text-white font-semibold text-sm truncate">{match.team_a}</span>
-                  <span className="text-white/30 text-xs">vs</span>
-                  <span className="text-white font-semibold text-sm truncate">{match.team_b}</span>
-                  <span className="text-xl">{match.flag_b ?? '🏳'}</span>
-                </div>
-                <span className="text-white/40 text-sm flex-shrink-0">
-                  {new Date(match.match_date).toLocaleString('fr-FR', {
-                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                  })}
-                </span>
-                <button
-                  onClick={() => startMatch(match.id)}
-                  disabled={startingId === match.id}
-                  className="flex-shrink-0 px-4 py-2 rounded-xl bg-red-500/15 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-40 text-red-400 text-sm font-bold flex items-center gap-2 transition-colors"
-                >
-                  <Play size={13} /> DÉMARRER
-                </button>
-              </div>
+              <UpcomingMatchCard
+                key={match.id}
+                match={match}
+                startingId={startingId}
+                onStart={startMatch}
+              />
             ))}
           </div>
         </div>
